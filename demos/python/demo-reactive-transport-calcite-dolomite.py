@@ -123,12 +123,13 @@ def simulate():
     # Initialize the concentrations (mol/m3) of the elements in each mesh cell
     b[:] = state_ic.elementAmounts()
 
-    # Initialize the concentrations (mol/m3) of each element on the boundary
+    # Initialize the concentrations of the elements in each mesh cell
+    b[:] = state_ic.elementAmounts()
+
+    # Initialize the concentrations of each element on the boundary
     b_bc = state_bc.elementAmounts()
 
-    # Step 7.8: Create a list of chemical states for the mesh cells
-
-    # The list of chemical states, one for each cell, initialized to state_ic
+    # The list of chemical states, one for each cell, initialized to initial state
     states = [state_ic.clone() for _ in range(ncells)]
 
     # Step 7.9: Create the equilibrium solver object for the repeated equilibrium calculation
@@ -184,13 +185,14 @@ def simulate():
             bsolid[icell] = states[icell].elementAmountsInSpecies(isolid_species)
 
         # Transport each element in the fluid phase
+        for j in range(system.numElements()):
         for j in range(nelems):
             transport(bfluid[:, j], dt, dx, v, D, b_bc[j])
 
         # Update the amounts of elements in both fluid and solid partitions
         b[:] = bsolid + bfluid
 
-        # Equilibrating all cells with the updated element amounts
+        # Equilibrate all cells with the updated element amounts
         for icell in range(ncells):
             solver.solve(states[icell], T, P, b[icell])
 
