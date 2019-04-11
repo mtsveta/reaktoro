@@ -123,7 +123,6 @@ def simulate():
     b_bc = state_bc.elementAmounts()
 
     # Step 7.8: Create a list of chemical states for the mesh cells
-
     # The list of chemical states, one for each cell, initialized to state_ic
     states = [state_ic.clone() for _ in range(ncells)]
 
