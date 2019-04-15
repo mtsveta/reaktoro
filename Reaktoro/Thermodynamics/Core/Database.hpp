@@ -40,7 +40,6 @@ using GaseousSpecies = FluidSpecies;
 using LiquidSpecies = FluidSpecies;
 class MineralSpecies;
 
-
 /// Provides operations to retrieve physical and thermodynamic data of chemical species.
 ///
 /// The Database class is used to retrieve information of chemical species. It is initialized
