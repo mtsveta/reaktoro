@@ -103,6 +103,11 @@ def simulate():
     # The number of elements in the chemical system
     nelems = system.numElements()
 
+    # Step 7.7: Specifying discretization structures needed for the reactive transport
+
+    # Get the number of the element in the chemical system
+    nelems = system.numElements()
+
     # The indices of the fluid and solid species
     ifluid_species = system.indicesFluidSpecies()
     isolid_species = system.indicesSolidSpecies()
@@ -158,6 +163,7 @@ def simulate():
 
         # We update the file with states that correspond to the cells' coordinates stored in x
         output.open()
+        # We update the file with states that correspond to the cells' coordinates stored in x
         for state, tag in zip(states, x):
             output.update(state, tag)
         output.close()
@@ -270,7 +276,6 @@ def plot():
     #for file in files:
     #    plotfile(file);
     Parallel(n_jobs=16)(delayed(plotfile)(file) for file in files)
-
     # Create videos for the figures
     ffmpegstr = 'ffmpeg -y -r 30 -i figures/{0}/%03d.png -codec:v mpeg4 -flags:v +qscale -global_quality:v 0 videos/{0}.mp4'
     os.system(ffmpegstr.format('calcite-dolomite'))
