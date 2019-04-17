@@ -91,6 +91,7 @@ rt.setVelocity(v)
 rt.setDiffusionCoeff(D)
 rt.setBoundaryState(state_bc)
 rt.setTimeStep(dt)
+# Initialize reactive transport solver with chemical field object
 rt.initialize(field)
 
 # Step 14: Set the output of the reactive transport simulation
@@ -103,15 +104,18 @@ output.add('speciesMolality(HCO3-)')
 output.add('speciesMolality(CO2(aq))')
 output.add('phaseVolume(Calcite)')
 output.add('phaseVolume(Dolomite)')
-output.filename('results/reactive-transport.txt')  # Set the name of the output files
 
-os.system('mkdir -p results')  # Ensure a results folder exist
+# Create the folder for the output text-files
+os.system('mkdir -p results')
+# Defined the name of the output files
+output.filename('results/reativetransport.txt')
 
 # Step 15: Perform given number of reactive tranport steps
 t = 0.0  # current time variable
 step = 0  # current number of steps
 
-while step <= nsteps:  # step until the number of steps are achieved
+# Reactive transport simulations in the cycle
+while step <= nsteps:
     # Print the progress of the simulation
     print("Progress: {}/{} steps, {} min".format(step, nsteps, t/minute))
     

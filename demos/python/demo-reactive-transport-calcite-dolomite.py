@@ -24,14 +24,13 @@ xl = 0.0          # the x-coordinate of the left boundary
 xr = 1.0          # the x-coordinate of the right boundary
 nsteps = 100      # the number of steps in the reactive transport simulation
 ncells = 100      # the number of cells in the discretization
-
 D  = 1.0e-9       # the diffusion coefficient (in units of m2/s)
 v  = 1.0/day      # the fluid pore velocity (in units of m/s)
+dirichlet = False # the parameter that defines whether Dirichlet BC must be used
 dt = 10*minute    # the time step (in units of s)
 T = 60.0 + 273.15 # the temperature (in units of K)
 P = 100 * 1e5     # the pressure (in units of Pa)
-
-dirichlet = False  # the parameter that determines whether Dirichlet BC must be used
+smrt_solv = False # the parameter that defines whether classic or smart EquilibriumSolver must be used
 
 # Step 4: The list of quantities to be output for each mesh cell, each time step
 output_quantities = """
@@ -107,6 +106,11 @@ def simulate():
     # The number of elements in the chemical system
     nelems = system.numElements()
 
+    # Step 7.7: Specifying discretization structures needed for the reactive transport
+
+    # Get the number of the element in the chemical system
+    nelems = system.numElements()
+
     # The indices of the fluid and solid species
     ifluid_species = system.indicesFluidSpecies()
     isolid_species = system.indicesSolidSpecies()
@@ -164,6 +168,7 @@ def simulate():
 
         # We update the file with states that correspond to the cells' coordinates stored in x
         output.open()
+        # We update the file with states that correspond to the cells' coordinates stored in x
         for state, tag in zip(states, x):
             output.update(state, tag)
         output.close()
@@ -185,14 +190,13 @@ def simulate():
             bsolid[icell] = states[icell].elementAmountsInSpecies(isolid_species)
 
         # Transport each element in the fluid phase
-        for j in range(system.numElements()):
         for j in range(nelems):
             transport(bfluid[:, j], dt, dx, v, D, b_bc[j])
 
         # Update the amounts of elements in both fluid and solid partitions
         b[:] = bsolid + bfluid
 
-        # Equilibrate all cells with the updated element amounts
+        # Equilibrating all cells with the updated element amounts
         for icell in range(ncells):
             solver.solve(states[icell], T, P, b[icell])
 
@@ -334,3 +338,7 @@ if __name__ == '__main__':
 
     # Plotting the result
     plot()
+
+    t1 = time.time()
+
+    print('total time = ', time.time()-t1)
