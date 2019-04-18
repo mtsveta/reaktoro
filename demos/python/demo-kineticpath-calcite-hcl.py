@@ -20,10 +20,11 @@ from reaktoro import *
 
 # Step 2: Define a chemical system with an aqueous and a mineral phase
 editor = ChemicalEditor()
-editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3")
+editor.addAqueousPhase("H2O HCl CaCO3")
+#editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3")
 editor.addMineralPhase("Calcite")
 
-# Step 3: Define mineral reaction for Calcite
+# Step 3: Define a mineral reaction involving the mineral phase and the aqueous phase
 editor.addMineralReaction("Calcite") \
     .setEquation("Calcite = Ca++ + CO3--") \
     .addMechanism("logk = -5.81 mol/(m2*s); Ea = 23.5 kJ/mol") \
@@ -34,30 +35,32 @@ editor.addMineralReaction("Calcite") \
 system = ChemicalSystem(editor)
 reactions = ReactionSystem(editor)
 
-# Step 5: Specify the equilibrium and kinetic species
+# Step 5: Define the partition of the chemical system to the kinetics and equilibrium species
 partition = Partition(system)
-partition.setKineticSpecies(["Calcite"])
+# Set the kinetics species
+partition.setKineticPhases(["Calcite"])
 
-# Step 6: Define the chemical equilibrium problem for the equilibrium partition
+# Step 6: Define the chemical equilibrium problem
 problem = EquilibriumProblem(system)
+# Provide the partition of the equilibrium problem
 problem.setPartition(partition)
 problem.setTemperature(30, "celsius")
 problem.setPressure(1, "bar")
 problem.add("H2O", 1, "kg")
 problem.add("HCl", 1, "mmol")
 
-# Step 7: Calculate the chemical equilibrium state in the equilibrium partition
+# Step 7: Calculate the chemical equilibrium state
 state0 = equilibrate(problem)
 state0.output('demo-kineticpath-calcite-hcl-before-kinetics')
 
 # Step 8: Set the initial mass of the kinetic species
 state0.setSpeciesMass("Calcite", 100, "g")
+print(state0)
 
-# Step 9: Define the kinetic path problem
 path = KineticPath(reactions)
 path.setPartition(partition)
 
-# Step 10: Plot different properties of the chemical system during kinetics
+# Step 10: Plotting of evolution of different properties of the chemical system
 plot1 = path.plot()
 plot1.x("time(units=minute)")
 plot1.y("elementMolality(Ca units=mmolal)", "Ca")
