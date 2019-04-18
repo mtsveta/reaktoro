@@ -20,7 +20,8 @@ from reaktoro import *
 
 # Step 2: Define a chemical system with an aqueous and a mineral phase
 editor = ChemicalEditor()
-editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3")
+editor.addAqueousPhase("H2O HCl CaCO3")
+#editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3")
 editor.addMineralPhase("Calcite")
 
 # Step 3: Define mineral reaction for Calcite
@@ -40,6 +41,7 @@ partition.setKineticSpecies(["Calcite"])
 
 # Step 6: Define the chemical equilibrium problem for the equilibrium partition
 problem = EquilibriumProblem(system)
+# Provide the partition of the equilibrium problem
 problem.setPartition(partition)
 problem.setTemperature(30, "celsius")
 problem.setPressure(1, "bar")
@@ -52,6 +54,7 @@ state0.output('demo-kineticpath-calcite-hcl-before-kinetics')
 
 # Step 8: Set the initial mass of the kinetic species
 state0.setSpeciesMass("Calcite", 100, "g")
+print(state0)
 
 # Step 9: Define the kinetic path problem
 path = KineticPath(reactions)
