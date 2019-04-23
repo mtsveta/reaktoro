@@ -23,8 +23,6 @@ editor = ChemicalEditor()
 editor.addAqueousPhase("H2O NaCl CaCO3 MgCO3")
 #editor.addAqueousPhaseWithElementsOf("H2O NaCl CaCO3 MgCO3")
 editor.addGaseousPhase(["H2O(g)", "CO2(g)"])
-editor.addMineralPhase(["Calcite", "Magnesite", "Dolomite", "Halite"])
-
 editor.addMineralPhase("Calcite")
 editor.addMineralPhase("Magnesite")
 editor.addMineralPhase("Dolomite")
@@ -51,12 +49,11 @@ editor.addMineralReaction("Dolomite") \
 
 # Step 4: Construct the chemical system
 system = ChemicalSystem(editor)
-# Step 4: Construct the reaction system
 reactions = ReactionSystem(editor)
 
 # Step 5: Specify the equilibrium and kinetic species
 partition = Partition(system)
-# Step 6: Set the kinetics species
+# Set the kinetics species
 partition.setKineticSpecies(["Calcite", "Magnesite", "Dolomite"])
 
 # Step 6: Define the initial chemical equilibrium state
@@ -88,6 +85,7 @@ plot0.y("pH")
 plot0.xlabel("Time [hour]")
 plot0.ylabel("pH")
 plot0.showlegend(False)
+plot0.open()
 
 plot1 = path.plot()
 plot1.x("time(units=hour)")

@@ -24,7 +24,7 @@ editor.addAqueousPhase("H2O HCl CaCO3")
 #editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3")
 editor.addMineralPhase("Calcite")
 
-# Step 3: Define a mineral reaction involving the mineral phase and the aqueous phase
+# Step 3: Define a mineral reactions
 editor.addMineralReaction("Calcite") \
     .setEquation("Calcite = Ca++ + CO3--") \
     .addMechanism("logk = -5.81 mol/(m2*s); Ea = 23.5 kJ/mol") \
