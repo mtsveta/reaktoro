@@ -85,7 +85,6 @@ plot0.y("pH")
 plot0.xlabel("Time [hour]")
 plot0.ylabel("pH")
 plot0.showlegend(False)
-plot0.open()
 
 plot1 = path.plot()
 plot1.x("time(units=hour)")

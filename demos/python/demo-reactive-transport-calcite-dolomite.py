@@ -34,6 +34,7 @@ P = 100 * 1e5          # the pressure (in units of Pa)
 alpha = v*dt/dx
 
 dirichlet = False  # the parameter that determines whether Dirichlet BC must be used
+smrt_solv = False # the parameter that defines whether classic or smart EquilibriumSolver must be used
 
 # Step 4: The list of quantities to be output for each mesh cell, each time step
 output_quantities = """

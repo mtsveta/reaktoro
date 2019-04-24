@@ -55,7 +55,6 @@ state0.output('demo-kineticpath-calcite-hcl-before-kinetics')
 
 # Step 8: Set the initial mass of the kinetic species
 state0.setSpeciesMass("Calcite", 100, "g")
-print(state0)
 
 path = KineticPath(reactions)
 path.setPartition(partition)

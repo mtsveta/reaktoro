@@ -64,8 +64,8 @@ Defining kinetically-controlled reactions
 Next, we define a mineral reaction for calcite and set its rate parameters.
 
 .. literalinclude:: ../../../../demos/python/demo-kineticpath-calcite-hcl.py
-    :start-at: Step 3
-    :end-before: Step 4
+    :start-at: Step 2
+    :end-before: Step 3
 
 We set the reaction equation using the ``setEquation`` method of the
 class `MineralReaction`_.

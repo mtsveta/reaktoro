@@ -220,7 +220,10 @@ output.add("phaseVolume(Calcite)")
 output.add("phaseVolume(Dolomite)")
 output.filename('results/rtsolver.txt')  # Set the name of the output files
 
-make_results_folders()
+# Create the folder for the output text-files
+os.system('mkdir -p results')
+# Defined the name of the output files
+output.filename('results/reativetransport.txt')
 
 # Step 15: Perform given number of reactive tranport steps
 t = 0.0  # current time variable
