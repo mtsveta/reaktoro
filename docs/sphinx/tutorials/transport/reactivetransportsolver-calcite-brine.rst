@@ -103,7 +103,7 @@ In this step, we create an object of the class ``ChemicalEditor`` and specify tw
 an **aqueous** and a **mineral** one, should be considered in the chemical system.
 The aqueous phase is defined by using a list of compounds, which will be broken
 into a list of element names, and the database will then be searched for all species that
-could be formed out of those elements. The mineral phase is defined by three mineral species:
+could be formed out of those elements. There are 3 mineral phases represented by
 quartz |SiO2|, calcite |CaCO3|, and dolomite |CaMg(CO3)2|.
 
 .. note::
@@ -130,6 +130,18 @@ quartz |SiO2|, calcite |CaCO3|, and dolomite |CaMg(CO3)2|.
             'CO2(aq)',
             'CO3--'
             ])
+
+.. attention::
+
+    Three different mineral phases must be added by 3 different functions ``editor.addMineralPhase()``
+    corresponding to each mineral. The line of code
+
+    .. code-block:: python
+
+         editor.addMineralPhase(["Calcite", "Magnesite", "Dolomite"]);
+
+    will create single mineral phase Calcite-Magnesite-Dolomite representing the mixture of three
+    minerals, which is different from the initial goal.
 
 Constructing the chemical system
 --------------------------------
