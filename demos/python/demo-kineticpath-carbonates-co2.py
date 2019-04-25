@@ -52,12 +52,10 @@ reactions = ReactionSystem(editor)
 
 # Step 5: Specify the equilibrium and kinetic species
 partition = Partition(system)
-# Set the kinetics species
 partition.setKineticSpecies(["Calcite", "Magnesite", "Dolomite"])
 
 # Step 6: Define the initial chemical equilibrium state
 problem = EquilibriumProblem(system)
-# Provide the partition of the equilibrium problem
 problem.setPartition(partition)
 problem.setTemperature(60, "celsius")
 problem.setPressure(100, "bar")
@@ -108,7 +106,8 @@ plot3.ylabel("Mass [g]")
 # Step 11: Perform the kinetic path calculation
 t0, t1 = 0.0, 25.0
 path.solve(state0, t0, t1, "hours")
-# Print the result state
+
+# Step 12: Output the final chemical state of the system
 state0.output('demo-kineticpath-carbonates-co2-after-kinetics')
 
 # Step 12: Output the final chemical state of the system
