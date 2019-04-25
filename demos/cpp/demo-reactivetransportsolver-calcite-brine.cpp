@@ -15,16 +15,12 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with this library. If not, see <http://www.gnu.org/licenses/>.
 
-// C++ includes
-#include <chrono>
-
-// Reaktoro includes
 #include <Reaktoro/Reaktoro.hpp>
+#include <Reaktoro/Transport/TransportSolver.hpp>
 
 //#include <boost/filesystem.hpp>
 //#include <sys/stat.h>
-//#include <cstdlib>
-
+#include <cstdlib>
 
 using namespace Reaktoro;
 
@@ -36,15 +32,14 @@ int main()
 
     // Step 2: Define parameters for the reactive transport simulation
     double xl(0.0), xr(100.0);          // the x-coordinates of the left and right boundaries
-    int nsteps(10);                    // the number of steps in the reactive
-    // transport simulation
+    int nsteps(100);                    // the number of steps in the reactive transport simulation
     int ncells(100);                    // the number of cells in the spacial discretization
     double D(1.0e-9);                   // the diffusion coefficient (in units of m2/s)
     double v(1.0 / day);                // the fluid pore velocity (in units of m/s)
     double dt(0.5 * day);               // the time step (in units of s)
     double T(60.0);                     // the temperature (in units of degC)
     double P(100);                      // the pressure (in units of bar)
-    double is_smrtsolv(true);          // the parameter that defines whether classic or smart EquilibriumSolver must be used
+    double smart_solver(true);          // the parameter that defines whether classic or smart EquilibriumSolver must be used
 
     // Step 3: Construct the chemical system with its phases and species (using ChemicalEditor)
     ChemicalEditor editor;
@@ -95,7 +90,7 @@ int main()
     ChemicalField field(mesh.numCells(), state_ic);
 
     // Step 12: Define the reactive transport modeling
-    ReactiveTransportSolver rtsolver(system, is_smrtsolv);
+    ReactiveTransportSolver rtsolver(system);
     rtsolver.setMesh(mesh);
     rtsolver.setVelocity(v);
     rtsolver.setDiffusionCoeff(D);
@@ -133,7 +128,7 @@ int main()
         std::cout << "Progress: " << step << " / " << nsteps << " "  << t/minute << " min" << std::endl;
 
         // Perform one reactive transport time step
-        rtsolver.step(field, is_smrtsolv);
+        rtsolver.step(field);
 
         // Increment time step and number of time steps
         t += dt;
