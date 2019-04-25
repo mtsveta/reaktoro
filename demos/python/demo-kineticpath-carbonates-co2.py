@@ -20,8 +20,7 @@ from reaktoro import *
 
 # Step 2: Specify the phases in the chemical system and their species
 editor = ChemicalEditor()
-editor.addAqueousPhase("H2O NaCl CaCO3 MgCO3")
-#editor.addAqueousPhaseWithElementsOf("H2O NaCl CaCO3 MgCO3")
+editor.addAqueousPhaseWithElementsOf("H2O NaCl CaCO3 MgCO3")
 editor.addGaseousPhase(["H2O(g)", "CO2(g)"])
 editor.addMineralPhase("Calcite")
 editor.addMineralPhase("Magnesite")
@@ -109,6 +108,8 @@ plot3.ylabel("Mass [g]")
 # Step 11: Perform the kinetic path calculation
 t0, t1 = 0.0, 25.0
 path.solve(state0, t0, t1, "hours")
+# Print the result state
+state0.output('demo-kineticpath-carbonates-co2-after-kinetics')
 
 # Step 12: Output the final chemical state of the system
 state0.output('demo-kineticpath-carbonates-co2-after-kinetics')

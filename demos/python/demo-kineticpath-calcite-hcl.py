@@ -20,8 +20,7 @@ from reaktoro import *
 
 # Step 2: Define a chemical system with an aqueous and a mineral phase
 editor = ChemicalEditor()
-editor.addAqueousPhase("H2O HCl CaCO3")
-#editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3")
+editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3")
 editor.addMineralPhase("Calcite")
 
 # Step 3: Define a mineral reactions
