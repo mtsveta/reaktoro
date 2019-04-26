@@ -34,14 +34,12 @@ editor.addMineralReaction("Calcite") \
 system = ChemicalSystem(editor)
 reactions = ReactionSystem(editor)
 
-# Step 5: Define the partition of the chemical system to the kinetics and equilibrium species
+# Step 5: Specify the equilibrium and kinetic species
 partition = Partition(system)
-# Set the kinetics species
-partition.setKineticPhases(["Calcite"])
+partition.setKineticSpecies(["Calcite"])
 
 # Step 6: Define the chemical equilibrium problem
 problem = EquilibriumProblem(system)
-# Provide the partition of the equilibrium problem
 problem.setPartition(partition)
 problem.setTemperature(30, "celsius")
 problem.setPressure(1, "bar")
