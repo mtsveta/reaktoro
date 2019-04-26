@@ -41,7 +41,6 @@ partition.setKineticSpecies(["Calcite"])
 
 # Step 6: Define the chemical equilibrium problem for the equilibrium partition
 problem = EquilibriumProblem(system)
-# Provide the partition of the equilibrium problem
 problem.setPartition(partition)
 problem.setTemperature(30, "celsius")
 problem.setPressure(1, "bar")
