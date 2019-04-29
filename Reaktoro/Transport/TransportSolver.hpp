@@ -21,7 +21,6 @@
 #include <memory>
 #include <vector>
 #include <chrono>
-#include <fstream>
 
 // Reaktoro includes
 #include <Reaktoro/Common/Index.hpp>
@@ -60,10 +59,9 @@ namespace Reaktoro {
 
 // Use this enum type to initialize profilers
 enum Profiling{
-    RT = 1,
-    EQ = 2,
-    CK = 3,
-    Total = 4,
+    ReactiveTransort = 1,
+    Equilibrium = 2,
+    ChemicalKinetics = 3,
 };
 
 /// Use this class for profiling reactive transport components
@@ -73,10 +71,9 @@ public:
     Profiler(Profiling what);
     auto startProfiling() -> void;
     auto endProfiling() -> void;
-    auto output()-> void;
+    auto getTimes() const -> std::vector<double>;
     auto getProfilingSubject() const -> Profiling;
     auto operator==(const Profiler& p) const -> bool;
-
 
 private:
     /// Enum indicating which part of the reactive transport is profiled
@@ -87,10 +84,6 @@ private:
 
     /// The vector of the elapsed CPU times
     std::vector<double> times;
-
-    /// The name of the output file
-    std::string filename;
-
 };
 
 class ChemicalField
@@ -315,6 +308,7 @@ private:
     Vector u0;
 };
 
+
 /// Use this class for solving reactive transport problems.
 class ReactiveTransportSolver
 {
@@ -337,12 +331,6 @@ public:
     auto output() -> ChemicalOutput;
 
     auto profile(Profiling what) -> Profiler;
-
-    auto addProfiler(Profiler& profiler) -> void;
-
-    auto getProfilers() -> const std::vector<Profiler> & ;
-
-    auto outputProfiling() -> void;
 
     auto initialize() -> void;
 
@@ -381,6 +369,9 @@ private:
 
     /// The classes to profile reactive transport computations
     std::vector<Profiler> profilers;
+
+    /// The plots of the kinetic path calculation
+    std::vector<ChemicalPlot> plots;
 
 };
 
