@@ -313,6 +313,21 @@ well as the phase volume of calcite and dolomite.
     Use the result files to general plots and videos, and add them here in the
     tutorial.
 
+
+Have you got an issue?
+----------------------
+
+Have you found any issue or error in this tutorial? Do you have any
+recommendations or you think something is not clear enough? Please, let us know
+by filling a new issue here:
+
+.. centered::
+    `Reaktoro's GitHub Issues`_
+
+You'll need a GitHub account - but this is easy to sort out if you don't have
+one yet!
+
+
 .. _ChemicalEditor: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalEditor.html
 .. _ChemicalSystem: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalSystem.html
 .. _ChemicalState: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalState.html
@@ -322,3 +337,4 @@ well as the phase volume of calcite and dolomite.
 .. _ChemicalOutput: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalOutput.html
 .. _Mesh: https://reaktoro.org/cpp/classReaktoro_1_1Mesh.html
 .. _ChemicalField: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalField.html
+.. _Reaktoro's GitHub Issues: https://github.com/reaktoro/reaktoro/issues/new
