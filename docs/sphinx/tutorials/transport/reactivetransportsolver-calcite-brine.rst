@@ -30,8 +30,8 @@ Reactive transport of |CO2|-saturated brine along a porous rock column
 
 In this tutorial, we show how Reaktoro can be used for one-dimensional reactive
 transport calculations for modeling the geochemical reactions that occur along
-a horizontal porous rock column as an aqueous fluid is continuously injected on
-its left side.
+a porous rock column as an aqueous fluid is continuously injected on its left
+side.
 
 The injected fluid is a brine with 0.9 molal NaCl, 0.05 molal |MgCl2|, 0.01
 molal |CaCl2| and almost |CO2|-saturated, with 0.75 molal of |CO2| dissolved.
@@ -40,9 +40,9 @@ The porous rock is initially composed of minerals quartz (|SiO2|) and calcite
 (|CaCO3|). The initial porosity is 10 %, and the initial volume percentages of
 the minerals are: 98 |%vol| of quartz, 2 |%vol| calcite. The initial conditions
 for the fluid in the rock is a 0.7 molal |NaCl| brine in equilibrium with the
-existing rock minerals calcite and quartz. These initial conditions for fluid
-and rock compositions are uniform throughout the rock core. We assume a rock
-column length of 100 m, at temperature 60 |degC| and pressure 100 bar.
+existing rock minerals calcite and quartz. These initial fluid and rock
+composition conditions are uniform throughout the rock core. We assume a rock
+column length of 100 m at temperature 60 |degC| and 100 bar throughout.
 
 .. admonition:: Assumptions
 
@@ -150,9 +150,9 @@ Initial condition (IC) for the fluid composition
 Below, we define the **initial condition** for the fluid composition in the
 rock. We want an aqueous fluid that is 0.7 molal of NaCl and in equilibrium
 (saturated) with calcite (|CaCO3|) and quartz (|SiO2|). To achieve this, we mix
-1 kg of |H2O|, 0.7 mol of NaCl, and plenty of calcite and quartz (10 mol each)
-to ensure that the aqueous solution is saturated with respect to these
-minerals. Temperature and pressure are set to 60 °C and 100 bar respectively.
+1 kg of |H2O|, 0.7 mol of NaCl, and plenty of calcite and quartz (10 mol each) to
+ensure that the aqueous solution is saturated with respect to these minerals.
+Temperature and pressure are set to 60 °C and 100 bar respectively.
 
 .. literalinclude:: ../../../../demos/python/demo-reactivetransportsolver-calcite-brine.py
     :start-at: Step 6
@@ -229,8 +229,8 @@ amounts of fluid species in ``state_bc`` also normalized by |m3|.
 Creating the mesh
 -----------------
 
-For modeling reactive transport, we need to spatially discretize our domain,
-which we do using the class `Mesh`_ as shown below:
+We define the mesh with the class `Mesh`_ in order to use in the initialization
+of class `ReactiveTransportSolver`_ later.
 
 .. literalinclude:: ../../../../demos/python/demo-reactivetransportsolver-calcite-brine.py
     :start-at: Step 11
@@ -252,8 +252,8 @@ chemical states: one for each mesh cell.
 
 .. note::
     Different initial conditions across the mesh cells is possible by assigning
-    different chemical states to each mesh cell. Here, the same chemical state,
-    given by ``state_ic``, is used for all cells.
+    different chemical states to each mesh cell. Here, the same chemical state
+    in ``state_ic`` is used for all cells.
 
 
 Initializing the reactive transport solver
