@@ -152,9 +152,9 @@ def plotfile(file):
 #------------------------------------------------------------------------------#
 
 # Step 4: Construct the chemical system with its phases and species
-db = Database('supcrt98.xml')
-editor = ChemicalEditor(db)
-editor.addAqueousPhase('H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--')
+editor = ChemicalEditor()
+editor.addAqueousPhaseWithElementsOf('H2O NaCl CaCl2 MgCl2 CO2')
+#editor.addAqueousPhase('H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--')
 editor.addMineralPhase('Quartz')
 editor.addMineralPhase('Calcite')
 editor.addMineralPhase('Dolomite')
@@ -220,10 +220,7 @@ output.add("phaseVolume(Calcite)")
 output.add("phaseVolume(Dolomite)")
 output.filename('results/rtsolver.txt')  # Set the name of the output files
 
-# Create the folder for the output text-files
-os.system('mkdir -p results')
-# Defined the name of the output files
-output.filename('results/reativetransport.txt')
+make_results_folders()
 
 # Step 15: Perform given number of reactive tranport steps
 t = 0.0  # current time variable

@@ -196,6 +196,13 @@ def simulate():
 
         # Equilibrating all cells with the updated element amounts
         for icell in range(ncells):
+            """
+            print("b[icell] = ")
+            for elem in b[icell]:
+                print("%12.6e"% elem)
+
+            print("states[icell] = ", states[icell])
+            """
             solver.solve(states[icell], T, P, b[icell])
 
         # Output the current state of the reactive transport calculation
@@ -278,7 +285,7 @@ def plot():
     #    plotfile(file);
     Parallel(n_jobs=16)(delayed(plotfile)(file) for file in files)
     # Create videos for the figures
-    ffmpegstr = 'ffmpeg -y -r 30 -i figures/{0}/%03d.png -codec:v mpeg4 -flags:v +qscale -global_quality:v 0 videos/{0}.mp4'
+    ffmpegstr = 'ffmpeg -y -r 30 -i figures/{0}/%04d.png -codec:v mpeg4 -flags:v +qscale -global_quality:v 0 videos/{0}.mp4'
     os.system(ffmpegstr.format('calcite-dolomite'))
     os.system(ffmpegstr.format('aqueous-species'))
     os.system(ffmpegstr.format('ph'))
