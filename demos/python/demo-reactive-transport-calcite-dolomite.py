@@ -21,16 +21,19 @@ year = 365 * day
 
 # Step 3: Parameters for the reactive transport simulation
 xl = 0.0          # the x-coordinate of the left boundary
-xr = 1.0          # the x-coordinate of the right boundary
-nsteps = 100      # the number of steps in the reactive transport simulation
-ncells = 100      # the number of cells in the discretization
+xr = 0.5          # the x-coordinate of the right boundary
+nsteps = 1200      # the number of steps in the reactive transport simulation
+ncells = 50      # the number of cells in the discretization
+
+#D  = 0.0       # the diffusion coefficient (in units of m2/s)
 D  = 1.0e-9       # the diffusion coefficient (in units of m2/s)
-v  = 1.0/day      # the fluid pore velocity (in units of m/s)
-dirichlet = False # the parameter that defines whether Dirichlet BC must be used
-dt = 10*minute    # the time step (in units of s)
+# v  = 1.0/day      # the fluid pore velocity (in units of m/s)
+v = 0.0
+dt = minute    # the time step (in units of s)
 T = 60.0 + 273.15 # the temperature (in units of K)
 P = 100 * 1e5     # the pressure (in units of Pa)
-smrt_solv = False # the parameter that defines whether classic or smart EquilibriumSolver must be used
+
+dirichlet = False  # the parameter that determines whether Dirichlet BC must be used
 
 # Step 4: The list of quantities to be output for each mesh cell, each time step
 output_quantities = """
@@ -106,11 +109,6 @@ def simulate():
     # The number of elements in the chemical system
     nelems = system.numElements()
 
-    # Step 7.7: Specifying discretization structures needed for the reactive transport
-
-    # Get the number of the element in the chemical system
-    nelems = system.numElements()
-
     # The indices of the fluid and solid species
     ifluid_species = system.indicesFluidSpecies()
     isolid_species = system.indicesSolidSpecies()
@@ -127,13 +125,12 @@ def simulate():
     # Initialize the concentrations (mol/m3) of the elements in each mesh cell
     b[:] = state_ic.elementAmounts()
 
-    # Initialize the concentrations of the elements in each mesh cell
-    b[:] = state_ic.elementAmounts()
-
-    # Initialize the concentrations of each element on the boundary
+    # Initialize the concentrations (mol/m3) of each element on the boundary
     b_bc = state_bc.elementAmounts()
 
-    # The list of chemical states, one for each cell, initialized to initial state
+    # Step 7.8: Create a list of chemical states for the mesh cells
+
+    # The list of chemical states, one for each cell, initialized to state_ic
     states = [state_ic.clone() for _ in range(ncells)]
 
     # Step 7.9: Create the equilibrium solver object for the repeated equilibrium calculation
@@ -168,7 +165,6 @@ def simulate():
 
         # We update the file with states that correspond to the cells' coordinates stored in x
         output.open()
-        # We update the file with states that correspond to the cells' coordinates stored in x
         for state, tag in zip(states, x):
             output.update(state, tag)
         output.close()
@@ -198,6 +194,13 @@ def simulate():
 
         # Equilibrating all cells with the updated element amounts
         for icell in range(ncells):
+            """
+            print("b[icell] = ")
+            for elem in b[icell]:
+                print("%12.6e"% elem)
+
+            print("states[icell] = ", states[icell])
+            """
             solver.solve(states[icell], T, P, b[icell])
 
         # Increment time step and number of time steps
@@ -217,6 +220,7 @@ def titlestr(t):
 
 # Step 9: Generate figures for a result file
 def plotfile(file):
+
     step = int(file.split('.')[0])
 
     print('Plotting figure', step, '...')
@@ -275,7 +279,7 @@ def plot():
     files = sorted(os.listdir('results'))
     Parallel(n_jobs=16)(delayed(plotfile)(file) for file in files)
     # Create videos for the figures
-    ffmpegstr = 'ffmpeg -y -r 30 -i figures/{0}/%03d.png -codec:v mpeg4 -flags:v +qscale -global_quality:v 0 videos/{0}.mp4'
+    ffmpegstr = 'ffmpeg -y -r 30 -i figures/{0}/%04d.png -codec:v mpeg4 -flags:v +qscale -global_quality:v 0 videos/{0}.mp4'
     os.system(ffmpegstr.format('calcite-dolomite'))
     os.system(ffmpegstr.format('aqueous-species'))
     os.system(ffmpegstr.format('ph'))
@@ -338,7 +342,3 @@ if __name__ == '__main__':
 
     # Plotting the result
     plot()
-
-    t1 = time.time()
-
-    print('total time = ', time.time()-t1)
