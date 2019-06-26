@@ -27,9 +27,10 @@ namespace Reaktoro {
 class ChemicalProperties;
 class ChemicalState;
 class ChemicalSystem;
-class Partition;
 class EquilibriumProblem;
+class Partition;
 struct EquilibriumOptions;
+struct EquilibriumProfiling;
 struct EquilibriumResult;
 struct EquilibriumSensitivity;
 
@@ -113,6 +114,9 @@ public:
 
     /// Compute the sensitivity of the species amounts with respect to element amounts.
     auto dndb() -> VectorConstRef;
+
+    /// Return the profiling information of the operations during an equilibrium calculation.
+    auto profiling() const -> const EquilibriumProfiling&;
 
 private:
     struct Impl;
