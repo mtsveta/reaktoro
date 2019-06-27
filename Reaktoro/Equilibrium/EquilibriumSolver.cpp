@@ -134,9 +134,9 @@ struct EquilibriumSolver::Impl
     Impl()
     {}
 
-    /// Construct a Impl instance with given Partition
-    Impl(const Partition& partition)
-    : system(partition.system()), properties(partition.system())
+    /// Construct a Impl instance
+    Impl(const ChemicalSystem& system)
+    : system(system), properties(system)
     {
         // Initialize the formula matrix
         A = system.formulaMatrix();
@@ -146,7 +146,7 @@ struct EquilibriumSolver::Impl
         E = system.numElements();
 
         // Set the default partition as all species are in equilibrium
-        setPartition(partition);
+        setPartition(Partition(system));
     }
 
     /// Set the partition of the chemical system
@@ -224,7 +224,7 @@ struct EquilibriumSolver::Impl
         n = state.speciesAmounts();
 
         // Update the standard thermodynamic properties of the chemical system
-        properties.update(T, P);
+        timeit( properties.update(T, P) ) >> profiling.time_standard_properties;
 
         // Update the normalized standard Gibbs energies of the species
         u0 = properties.standardPartialMolarGibbsEnergies()/RT;
@@ -239,7 +239,7 @@ struct EquilibriumSolver::Impl
             n(ies) = ne;
 
             // Update the chemical properties of the chemical system
-            properties.update(n);
+            timeit( properties.update(T, P, n) ).accumulate(profiling.time_chemical_properties);
 
             // Set the scaled chemical potentials of the species
             u = u0 + properties.lnActivities();
@@ -335,13 +335,6 @@ struct EquilibriumSolver::Impl
         state.setSpeciesAmounts(n);
         state.setElementDualPotentials(y);
         state.setSpeciesDualPotentials(z);
-    }
-
-    /// Find a feasible approximation for an equilibrium problem with all elements present on chemical system.
-    auto approximate_with_all_element_amounts(ChemicalState& state, double T, double P, VectorConstRef b) -> EquilibriumResult
-    {
-        Vector be = b(iee); 
-        return approximate(state, T, P, be);
     }
 
     /// Find a feasible approximation for an equilibrium problem.
@@ -451,13 +444,6 @@ struct EquilibriumSolver::Impl
         return zero || !options.warmstart;
     }
 
-    /// Solve the equilibrium problem, passing all elements that has on chemical system
-    auto solve_with_all_element_amounts(ChemicalState& state, double T, double P, VectorConstRef b) -> EquilibriumResult
-    {
-        Vector be = b(iee);
-        return solve(state, T, P, be);
-    }
-
     /// Solve the equilibrium problem
     auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> EquilibriumResult
     {
@@ -471,10 +457,15 @@ struct EquilibriumSolver::Impl
     }
 
     /// Solve the equilibrium problem
-    auto solve(ChemicalState& state, double T, double P, const double* _be) -> EquilibriumResult
+    auto solve(ChemicalState& state, double T, double P, const double* b) -> EquilibriumResult
     {
+        tic();
+
+        // Reset profiling object.
+        profiling = {};
+
         // Set the molar amounts of the elements
-        be = Vector::Map(_be, Ee);
+        be = Vector::Map(b, Ee);
 
         // Set temperature and pressure of the chemical state
         state.setTemperature(T);
@@ -519,12 +510,16 @@ struct EquilibriumSolver::Impl
         // Update the chemical state from the optimum state
         updateChemicalState(state);
 
+        toc() >> profiling.time_solve;
+
         return result;
     }
 
     /// Return the sensitivity of the equilibrium state.
     auto sensitivity() -> const EquilibriumSensitivity&
     {
+        tic();
+
         zerosEe = zeros(Ee);
         zerosNe = zeros(Ne);
         unitjEe = zeros(Ee);
@@ -540,6 +535,8 @@ struct EquilibriumSolver::Impl
             unitjEe = unit(Ee, j);
             sensitivities.dndb.col(j) = solver.dxdp(zerosNe, unitjEe);
         }
+
+        toc() >> profiling.time_sensitivity;
 
         return sensitivities;
     }
@@ -587,11 +584,7 @@ EquilibriumSolver::EquilibriumSolver()
 {}
 
 EquilibriumSolver::EquilibriumSolver(const ChemicalSystem& system)
-: pimpl(new Impl(Partition(system)))
-{}
-
-EquilibriumSolver::EquilibriumSolver(const Partition& partition)
-: pimpl(new Impl(partition))
+: pimpl(new Impl(system))
 {}
 
 EquilibriumSolver::EquilibriumSolver(const EquilibriumSolver& other)
@@ -624,13 +617,12 @@ auto EquilibriumSolver::approximate(ChemicalState& state, double T, double P, Ve
 
 auto EquilibriumSolver::approximate(ChemicalState& state, const EquilibriumProblem& problem) -> EquilibriumResult
 {
-    setPartition(problem.partition());
-    return pimpl->approximate_with_all_element_amounts(state, problem.temperature(), problem.pressure(), problem.elementAmounts());
+    return approximate(state, problem.temperature(), problem.pressure(), problem.elementAmounts());
 }
 
 auto EquilibriumSolver::approximate(ChemicalState& state) -> EquilibriumResult
 {
-    return pimpl->approximate_with_all_element_amounts(state, state.temperature(), state.pressure(), state.elementAmounts());
+    return approximate(state, state.temperature(), state.pressure(), state.elementAmounts());
 }
 
 auto EquilibriumSolver::solve(ChemicalState& state, double T, double P, VectorConstRef be) -> EquilibriumResult
@@ -645,13 +637,12 @@ auto EquilibriumSolver::solve(ChemicalState& state, double T, double P, const do
 
 auto EquilibriumSolver::solve(ChemicalState& state) -> EquilibriumResult
 {
-    return pimpl->solve_with_all_element_amounts(state, state.temperature(), state.pressure(), state.elementAmounts());
+    return solve(state, state.temperature(), state.pressure(), state.elementAmounts());
 }
 
 auto EquilibriumSolver::solve(ChemicalState& state, const EquilibriumProblem& problem) -> EquilibriumResult
 {
-    setPartition(problem.partition());
-    return pimpl->solve_with_all_element_amounts(state, problem.temperature(), problem.pressure(), problem.elementAmounts());
+    return solve(state, problem.temperature(), problem.pressure(), problem.elementAmounts());
 }
 
 auto EquilibriumSolver::properties() const -> const ChemicalProperties&
