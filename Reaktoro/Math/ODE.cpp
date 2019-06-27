@@ -18,9 +18,15 @@
 #include "ODE.hpp"
 
 // Sundials includes
-#include <cvode/cvode.h>
-#include <cvode/cvode_dense.h>
+#include <cvodes/cvodes.h>
 #include <nvector/nvector_serial.h>
+#include <sunmatrix/sunmatrix_dense.h>
+//#include <sundials/cvodes/cvodes.h>
+//#include <sundials/nvecror_serial.h>
+//#include <cvodes/cvodes.h>
+//#include <cvode/cvode.h>
+//#include <cvode/cvode_dense.h>
+
 
 // Reaktoro includes
 #include <Reaktoro/Common/Exception.hpp>
@@ -28,7 +34,8 @@
 namespace Reaktoro {
 
 #define VecEntry(v, i)    NV_Ith_S(v, i)
-#define MatEntry(A, i, j) DENSE_ELEM(A, i, j)
+//#define MatEntry(A, i, j) DENSE_ELEM(A, i, j)
+#define MatEntry(A, i, j) SM_ELEMENT_D(A, i, j)
 
 #define CheckInitialize(r) \
     Assert(r == CV_SUCCESS, \
@@ -43,11 +50,12 @@ namespace Reaktoro {
 using N_Vector = struct _generic_N_Vector*;
 
 inline int CVODEStep(const ODEStepMode& step);
-inline int CVODEIteration(const ODEIterationMode& iteration);
+//inline int CVODEIteration(const ODEIterationMode& iteration);
 inline int CVODEMaxStepOrder(const ODEOptions& options);
 
 int CVODEFunction(realtype t, N_Vector y, N_Vector ydot, void* user_data);
-int CVODEJacobian(long int N, realtype t, N_Vector y, N_Vector fy, DlsMat J, void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
+//int CVODEJacobian(long int N, realtype t, N_Vector y, N_Vector fy, DlsMat J, void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
+int CVODEJacobian(realtype t, N_Vector y, N_Vector fy, SUNMatrix J, void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3);
 
 struct ODEData
 {
@@ -143,7 +151,8 @@ struct ODESolver::Impl
             VecEntry(cvode_y, i) = y[i];
 
         // Initialize a new cvode context
-        cvode_mem = CVodeCreate(CVODEStep(options.step), CVODEIteration(options.iteration));
+        //cvode_mem = CVodeCreate(CVODEStep(options.step), CVODEIteration(options.iteration));
+        cvode_mem = CVodeCreate(CVODEStep(options.step));
 
         // Set the maximum order of the Adams or BDF methods
         CheckInitialize(CVodeSetMaxOrd(cvode_mem, CVODEMaxStepOrder(options)));
@@ -181,10 +190,18 @@ struct ODESolver::Impl
         CheckInitialize(CVodeSVtolerances(cvode_mem, options.reltol, abstols));
 
         // Call CVDense to specify the CVDENSE dense linear solver
-        CheckInitialize(CVDense(cvode_mem, num_equations));
+        // Note:
+        // Removed package-specific, linear solver-specific, solver modules (e.g. CVDENSE, KINBAND,
+        // IDAKLU, ARKSPGMR) since their functionality is entirely replicated by the generic Dls/Spils
+        // interfaces and SUNLINEARSOLVER/SUNMATRIX modules. The exception is CVDIAG, a diagonal
+        // approximate Jacobian solver available to CVODE and CVODES.
+        // CheckInitialize(CVDense(cvode_mem, num_equations));
 
         // Set the Jacobian function
-        CheckInitialize(CVDlsSetDenseJacFn(cvode_mem, CVODEJacobian));
+        // CheckInitialize(CVDlsSetDenseJacFn(cvode_mem, CVODEJacobian));
+        // CheckInitialize(CVDlsSetJacFn(cvode_mem, CVODEJacobian));
+        CheckInitialize(CVodeSetJacFn(cvode_mem, CVODEJacobian));
+
 
         // Free dynamic memory allocated for `yc`
         N_VDestroy_Serial(abstols);
@@ -266,7 +283,11 @@ inline int CVODEStep(const ODEStepMode& step)
         default: return CV_BDF;
     }
 }
-
+/*
+* NOTE:
+* With the introduction of sunnonlinsol modules, the input parameter iter to CVodeCreate
+* has been removed along with the function CVodeSetIterType and the constants CV NEWTON and
+* CV FUNCTIONAL.
 inline int CVODEIteration(const ODEIterationMode& iteration)
 {
     switch(iteration)
@@ -275,6 +296,7 @@ inline int CVODEIteration(const ODEIterationMode& iteration)
         default: return CV_NEWTON;
     }
 }
+*/
 
 inline int CVODEMaxStepOrder(const ODEOptions& options)
 {
@@ -300,7 +322,24 @@ int CVODEFunction(realtype t, N_Vector y, N_Vector f, void* user_data)
     return result;
 }
 
+/*
 int CVODEJacobian(long int N, realtype t, N_Vector y, N_Vector fy, DlsMat J, void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
+{
+    ODEData& data = *static_cast<ODEData*>(user_data);
+
+    for(int i = 0; i < data.num_equations; ++i)
+        data.y[i] = VecEntry(y, i);
+
+    int result = data.problem.jacobian(t, data.y, data.J);
+
+    for(int i = 0; i < data.num_equations; ++i)
+        for(int j = 0; j < data.num_equations; ++j)
+            MatEntry(J, i, j) = data.J(i, j);
+
+    return result;
+}
+*/
+int CVODEJacobian(realtype t, N_Vector y, N_Vector fy, SUNMatrix J, void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
 {
     ODEData& data = *static_cast<ODEData*>(user_data);
 

@@ -1,6 +1,10 @@
 # Find Boost library
 find_package(Boost REQUIRED)
 
+# Find cvodes library
+find_library(CVODES sundials_cvodes)
+message("-- CVODES path: ${CVODES}")
+
 # Find pybind11 library (if needed) https://github.com/pybind/pybind11
 if(REAKTORO_BUILD_PYTHON)
 

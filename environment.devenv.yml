@@ -30,6 +30,7 @@ dependencies:
   - libstdcxx-ng                   # [linux]
   - ccache                         # [unix]
   - clcache                        # [win]
+  - sundials
 
 environment:
 
