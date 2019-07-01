@@ -18,15 +18,11 @@
 #include "ODE.hpp"
 
 // Sundials includes
-#include <cvodes/cvodes.h>
-#include <nvector/nvector_serial.h>
-#include <sunmatrix/sunmatrix_dense.h>
-//#include <sundials/cvodes/cvodes.h>
-//#include <sundials/nvecror_serial.h>
-//#include <cvodes/cvodes.h>
-//#include <cvode/cvode.h>
-//#include <cvode/cvode_dense.h>
-
+#include <cvodes/cvodes.h>             /* prototypes for CVODE fcts., consts.  */
+#include <nvector/nvector_serial.h>    /* access to serial N_Vector            */
+#include <sunmatrix/sunmatrix_dense.h> /* access to dense SUNMatrix            */
+#include <sunlinsol/sunlinsol_dense.h> /* access to dense SUNLinearSolver      */
+#include <sundials/sundials_types.h>   /* defs. of realtype, sunindextype      */
 
 // Reaktoro includes
 #include <Reaktoro/Common/Exception.hpp>
@@ -34,8 +30,11 @@
 namespace Reaktoro {
 
 #define VecEntry(v, i)    NV_Ith_S(v, i)
-//#define MatEntry(A, i, j) DENSE_ELEM(A, i, j)
 #define MatEntry(A, i, j) SM_ELEMENT_D(A, i, j)
+
+//#define VecEntry(v,i)    NV_Ith_S(v,i-1)         /* Ith numbers components 1..NEQ */
+//#define MatEntry(A,i,j) SM_ELEMENT_D(A,i-1,j-1) /* IJth numbers rows,cols 1..NEQ */
+
 
 #define CheckInitialize(r) \
     Assert(r == CV_SUCCESS, \
