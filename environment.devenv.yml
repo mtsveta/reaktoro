@@ -3,29 +3,23 @@
 name: reaktoro
 
 {% set python_version = os.environ.get("PY_VER", "3.7") %}
-{% set debug = os.environ.get("CONFIG", "").lower() == "debug" %}
 
 dependencies:
-  # Compilers
-  - gxx_linux-64=7.3.0             # [linux]
-  - libstdcxx-ng                   # [linux]
-  - clangxx=9.0.0                  # [osx]
-  # C++ dependendies
   - boost=1.70
-  - pybind11
-  - thermofun
-  {% if not debug %}
-  - pugixml                        # cannot link the Release version of `pugixml` (from conda) to the Debug version of Reaktoro
-  {% endif %}
-  # Python dependendies
+  - cmake>=3.13
+  - invoke
+  - ninja
   - numpy
   - pandas
   - pip
   - pip:
-    - sphinx==1.8.5
+    - sphinx
     - sphinx-autobuild
     - sphinx_rtd_theme
     - sphinxcontrib-images
+  - pugixml
+  - nlohmann_json
+  - pybind11=2.3.0
   - pytest
   - pytest-cpp
   - pytest-datadir
@@ -35,15 +29,10 @@ dependencies:
   - pytest-xdist
   - python={{ python_version }}
   - tabulate
-  # Doxygen documentation
-  # - doxygen=1.8.9                 # [linux]
-  - graphviz                       # [linux]
-  # Utilities
-  - cmake=3.15
-  - ninja>=1.9.0
+  - gxx_linux-64=7.3.0             # [linux]
+  - libstdcxx-ng                   # [linux]
   - ccache                         # [unix]
   - clcache                        # [win]
-  - invoke
 
 environment:
 
@@ -53,15 +42,10 @@ environment:
     - {{ root }}/build/lib64/python{{ python_version }}/site-packages            # [unix]
     - {{ root }}\artifacts\python\Lib\site-packages                              # [win]
     - {{ root }}\build\lib\python{{ python_version }}\site-packages              # [win]
+    - {{ root }}\build\lib64\python{{ python_version }}\site-packages            # [win]
 
   LD_LIBRARY_PATH:                                                   # [unix]
     - {{ root }}/artifacts/lib                                       # [unix]
 
   PATH:                                                              # [win]
     - {{ root }}\artifacts\bin                                       # [win]
-
-  CC: clcache                               # [win]
-  CXX: clcache                              # [win]
-  CLCACHE_BASEDIR: {{ root }}               # [win]
-  # Improves CLCACHE robustness, minimizing the chance of a race condition
-  CLCACHE_OBJECT_CACHE_TIMEOUT_MS: 3600000  # [win]

@@ -43,6 +43,7 @@ target_include_directories(Reaktoro
 # Link Reaktoro library against external dependencies
 target_link_libraries(Reaktoro
     PRIVATE ${THIRDPARTY_LIBS}
+    PRIVATE nlohmann_json::nlohmann_json
     PUBLIC Boost::boost)
 
 # Link Reaktoro library against ThermoFun if found
