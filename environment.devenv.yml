@@ -3,12 +3,13 @@
 name: reaktoro
 
 {% set python_version = os.environ.get("PY_VER", "3.7") %}
+{% set debug = os.environ.get("CONFIG", "").lower() == "debug" %}
 
 dependencies:
   - boost=1.70
-  - cmake>=3.13
+  - cmake=3.15
   - invoke
-  - ninja
+  - ninja>=1.9.0
   - numpy
   - pandas
   - pip
@@ -33,6 +34,10 @@ dependencies:
   - libstdcxx-ng                   # [linux]
   - ccache                         # [unix]
   - clcache                        # [win]
+  {% if not debug %}
+  # Cannot link the Release version of `pugixml` (from conda) to the Debug version of Reaktoro
+  - pugixml
+  {% endif %}
 
 environment:
 
@@ -49,3 +54,9 @@ environment:
 
   PATH:                                                              # [win]
     - {{ root }}\artifacts\bin                                       # [win]
+
+  CC: clcache                               # [win]
+  CXX: clcache                              # [win]
+  CLCACHE_BASEDIR: {{ root }}               # [win]
+  # Improves CLCACHE robustness, minimizing the chance of a race condition
+  CLCACHE_OBJECT_CACHE_TIMEOUT_MS: 3600000  # [win]
