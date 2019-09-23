@@ -19,6 +19,7 @@
 #include <list>
 #include <fstream>
 #include <numeric>
+#include <nanoflann>
 
 // Reaktoro includes
 #include <Reaktoro/Common/Exception.hpp>

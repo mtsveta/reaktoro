@@ -33,6 +33,7 @@ dependencies:
   - libstdcxx-ng                   # [linux]
   - ccache                         # [unix]
   - clcache                        # [win]
+  - nanoflann
   {% if not debug %}
   # Cannot link the Release version of `pugixml` (from conda) to the Debug version of Reaktoro
   - pugixml
