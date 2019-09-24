@@ -19,10 +19,19 @@
 
 namespace Reaktoro {
 
-KineticResult::KineticResult()
+auto KineticTiming::operator+=(const KineticTiming& other) -> KineticTiming&
 {
-	// TODO Auto-generated constructor stub
-
+    solve += other.solve;
+    integrate += other.integrate;
+    return *this;
 }
 
+auto KineticResult::operator+=(const KineticResult& other) -> KineticResult&
+{
+    timing += other.timing;
+    return *this;
+}
 } // namespace Reaktoro
+
+
+

@@ -1,6 +1,6 @@
 // Reaktoro is a unified framework for modeling chemically reactive systems.
 //
-// Copyright (C) 2014-2018 Allan Leal
+// Copyright (C) 2014-2019
 //
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
@@ -19,10 +19,27 @@
 
 namespace Reaktoro {
 
-class KineticResult
+/// Timing information of the operations during an kinetic calculation.
+struct KineticTiming {
+
+    /// The time spent for solving the chemical kinetic problem.
+    double solve = 0.0;
+
+    /// The time spent for integrating during the chemical kinetic solve step.
+    double integrate = 0.0;
+
+    /// Self addition assignment to accumulate kinetic timing.
+    auto operator+=(const KineticTiming& other) -> KineticTiming&;
+
+};
+/// A type used to describe the result of an kinetic calculation.
+struct KineticResult
 {
-public:
-	KineticResult();
+    /// The timing information of the operations during an equilibrium calculation.
+    KineticTiming timing;
+
+    /// Self addition assignment to accumulate results.
+    auto operator+=(const KineticResult& other) -> KineticResult&;
 };
 
 } // namespace Reaktoro
