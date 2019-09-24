@@ -47,36 +47,35 @@ struct Params
     double T; // the temperature (in units of degC)
     double P; // the pressure (in units of bar)
 
-    // Solver params
-    bool use_smart_eqilibirum_solver;
-    bool track_statistics;
-    double smart_equlibrium_reltol;
-    double smart_equlibrium_abstol;
+    // Equilibrium solver's parameters
+    bool use_smart_equilibrium_solver;
+    double smart_equilibrium_reltol;
+    double smart_equilibrium_abstol;
 
     double tol;
 
 };
 
-struct Results
+struct RTEquilibriumResults
 {
-    /// Total CPU time (in s) required by smart equilibrium scheme
-    double smart_total;
+    /// Total CPU time (in s) required by smart equilibrium scheme.
+    double smart_total = 0.0;
 
     /// Total CPU time (in s) excluding the costs for the search of the closest reference states.
-    double smart_total_ideal_search;
+    double smart_total_ideal_search = 0.0;
 
     /// Total CPU time (in s) required by smart equilibrium scheme
     /// excluding the costs for the search and storage of the closest reference states.
-    double smart_total_ideal_search_store;
+    double smart_total_ideal_search_store = 0.0;
 
-    /// Total CPU time (in s) required by conventional equilibrium scheme
-    double conventional_total;
+    /// Total CPU time (in s) required by conventional equilibrium scheme.
+    double conventional_total = 0.0;
 
-    /// The total time taken to perform all time steps using conventional equilibrium algorithm
-    double time_reactive_transport_conventional;
+    /// The total time taken to perform all time steps using conventional equilibrium algorithm.
+    double time_reactive_transport_conventional = 0.0;
 
-    /// The total time taken to perform all time steps using smart equilibrium algorithm
-    double time_reactive_transport_smart;
+    /// The total time taken to perform all time steps using smart equilibrium algorithm.
+    double time_reactive_transport_smart = 0.0;
 
     /// The accumulated timing information of all equilibrium calculations.
     EquilibriumTiming equilibrium_timing;
@@ -93,23 +92,23 @@ struct Results
 auto mkdir(const std::string& folder) -> bool;
 auto outputConsole(const Params& params) -> void;
 auto makeResultsFolder(const Params& params) -> std::string;
-auto runReactiveTransport(const Params& params, Results& results) -> void;
+auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -> void;
 
 int main()
 {
     Time start = time();
 
     // Step 1: Initialise auxiliary time-related constants
-    int second = 1;
+    // int second = 1;
     int minute = 60;
     int hour = 60 * minute;
     int day = 24 * hour;
     int week = 7 * day;
-    int month = 30 * day;
-    int year = 365 * day;
+    // int month = 30 * day;
+    // int year = 365 * day;
 
     // Step 2: Define parameters for the reactive transport simulation
-    Params params;
+    Params params = {};
 
     // Define discretization parameters
     params.xl = 0.0; // the x-coordinates of the left boundaries
@@ -140,8 +139,8 @@ int main()
     // Output
     outputConsole(params);
 
-    // Results
-    Results results;
+    // RTEquilibriumResults
+    RTEquilibriumResults results;
 
     // Execute reactive transport with different solvers
     params.use_smart_eqilibirum_solver = true; runReactiveTransport(params, results);
@@ -174,7 +173,7 @@ int main()
 
     return 0;
 }
-auto runReactiveTransport(const Params& params, Results& results) -> void
+auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -> void
 {
     // Step **: Create the results folder
     auto folder = makeResultsFolder(params);
@@ -245,7 +244,7 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
 
     // Step **: Define the options for the reactive transport solver
     ReactiveTransportOptions reactive_transport_options;
-    reactive_transport_options.use_smart_equilibrium_solver = params.use_smart_eqilibirum_solver;
+    reactive_transport_options.use_smart_equilibrium_solver = params.use_smart_equilibrium_solver;
     reactive_transport_options.equilibrium = equilibrium_options;
     reactive_transport_options.smart_equilibrium = smart_equilibrium_options;
 
@@ -300,14 +299,14 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
         step += 1;
     }
 
-    toc(0, (params.use_smart_eqilibirum_solver ? results.time_reactive_transport_smart : results.time_reactive_transport_conventional) );
+    toc(0, (params.use_smart_equilibrium_solver ? results.time_reactive_transport_smart : results.time_reactive_transport_conventional) );
 
     // Step **: Collect the analytics related to reactive transport performance
     auto analysis = profiler.analysis();
     auto rt_results = profiler.results();
 
     // Step **: Generate json output file with collected profiling data
-    if(params.use_smart_eqilibirum_solver)  JsonOutput(folder + "/" + "analysis-smart.json") << analysis;
+    if(params.use_smart_equilibrium_solver)  JsonOutput(folder + "/" + "analysis-smart.json") << analysis;
     else    JsonOutput(folder + "/" + "analysis-conventional.json") << analysis;
 
     // Step **: Save equilibrium timing to compare the speedup of smart equilibrium solver versus conventional one
@@ -356,7 +355,7 @@ auto makeResultsFolder(const Params& params) -> std::string
     //std::string folder = "results-pitzer-" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder.c_str());
 
-    std::cout << "\nsolver                         : " << (params.use_smart_eqilibirum_solver == true ? "smart" : "conventional") << std::endl;
+    std::cout << "\nsolver                         : " << (params.use_smart_equilibrium_solver ? "smart" : "conventional") << std::endl;
 
     return folder;
 }
