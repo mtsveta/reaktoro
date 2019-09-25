@@ -21,14 +21,21 @@
 #include <memory>
 #include <string>
 
+// Reaktoro includes
+#include <Reaktoro/Math/Matrix.hpp>
+
+
 namespace Reaktoro {
 
-// Forward declarations
+// Forward declarations (classes)
 class ChemicalState;
 class ChemicalState;
 class Partition;
 class ReactionSystem;
+
+// Forward declarations (structs)
 struct KineticOptions;
+struct KineticResult;
 
 /// A class that represents a solver for chemical kinetics problems.
 /// @see KineticProblem
@@ -42,13 +49,13 @@ public:
     explicit KineticSolver(const ReactionSystem& reactions);
 
     /// Construct a copy of a KineticSolver instance.
-    KineticSolver(const KineticSolver& other) = delete;
-
-    /// Destroy the KineticSolver instance.
-    virtual ~KineticSolver();
+    KineticSolver(const KineticSolver& other);
 
     /// Assign a KineticSolver instance to this instance.
     auto operator=(KineticSolver other) -> KineticSolver&;
+
+    /// Destroy the KineticSolver instance.
+    virtual ~KineticSolver();
 
     /// Set the options for the chemical kinetics calculation.
     auto setOptions(const KineticOptions& options) -> void;
@@ -109,6 +116,17 @@ public:
     /// @param t The start time of the integration (in units of seconds)
     /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
     auto solve(ChemicalState& state, double t, double dt) -> void;
+
+    /// Update elements' amounts
+    /// @param b The amount of element
+    auto setElementsAmounts(VectorConstRef b) -> void;
+
+    /// Update elements' amounts
+    /// @param b The amount of element
+    auto getEquilibriumElementsAmounts() -> VectorConstRef;
+
+    /// Return the result of the last kinetic calculation.
+    auto result() const -> const KineticResult&;
 
 private:
     struct Impl;

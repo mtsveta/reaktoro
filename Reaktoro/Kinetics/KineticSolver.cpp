@@ -24,8 +24,7 @@ using namespace std::placeholders;
 // Reaktoro includes
 #include <Reaktoro/Common/ChemicalVector.hpp>
 #include <Reaktoro/Common/Exception.hpp>
-#include <Reaktoro/Math/Matrix.hpp>
-#include <Reaktoro/Common/StringUtils.hpp>
+#include <Reaktoro/Common/Profiling.hpp>
 #include <Reaktoro/Common/Units.hpp>
 #include <Reaktoro/Core/ChemicalProperties.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
@@ -36,9 +35,10 @@ using namespace std::placeholders;
 #include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumSensitivity.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumSolver.hpp>
+#include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
+#include <Reaktoro/Equilibrium/SmartEquilibriumSolver.hpp>
 #include <Reaktoro/Kinetics/KineticOptions.hpp>
-#include <Reaktoro/Kinetics/KineticProblem.hpp>
-#include <Reaktoro/Thermodynamics/Water/WaterConstants.hpp>
+#include <Reaktoro/Kinetics/KineticResult.hpp>
 
 namespace Reaktoro {
 
@@ -56,8 +56,14 @@ struct KineticSolver::Impl
     /// The options of the kinetic solver
     KineticOptions options;
 
+    /// The result of the kinetic solver
+    KineticResult result;
+
     /// The equilibrium solver instance
     EquilibriumSolver equilibrium;
+
+    /// The equilibrium solver instance
+    SmartEquilibriumSolver smart_equilibrium;
 
     /// The sensitivity of the equilibrium state
     EquilibriumSensitivity sensitivity;
@@ -78,7 +84,7 @@ struct KineticSolver::Impl
     Index Ee, Ek;
 
     /// The formula matrix of the equilibrium species
-    Matrix Ae;
+    Matrix Ae, Ak;
 
     /// The stoichiometric matrix w.r.t. the equilibrium species
     Matrix Se;
@@ -132,15 +138,20 @@ struct KineticSolver::Impl
     {}
 
     Impl(const ReactionSystem& reactions)
-    : reactions(reactions), system(reactions.system()), equilibrium(system)
+    : reactions(reactions), system(reactions.system()), equilibrium(system), smart_equilibrium(system)
     {
         setPartition(Partition(system));
     }
 
-    auto setOptions(const KineticOptions& options_) -> void
+    auto setOptions(const KineticOptions& options) -> void
     {
         // Initialise the options of the kinetic solver
-        options = options_;
+        this->options = options;
+
+        // Set options for the equilibrium calculations
+        equilibrium.setOptions(options.equilibrium);
+        smart_equilibrium.setOptions(options.smart_equilibrium);
+
     }
 
     auto setPartition(const Partition& partition_) -> void
@@ -148,8 +159,9 @@ struct KineticSolver::Impl
         // Initialise the partition member
         partition = partition_;
 
-        // Set the partition of the equilibrium solver
+        // Set the partition of the equilibrium and smart equilibrium solver
         equilibrium.setPartition(partition);
+        smart_equilibrium.setPartition(partition);
 
         // Set the indices of the equilibrium and kinetic species
         ies = partition.indicesEquilibriumSpecies();
@@ -169,6 +181,22 @@ struct KineticSolver::Impl
 
         // Initialise the formula matrix of the equilibrium partition
         Ae = partition.formulaMatrixEquilibriumPartition();
+
+        // Initialise the formula matrix of the kinetic partition
+        // Ak_tmp is of the size (Indices of elements that are included in kinetic species) x Nk
+        Matrix Ak_tmp = partition.formulaMatrixKineticPartition();
+        if(Nk)
+        {
+            // Initialize formula matrix of the kinetic partition
+            // Ak is of the size N x Nk
+            Ak = Matrix::Zero(system.numElements(), Nk);
+
+            for(Index i = 0; i < ike.size(); ++i)
+            {
+                // Copy the rows of Ak_tmp to the positions of the kinetic elements
+                Ak.row(ike[i]) << Ak_tmp.row(i);
+            }
+        }
 
         // Initialise the stoichiometric matrices w.r.t. the equilibrium and kinetic species
         Se = cols(reactions.stoichiometricMatrix(), ies);
@@ -287,12 +315,13 @@ struct KineticSolver::Impl
 
         // Extract the composition of the equilibrium and kinetic species
         const auto& n = state.speciesAmounts();
-        ne = n(ies);
+        //ne = n(ies);
         nk = n(iks);
 
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
-        benk.head(Ee) = Ae * ne;
+        //benk.head(Ee) = Ae * ne;
+        benk.head(Ee) = be;
         benk.tail(Nk) = nk;
 
         // Define the ODE function
@@ -323,6 +352,7 @@ struct KineticSolver::Impl
 
         // Set the options of the equilibrium solver
         equilibrium.setOptions(options.equilibrium);
+        smart_equilibrium.setOptions(options.smart_equilibrium);
     }
 
     auto step(ChemicalState& state, double t) -> double
@@ -354,13 +384,15 @@ struct KineticSolver::Impl
         state.setSpeciesAmounts(nk, iks);
 
         // Update the composition of the equilibrium species
-        equilibrium.solve(state, T, P, be);
+        if(options.use_smart_equilibrium_solver) smart_equilibrium.solve(state, T, P, be);
+        else equilibrium.solve(state, T, P, be);
 
         return t;
     }
 
     auto solve(ChemicalState& state, double t, double dt) -> void
     {
+        tic(0);
         // Initialise the chemical kinetics solver
         initialize(state, t);
 
@@ -374,8 +406,16 @@ struct KineticSolver::Impl
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
 
+        // TODO: is this  equiliration needed?
         // Update the composition of the equilibrium species
-        equilibrium.solve(state, T, P, be);
+        // equilibrium.solve(state, T, P, be);
+
+        toc(0, result.timing.solve);
+    }
+
+    auto setElementsAmounts(VectorConstRef b) -> void
+    {
+        be = b - Ak * nk;
     }
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
@@ -385,7 +425,7 @@ struct KineticSolver::Impl
         nk = u.tail(Nk);
 
         // Check for non-finite values in the vector `benk`
-        for(int i = 0; i < u.rows(); ++i)
+        for(Index i = 0; i < u.rows(); ++i)
             if(!std::isfinite(u[i]))
                 return 1; // ensure the ode solver will reduce the time step
 
@@ -393,25 +433,47 @@ struct KineticSolver::Impl
         state.setSpeciesAmounts(nk, iks);
 
         // Solve the equilibrium problem using the elemental molar abundance `be`
-        auto result = equilibrium.solve(state, T, P, be);
-
-        // Check if the calculation failed, if so, use cold-start
-        if(!result.optimum.succeeded)
+        if(options.use_smart_equilibrium_solver) // using smart equilibrium solver
         {
-            state.setSpeciesAmounts(0.0);
-            result = equilibrium.solve(state, T, P, be);
+            SmartEquilibriumResult res = {};
+
+            timeit(smart_equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+
+            // If smart calculation failed, use cold-start
+            if(!res.estimate.accepted && res.learning.gibbs_energy_minimization.optimum.succeeded)
+            {
+                state.setSpeciesAmounts(0.0);
+                timeit( res = smart_equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+            }
+            // Assert the smart equilibrium calculation did not fail
+            Assert(!res.estimate.accepted && res.learning.gibbs_energy_minimization.optimum.succeeded,
+                   "Could not calculate the rates of the species.",
+                   "The smart equilibrium calculation failed.");
+
+        }
+        else  // using conventional equilibrium solver
+        {
+            EquilibriumResult res = {};
+
+            timeit( res = equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+
+            // Check if the calculation failed, if so, use cold-start
+            if(!res.optimum.succeeded)
+            {
+                state.setSpeciesAmounts(0.0);
+                timeit( res = equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+            }
+            // Assert the equilibrium calculation did not fail
+            Assert(res.optimum.succeeded,
+                   "Could not calculate the rates of the species.",
+                   "The equilibrium calculation failed.");
         }
 
-        // Assert the equilibrium calculation did not fail
-        Assert(result.optimum.succeeded,
-            "Could not calculate the rates of the species.",
-            "The equilibrium calculation failed.");
-
         // Update the chemical properties of the system
-        properties = state.properties();
+        timeit(properties = state.properties(), result.timing.chemical_properties+=);
 
         // Calculate the kinetic rates of the reactions
-        r = reactions.rates(properties);
+        timeit(r = reactions.rates(properties), result.timing.reaction_rates+=);
 
         // Calculate the right-hand side function of the ODE
         res = A * r.val;
@@ -432,7 +494,7 @@ struct KineticSolver::Impl
     auto jacobian(ChemicalState& state, double t, VectorConstRef u, MatrixRef res) -> int
     {
         // Calculate the sensitivity of the equilibrium state
-        sensitivity = equilibrium.sensitivity();
+        sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity();
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
         drdne = cols(r.ddn, ies);
@@ -470,6 +532,10 @@ struct KineticSolver::Impl
 
 KineticSolver::KineticSolver()
 : pimpl(new Impl())
+{}
+
+KineticSolver::KineticSolver(const KineticSolver& other)
+: pimpl(new Impl(*other.pimpl))
 {}
 
 KineticSolver::KineticSolver(const ReactionSystem& reactions)
@@ -534,5 +600,21 @@ auto KineticSolver::solve(ChemicalState& state, double t, double dt) -> void
 {
     pimpl->solve(state, t, dt);
 }
+
+auto KineticSolver::setElementsAmounts(VectorConstRef b) -> void
+{
+    pimpl->setElementsAmounts(b);
+}
+
+auto KineticSolver::getEquilibriumElementsAmounts() -> VectorConstRef
+{
+    pimpl->be;
+}
+
+auto KineticSolver::result() const -> const KineticResult&
+{
+    return pimpl->result;
+}
+
 
 } // namespace Reaktoro

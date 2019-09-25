@@ -22,3 +22,7 @@
 #include <Reaktoro/Kinetics/KineticProblem.hpp>
 #include <Reaktoro/Kinetics/KineticResult.hpp>
 #include <Reaktoro/Kinetics/KineticSolver.hpp>
+
+#include <Reaktoro/Kinetics/SmartKineticOptions.hpp>
+#include <Reaktoro/Kinetics/SmartKineticResult.hpp>
+
