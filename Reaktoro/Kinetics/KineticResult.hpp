@@ -25,8 +25,14 @@ struct KineticTiming {
     /// The time spent for solving the chemical kinetic problem.
     double solve = 0.0;
 
-    /// The time spent for integrating during the chemical kinetic solve step.
-    double integrate = 0.0;
+    /// The time spent for computing the chemical properties of the system.
+    double chemical_properties = 0.0;
+
+    /// The time spent for computing the chemical properties of the system.
+    double reaction_rates = 0.0;
+
+    /// The time spent for equilibration of the system.
+    double equilibration = 0.0;
 
     /// Self addition assignment to accumulate kinetic timing.
     auto operator+=(const KineticTiming& other) -> KineticTiming&;
