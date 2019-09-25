@@ -499,6 +499,16 @@ struct SmartEquilibriumSolver::Impl
 
         return result;
     }
+    auto properties() const -> const ChemicalProperties&
+    {
+        solver.properties();
+    }
+
+    auto sensitivity() -> const EquilibriumSensitivity&
+    {
+        solver.sensitivity();
+    }
+
 };
 
 SmartEquilibriumSolver::SmartEquilibriumSolver()
@@ -544,6 +554,11 @@ auto SmartEquilibriumSolver::solve(ChemicalState& state, double T, double P, Vec
 auto SmartEquilibriumSolver::solve(ChemicalState& state, const EquilibriumProblem& problem) -> SmartEquilibriumResult
 {
     return pimpl->solve(state, problem);
+}
+
+auto SmartEquilibriumSolver::sensitivity() const -> const EquilibriumSensitivity&
+{
+    return pimpl->sensitivity();
 }
 
 auto SmartEquilibriumSolver::properties() const -> const ChemicalProperties&

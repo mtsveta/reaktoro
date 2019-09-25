@@ -27,6 +27,7 @@ namespace Reaktoro {
 class ChemicalProperties;
 class ChemicalState;
 class ChemicalSystem;
+class EquilibriumSolver;
 class EquilibriumProblem;
 class EquilibriumSensitivity;
 class Partition;
@@ -76,9 +77,18 @@ public:
     auto solve(ChemicalState& state, const EquilibriumProblem& problem) -> SmartEquilibriumResult;
 
     /// Return the chemical properties of the calculated equilibrium state.
+    /// @see ChemicalProperties
     auto properties() const -> const ChemicalProperties&;
 
+    /// Return the sensitivity of the equilibrium state.
+    /// The sensitivity of the equilibrium state is defined as the rate of change of the
+    /// molar amounts of the equilibrium species with respect to temperature `T`, pressure `P`,
+    /// and molar amounts of equilibrium elements `be`.
+    /// @see EquilibriumSensitivity
+    auto sensitivity() -> const EquilibriumSensitivity&;
+
     /// Return the result of the last smart equilibrium calculation.
+    /// @see SmartEquilibriumResult
     auto result() const -> const SmartEquilibriumResult&;
 
 private:
