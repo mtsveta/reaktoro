@@ -42,11 +42,10 @@ struct ReactiveTransportOptions
     /// The options for the smart kinetic calculations.
     SmartKineticOptions smart_kinetics;
 
-
-    /// The boolean flag that indicates whether SmartEquilibriumSolver should be used.
+    /// The boolean flag that indicates whether smart equilibrium solver should be used.
     bool use_smart_equilibrium_solver = false;
 
-    /// The boolean flag that indicates whether SmartKineticSolver should be used.
+    /// The boolean flag that indicates whether smart kinetic solver should be used.
     bool use_smart_kinetic_solver = false;
 };
 
