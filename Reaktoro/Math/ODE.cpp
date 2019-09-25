@@ -59,7 +59,7 @@ struct ODEData
     VectorRef y;
     VectorRef f;
     MatrixRef J;
-    int num_equations;
+    unsigned int num_equations;
 };
 
 struct ODEProblem::Impl
@@ -99,7 +99,7 @@ struct ODESolver::Impl
 
     /// Construct a default ODESolver::Impl instance
     Impl()
-    : cvode_mem(0), cvode_y(0)
+    : cvode_mem(nullptr), cvode_y(nullptr)
     {}
 
     ~Impl()
@@ -125,7 +125,7 @@ struct ODESolver::Impl
             "The dimension of the vector parameter `y` does not match the number of equations.");
 
         // The number of differential equations
-        const int num_equations = problem.numEquations();
+        const unsigned int num_equations = problem.numEquations();
 
         // Allocate memory for f and J
         f.resize(num_equations);
@@ -149,7 +149,7 @@ struct ODESolver::Impl
         CheckInitialize(CVodeSetMaxOrd(cvode_mem, CVODEMaxStepOrder(options)));
 
         // Check if the cvode creation succeeded
-        Assert(cvode_mem != NULL,
+        Assert(cvode_mem != nullptr,
             "Cannot proceed with ODESolver::initialize to initialize the solver.",
             "There was an error creating the CVODE context.");
 
@@ -302,6 +302,7 @@ int CVODEFunction(realtype t, N_Vector y, N_Vector f, void* user_data)
 
 int CVODEJacobian(long int N, realtype t, N_Vector y, N_Vector fy, DlsMat J, void* user_data, N_Vector tmp1, N_Vector tmp2, N_Vector tmp3)
 {
+    // TODO: N and fy never used. Do we need them here?
     ODEData& data = *static_cast<ODEData*>(user_data);
 
     for(int i = 0; i < data.num_equations; ++i)
@@ -380,6 +381,10 @@ auto ODEProblem::jacobian(double t, VectorConstRef y, MatrixRef J) const -> int
 
 ODESolver::ODESolver()
 : pimpl(new Impl())
+{}
+
+ODESolver::ODESolver(const ODESolver& other)
+: pimpl(new Impl(*other.pimpl))
 {}
 
 ODESolver::~ODESolver()

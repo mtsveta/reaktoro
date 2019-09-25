@@ -172,7 +172,7 @@ public:
     ODESolver();
 
     /// Construct a copy of an ODESolver instance.
-    ODESolver(const ODESolver& other) = delete;
+    ODESolver(const ODESolver& other);
 
     /// Destroy this ODESolver instance.
     virtual ~ODESolver();
