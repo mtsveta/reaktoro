@@ -27,7 +27,6 @@
 #include <Reaktoro/Common/Exception.hpp>
 #include <Reaktoro/Common/Profiling.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
-#include <Reaktoro/Transport/Mesh.hpp>
 
 namespace Reaktoro {
 
@@ -50,6 +49,14 @@ struct ReactiveTransportSolver::Impl
 
     /// The equilibrium solver using a smart on-demand learning strategy.
     SmartEquilibriumSolver smart_equilibrium_solver;
+
+    /// The equilibrium solver using conventional Gibbs energy minimization approach.
+    KineticSolver kinetic_solver;
+
+    /*
+    /// The equilibrium solver using a smart on-demand learning strategy.
+    SmartKineticSolver smart_kinetic_solver;
+    */
 
     /// The list of chemical output objects
     std::vector<ChemicalOutput> outputs;
@@ -83,8 +90,18 @@ struct ReactiveTransportSolver::Impl
     auto setOptions(const ReactiveTransportOptions& options) -> void
     {
         this->options = options;
+
+        // Set options of equilibrium solvers
         equilibrium_solver.setOptions(options.equilibrium);
         smart_equilibrium_solver.setOptions(options.smart_equilibrium);
+
+        // Set options of kinetic solvers
+        kinetic_solver.setOptions(options.kinetics);
+        //this->options.kinetics.use_smart_equilibrium_solver = options.use_smart_equilibrium_solver; // TODO: make sure the flag is set
+
+        /*
+        smart_kinetic_solver.setOptions(options.smart_kinetics);
+        */
     }
 
     /// Initialize the mesh discretizing the computational domain for reactive transport.
@@ -146,7 +163,7 @@ struct ReactiveTransportSolver::Impl
     auto step(ChemicalField& field) -> ReactiveTransportResult
     {
         // The result of the reactive transport step
-        ReactiveTransportResult rt_result;
+        ReactiveTransportResult rt_result = {};
 
         // Auxiliary variables
         const auto& mesh = transport_solver.mesh();
@@ -254,6 +271,178 @@ struct ReactiveTransportSolver::Impl
 
         return rt_result;
     }
+
+    /// Perform one time step of a reactive transport calculation.
+    auto stepKinetics(ChemicalField& field) -> ReactiveTransportResult
+    {
+        // The result of the reactive transport step
+        ReactiveTransportResult rt_result = {};
+
+        // Auxiliary variables
+        const auto& mesh = transport_solver.mesh();
+        const auto& num_elements = system.numElements();
+        const auto& num_cells = mesh.numCells();
+        const auto& ifs = system.indicesFluidSpecies();
+        const auto& iss = system.indicesSolidSpecies();
+
+        // Open the the file for outputting chemical states
+        for(auto output : outputs)
+        {
+            output.suffix("-" + std::to_string(steps));
+            output.open();
+        }
+
+        //---------------------------------------------------------------------------
+        // Step 1: Perform a time step transport calculation for each fluid element
+        //---------------------------------------------------------------------------
+        tic(0);
+
+        // Collect the amounts of elements in the solid and fluid species
+        for(Index icell = 0; icell < num_cells; ++icell)
+        {
+            bf.row(icell) = field[icell].elementAmountsInSpecies(ifs);
+            bs.row(icell) = field[icell].elementAmountsInSpecies(iss);
+        }
+
+        // Left boundary condition cell
+        Index icell_bc = 0;
+        // Get porosity of the left boundary cell
+        const auto phi_bc = field[icell_bc].properties().fluidVolume().val / field[icell_bc].properties().volume().val;
+
+        // Ensure the result of each fluid element transport calculation can be saved
+        result.transport_of_element.resize(num_elements);
+
+        // Transport the elements in the fluid species
+        for(Index ielement = 0; ielement < num_elements; ++ielement)
+        {
+            // Scale BC with a porosity of the boundary cell
+            transport_solver.setBoundaryValue(phi_bc * bbc[ielement]);
+            transport_solver.step(bf.col(ielement));
+
+            // Save the result of this element transport calculation.
+            result.transport_of_element[ielement] = transport_solver.result();
+        }
+
+        // Sum the amounts of elements distributed among fluid and solid species
+        b.noalias() = bf + bs;
+
+        // Update the amounts of elements for kinetic solver
+        kinetic_solver.setElementsAmounts(b);
+
+        toc(0, result.timing.transport);
+
+        //---------------------------------------------------------------------------
+        // Step 2: Perform a time step equilibrium calculation for each cell
+        //---------------------------------------------------------------------------
+        tic(1);
+
+        if(options.use_smart_kinetic_solver)
+        {
+            // Ensure the result of each cell's smart kinetic calculation can be saved
+            result.smart_kinetics_at_cell.resize(num_cells);
+
+            for(Index icell = 0; icell < num_cells; ++icell)
+            {
+                const auto T = field[icell].temperature();
+                const auto P = field[icell].pressure();
+
+                // Solve with a smart kinetic solver
+                // smart_kinetic_solver.solve(field[icell], T, P);
+
+                // Save the result of this cell's smart kinetic calculation
+                // result.smart_kinetics_at_cell[icell] = smart_kinetic_solver.result();
+            }
+        }
+        else
+        {
+            // Ensure the result of each cell's kinetic calculation can be saved.
+            result.kinetics_at_cell.resize(num_cells);
+
+            for(Index icell = 0; icell < num_cells; ++icell)
+            {
+                const auto T = field[icell].temperature();
+                const auto P = field[icell].pressure();
+
+                // Solve with a conventional kinetic solver
+                kinetic_solver.solve(field[icell], T, P);
+
+                // Save the result of this cell's smart equilibrium calculation.
+                result.kinetics_at_cell[icell] = kinetic_solver.result();
+
+                /*
+                // TODO: is this equilibration needed at all
+                if(options.use_smart_kinetic_solver) {
+                    // Solve with a conventional equilibrium solver
+                    equilibrium_solver.solve(field[icell], T, P, kinetic_solver.getEquilibirumElementsAmounts());
+                }
+                else
+                {
+                    // Solve with a smart equilibrium solver
+                    smart_equilibrium_solver.solve(field[icell], T, P, kinetic_solver.getEquilibirumElementsAmounts());
+                }
+                */
+            }
+        }
+
+        toc(1, result.timing.kinetics);
+
+        /*
+        //---------------------------------------------------------------------------
+        // Step 3: Perform a time step equilibrium calculation for each cell
+        //---------------------------------------------------------------------------
+        tic(2);
+
+        if(options.use_smart_equilibrium_solver)
+        {
+            // Ensure the result of each cell's smart equilibrium calculation can be saved
+            result.smart_equilibrium_at_cell.resize(num_cells);
+
+            for(Index icell = 0; icell < num_cells; ++icell)
+            {
+                const auto T = field[icell].temperature();
+                const auto P = field[icell].pressure();
+
+                // Solve with a smart equilibrium solver
+                smart_equilibrium_solver.solve(field[icell], T, P, be);
+
+                // Save the result of this cell's smart equilibrium calculation
+                result.smart_equilibrium_at_cell[icell] = smart_equilibrium_solver.result();
+            }
+        }
+        else
+        {
+            // Ensure the result of each cell's equilibrium calculation can be saved.
+            result.equilibrium_at_cell.resize(num_cells);
+
+            for(Index icell = 0; icell < num_cells; ++icell)
+            {
+                const auto T = field[icell].temperature();
+                const auto P = field[icell].pressure();
+
+                // Solve with a conventional equilibrium solver
+                equilibrium_solver.solve(field[icell], T, P, be);
+
+                // Save the result of this cell's smart equilibrium calculation.
+                result.equilibrium_at_cell[icell] = equilibrium_solver.result();
+            }
+        }
+
+        toc(2, result.timing.equilibrium);
+        */
+        // Update the output files with the chemical state of every cell
+        for(Index icell = 0; icell < num_cells; ++icell)
+            for(auto output : outputs)
+                output.update(field[icell], icell);
+
+        // Output chemical states in the output files
+        for(auto output : outputs)
+            output.close();
+
+        // Increment the current number of reactive transport steps
+        ++steps;
+
+        return rt_result;
+    }
 };
 
 ReactiveTransportSolver::ReactiveTransportSolver(const ChemicalSystem& system)
@@ -267,8 +456,7 @@ ReactiveTransportSolver::ReactiveTransportSolver(const ReactiveTransportSolver& 
 }
 
 ReactiveTransportSolver::~ReactiveTransportSolver()
-{
-}
+{}
 
 auto ReactiveTransportSolver::operator=(ReactiveTransportSolver other) -> ReactiveTransportSolver&
 {
@@ -319,6 +507,11 @@ auto ReactiveTransportSolver::initialize() -> void
 auto ReactiveTransportSolver::step(ChemicalField& field) -> ReactiveTransportResult
 {
     return pimpl->step(field);
+}
+
+auto ReactiveTransportSolver::stepKinetics(Reaktoro::ChemicalField &field) -> ReactiveTransportResult
+{
+    return pimpl->stepKinetics(field);
 }
 
 auto ReactiveTransportSolver::result() const -> const ReactiveTransportResult&

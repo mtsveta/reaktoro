@@ -206,8 +206,8 @@ int main()
     params.smart_equilibrium_abstol = 1e-8;
 
     // Define parameters of the kinetics solvers
-    params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_abstol = 1e-2;
+    params.smart_kinetics_reltol = 1e-1;
+    params.smart_kinetics_abstol = 1e-2;
 
     // Output
     outputConsole(params);
@@ -216,11 +216,25 @@ int main()
     RTKineticsResults results;
 
     // Execute reactive transport with different solvers
-    params.use_smart_equilibrium_solver = true; params.use_smart_kinetics_solver = false; runReactiveTransport(params, results);
+    params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
-    results.conv_kin_conv_eq_total = 0.0;
-    results.conv_kin_conv_eq_total_ideal_properties = 0.0;
+    results.conv_kin_conv_eq_total = results.kinetic_timing.solve;
+    results.conv_kin_conv_eq_total_ideal_properties = results.kinetic_timing.solve - results.kinetic_timing.chemical_properties;
 
+    // Execute reactive transport with different solvers
+    params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = true; runReactiveTransport(params, results);
+
+    results.conv_kin_smart_eq_total = results.kinetic_timing.solve;
+    results.conv_kin_smart_eq_total_ideal_search = results.kinetic_timing.solve - results.smart_equilibrium_timing.estimate_search;
+    results.conv_kin_smart_eq_total_ideal_search_store = results.kinetic_timing.solve
+                                                            - results.smart_equilibrium_timing.estimate_search
+                                                            - results.smart_equilibrium_timing.learn_storage;
+    results.conv_kin_smart_eq_total_ideal_search_store_properties = results.kinetic_timing.solve
+                                                                    - results.smart_equilibrium_timing.estimate_search
+                                                                    - results.smart_equilibrium_timing.learn_storage
+                                                                    - results.kinetic_timing.chemical_properties;
+
+    /*
     // Execute reactive transport with different solvers
     params.use_smart_equilibrium_solver = true; params.use_smart_kinetics_solver = true; runReactiveTransport(params, results);
 
@@ -230,18 +244,15 @@ int main()
     results.smart_kin_conv_eq_total_ideal_search_store_properties = 0.0;
 
     // Execute reactive transport with different solvers
-    params.use_smart_equilibrium_solver = false; params.use_smart_kinetics_solver = true; runReactiveTransport(params, results);
+    params.use_smart_kinetics_solver = true; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conv_kin_smart_eq_total = 0.0;
     results.conv_kin_smart_eq_total_ideal_search = 0.0;
     results.conv_kin_smart_eq_total_ideal_search_store = 0.0;
     results.conv_kin_smart_eq_total_ideal_search_store_properties = 0.0;
+    */
 
-
-    // Execute reactive transport with different solvers
-    params.use_smart_equilibrium_solver = false; params.use_smart_kinetics_solver = false; runReactiveTransport(params, results);
-
-
+    /*
     // Summarise the profiling results
     results.conv_kin_conv_eq_total = 0.0;
 
@@ -259,7 +270,26 @@ int main()
     results.smart_kin_smart_eq_total_ideal_search = 0.0;
     results.smart_kin_smart_eq_total_ideal_search_store = 0.0;
     results.smart_kin_smart_eq_total_ideal_search_store_properties = 0.0;
+    */
 
+    if(results.conv_kin_smart_eq_total != 0){
+        std::cout << "speed up of using smart equilibrium solver                  : "
+                  << results.conv_kin_conv_eq_total / results.conv_kin_smart_eq_total << std::endl;
+        std::cout << "speed up ... (with ideal search)                            : "
+                  << results.conv_kin_conv_eq_total / results.conv_kin_smart_eq_total_ideal_search << std::endl;
+        std::cout << "speed up ... (with ideal search & store)                    : "
+                  << results.conv_kin_conv_eq_total / results.conv_kin_smart_eq_total_ideal_search_store << std::endl;
+        std::cout << "speed up ... (with ideal search & store & properties eval.) : "
+                  << results.conv_kin_conv_eq_total / results.conv_kin_smart_eq_total_ideal_search_store_properties << std::endl;
+
+        std::cout << "time RT conv.kin.& conv.eq.  : " << results.time_reactive_transport_conv_kin_conv_eq << std::endl;
+        std::cout << "time RT conv.kin.& smart.eq. : " << results.time_reactive_transport_conv_kin_smart_eq << std::endl;
+        //std::cout << "time RT smart.kin.& conv.eq. : " << results.time_reactive_transport_smart_kin_conv_eq << std::endl;
+        std::cout << "speedup                      : " << results.time_reactive_transport_conv_kin_conv_eq
+                                                          / results.time_reactive_transport_conv_kin_smart_eq << std::endl;
+
+    }
+    /*
     if(results.smart_kin_conv_eq_total != 0){
         std::cout << "speed up of using smart kinetic solver                      : "
                   << results.conv_kin_conv_eq_total / results.smart_kin_conv_eq_total << std::endl;
@@ -276,6 +306,7 @@ int main()
                                                             / results.time_reactive_transport_conv_kin_smart_eq << std::endl;
 
     }
+    */
     std::cout << "total time                          : " << elapsed(start) << std::endl;
 
     /*
@@ -319,6 +350,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Step **: Define chemical kinetic solver options
     KineticOptions kinetic_options;
     kinetic_options.equilibrium = equilibrium_options;
+    kinetic_options.use_smart_equilibrium_solver = params.use_smart_equilibrium_solver;
 
     // Step **: Define smart chemical kinetic solver options
     SmartKineticOptions smart_kinetic_options;
@@ -464,6 +496,9 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     if(!params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) results.conv_kin_conv_eq_total = 0.0;
     if(!params.use_smart_kinetics_solver && params.use_smart_equilibrium_solver) results.conv_kin_smart_eq_total = 0.0;
     if(params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) results.smart_kin_conv_eq_total = 0.0;
+
+    //if(params.use_smart_equilibrium_solver) results.smart_equilibrium_timing = analysis.smart_equilibrium.timing;
+    //else results.equilibrium_timing = analysis.equilibrium.timing;
 }
 
 /// Make directory for Windows and Linux

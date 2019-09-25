@@ -20,17 +20,19 @@
 #include <memory>
 
 // Reaktoro includes
+#include <Reaktoro/Math/Matrix.hpp>
 #include <Reaktoro/Core/ChemicalOutput.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
 #include <Reaktoro/Core/ChemicalSystem.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumSolver.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumSolver.hpp>
-#include <Reaktoro/Math/Matrix.hpp>
 #include <Reaktoro/Transport/ChemicalField.hpp>
 #include <Reaktoro/Transport/ReactiveTransportOptions.hpp>
 #include <Reaktoro/Transport/ReactiveTransportResult.hpp>
 #include <Reaktoro/Transport/TransportSolver.hpp>
+#include <Reaktoro/Transport/Mesh.hpp>
+#include <Reaktoro/Kinetics/KineticSolver.hpp>
 
 namespace Reaktoro {
 
@@ -39,7 +41,7 @@ class ReactiveTransportSolver
 {
 public:
     /// Construct a ReactiveTransportSolver instance.
-    ReactiveTransportSolver(const ChemicalSystem& system);
+    explicit ReactiveTransportSolver(const ChemicalSystem& system);
 
     /// Construct a copy of a ReactiveTransportSolver instance.
     ReactiveTransportSolver(const ReactiveTransportSolver& other);
@@ -81,8 +83,11 @@ public:
     /// This method should be called before the first call to method ReactiveTransportSolver::step.
     auto initialize() -> void;
 
-    /// Perform one time step of a reactive transport calculation.
+    /// Perform one time step of a reactive transport calculation with pure equilibrium.
     auto step(ChemicalField& field) -> ReactiveTransportResult;
+
+    /// Perform one time step of a reactive transport calculation with kinetics.
+    auto stepKinetics(ChemicalField& field) -> ReactiveTransportResult;
 
     /// Return the result of the last reactive transport time step calculation.
     auto result() const -> const ReactiveTransportResult&;
