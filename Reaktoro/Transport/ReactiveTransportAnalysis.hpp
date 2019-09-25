@@ -22,6 +22,7 @@
 #include <Reaktoro/Common/Index.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
+#include <Reaktoro/Kinetics/KineticResult.hpp>
 #include <Reaktoro/Transport/TransportResult.hpp>
 
 namespace Reaktoro {
@@ -41,6 +42,13 @@ struct ReactiveTransportAnalysis
     {
         /// The accumulated timing for the operations during equilibrium calculations.
         EquilibriumTiming timing;
+    };
+
+    /// Provide a summary of the performance analysis of all kinetic calculations.
+    struct KineticsAnalysis
+    {
+        /// The accumulated timing for the operations during kinetic calculations.
+        KineticTiming timing;
     };
 
     /// Provide a summary of the performance analysis of all smart equilibrium calculations.
@@ -70,6 +78,9 @@ struct ReactiveTransportAnalysis
     {
         /// The time spent (in s) in each time step for fluid element transport calculations.
         std::vector<double> transport;
+
+        /// The time spent (in s) in each time step for chemical kinetic calculations.
+        std::vector<double> kinetics;
 
         /// The time spent (in s) in each time step for chemical equilibrium calculations.
         std::vector<double> equilibrium;
@@ -101,6 +112,8 @@ struct ReactiveTransportAnalysis
     EquilibriumAnalysis equilibrium;
 
     SmartEquilibriumAnalysis smart_equilibrium;
+
+    KineticsAnalysis kinetics;
 
     ComputingCostsPerTimeStep computing_costs_per_time_step;
 };
