@@ -556,7 +556,7 @@ auto SmartEquilibriumSolver::solve(ChemicalState& state, const EquilibriumProble
     return pimpl->solve(state, problem);
 }
 
-auto SmartEquilibriumSolver::sensitivity() const -> const EquilibriumSensitivity&
+auto SmartEquilibriumSolver::sensitivity() -> const EquilibriumSensitivity&
 {
     return pimpl->sensitivity();
 }
