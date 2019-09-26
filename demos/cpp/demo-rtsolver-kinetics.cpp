@@ -193,7 +193,7 @@ int main()
     //*/
     params.nsteps = 10; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
-    params.dt = 30 * minute; // the time step (in units of s)
+    params.dt = 5 * minute; // the time step (in units of s)
 
     // Define physical and chemical parameters
     params.D = 1.0e-9;     // the diffusion coefficient (in units of m2/s)
@@ -203,7 +203,7 @@ int main()
 
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_abstol = 1e-8;
+    params.smart_equilibrium_abstol = 1e-12;
 
     // Define parameters of the kinetics solvers
     params.smart_kinetics_reltol = 1e-1;
@@ -361,21 +361,32 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 
     // Step **: Construct the chemical system with its phases and species (using ChemicalEditor)
     ChemicalEditor editor;
-    // Default chemical model (HKF extended Debye-Hückel model)
-    // editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--");
-    // Create aqueous phase with all possible elements
-    // Set a chemical model of the phase with the Pitzer equation of state
-    // With an exception for the CO2, for which Drummond model is set
-    editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
-            .setChemicalModelPitzerHMW()
-            .setActivityModelDrummondCO2();
+
+    // Step **: Add aqueous phase, default chemical model (HKF extended Debye-Hückel model)
+    editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C");
+    // Step **: Add mineral phase
     editor.addMineralPhase("Quartz");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Dolomite");
 
+    MineralReaction reaction = editor.addMineralReaction("Calcite");
+    reaction.setEquation("Calcite = Ca++ + CO3--");
+    reaction.addMechanism("logk = -5.81 mol/(m2*s); Ea = 23.5 kJ/mol");
+    reaction.addMechanism("logk = -0.30 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0");
+    reaction.setSpecificSurfaceArea(5000, "cm2/g");
+
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
-    //if (params.use_smart_equilibrium_solver) std::cout << "system = \n" << system << std:: endl;
+
+    // Step **: Create the ReactionSystem instances
+    ReactionSystem reactions(editor);
+
+    // std::cout << "system = \n" << system << std:: endl;
+    // std::cout << "reactions number = " << reactions.numReactions() << std:: endl;
+
+    // Step **: Create the ReactionSystem instances
+    Partition partition(system);
+    partition.setKineticSpecies({"Calcite"});
 
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumProblem problem_ic(system);
