@@ -119,11 +119,7 @@ public:
 
     /// Update elements' amounts
     /// @param b The amount of element
-    auto setElementsAmounts(VectorConstRef b) -> void;
-
-    /// Update elements' amounts
-    /// @param b The amount of element
-    auto getEquilibriumElementsAmounts() -> VectorConstRef;
+    auto setElementsAmountsPerCell(VectorConstRef b) -> void;
 
     /// Return the result of the last kinetic calculation.
     auto result() const -> const KineticResult&;

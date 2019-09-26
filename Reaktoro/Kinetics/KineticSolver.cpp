@@ -224,6 +224,24 @@ struct KineticSolver::Impl
 
         // Allocate memory for the partial derivatives of the source rates `q` w.r.t. to `u = [be nk]`
         dqdu.resize(system.numSpecies(), Ee + Nk);
+
+        if (Nk)
+        {
+            std::cout << "setPartition function :" << std::endl;
+            std::cout << "ies :"; for (auto elem : ies) std::cout << elem << " "; std::cout << std::endl;
+            std::cout << "iks :"; for (auto elem : iks) std::cout << elem << " "; std::cout << std::endl;
+
+            std::cout << "iee :"; for (auto elem : iee) std::cout << elem << " "; std::cout << std::endl;
+            std::cout << "ike :"; for (auto elem : ike) std::cout << elem << " "; std::cout << std::endl;
+
+            std::cout << "S \n" << reactions.stoichiometricMatrix() << std::endl;
+            std::cout << "Se \n" << Se << std::endl;
+            std::cout << "Sk \n" << Sk << std::endl;
+
+            std::cout << "A \n" << A << std::endl;
+            std::cout << "Ae \n" << Ae << std::endl;
+            std::cout << "B \n" << B << std::endl;
+        }
     }
 
     auto addSource(ChemicalState state, double volumerate, std::string units) -> void
@@ -318,6 +336,11 @@ struct KineticSolver::Impl
         //ne = n(ies);
         nk = n(iks);
 
+        std::cout << "initializing  benk ..." << std::endl;
+        std::cout << "be = " << tr(be) << std::endl;
+        std::cout << "be = Ae * ne = " << tr(Ae * ne) << std::endl;
+        std::cout << "b  = Ae * ne + Ak * nk = " << tr(Ae * ne + Ak * nk) << std::endl;
+
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
         //benk.head(Ee) = Ae * ne;
@@ -349,6 +372,8 @@ struct KineticSolver::Impl
         ode.setProblem(problem);
         ode.setOptions(options_ode);
         ode.initialize(tstart, benk);
+
+        std::cout << "setting options ..." << std::endl;
 
         // Set the options of the equilibrium solver
         equilibrium.setOptions(options.equilibrium);
@@ -393,8 +418,11 @@ struct KineticSolver::Impl
     auto solve(ChemicalState& state, double t, double dt) -> void
     {
         tic(0);
+
         // Initialise the chemical kinetics solver
         initialize(state, t);
+
+        std::cout << "solving  ..." << std::endl;
 
         // Integrate the chemical kinetics ODE from `t` to `t + dt`
         ode.solve(t, dt, benk);
@@ -413,9 +441,11 @@ struct KineticSolver::Impl
         toc(0, result.timing.solve);
     }
 
-    auto setElementsAmounts(VectorConstRef b) -> void
+    auto setElementsAmountsPerCell(VectorConstRef b) -> void
     {
         be = b - Ak * nk;
+        std::cout << "set be : " << tr(be) << std::endl;
+
     }
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
@@ -601,14 +631,9 @@ auto KineticSolver::solve(ChemicalState& state, double t, double dt) -> void
     pimpl->solve(state, t, dt);
 }
 
-auto KineticSolver::setElementsAmounts(VectorConstRef b) -> void
+auto KineticSolver::setElementsAmountsPerCell(VectorConstRef b) -> void
 {
-    pimpl->setElementsAmounts(b);
-}
-
-auto KineticSolver::getEquilibriumElementsAmounts() -> VectorConstRef
-{
-    pimpl->be;
+    pimpl->setElementsAmountsPerCell(b);
 }
 
 auto KineticSolver::result() const -> const KineticResult&
