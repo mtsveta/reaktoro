@@ -119,7 +119,7 @@ public:
 
     /// Update elements' amounts
     /// @param b The amount of element
-    auto setElementsAmountsPerCell(VectorConstRef b) -> void;
+    auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void;
 
     /// Return the result of the last kinetic calculation.
     auto result() const -> const KineticResult&;

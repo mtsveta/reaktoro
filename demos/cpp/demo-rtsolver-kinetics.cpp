@@ -438,7 +438,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     reactive_transport_options.smart_kinetics = smart_kinetic_options;
 
     // Step **: Define the reactive transport modeling
-    ReactiveTransportSolver rtsolver(system);
+    ReactiveTransportSolver rtsolver(system, reactions, partition);
     rtsolver.setOptions(reactive_transport_options);
     rtsolver.setMesh(mesh);
     rtsolver.setVelocity(params.v);

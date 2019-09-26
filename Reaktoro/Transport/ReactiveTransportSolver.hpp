@@ -24,6 +24,8 @@
 #include <Reaktoro/Core/ChemicalOutput.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
 #include <Reaktoro/Core/ChemicalSystem.hpp>
+#include <Reaktoro/Core/ReactionSystem.hpp>
+#include <Reaktoro/Core/Partition.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumSolver.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumSolver.hpp>
@@ -42,6 +44,9 @@ class ReactiveTransportSolver
 public:
     /// Construct a ReactiveTransportSolver instance.
     explicit ReactiveTransportSolver(const ChemicalSystem& system);
+
+    /// Construct a ReactiveTransportSolver instance when .
+    ReactiveTransportSolver(const ChemicalSystem& system, const ReactionSystem& reactions, const Partition& partition);
 
     /// Construct a copy of a ReactiveTransportSolver instance.
     ReactiveTransportSolver(const ReactiveTransportSolver& other);
