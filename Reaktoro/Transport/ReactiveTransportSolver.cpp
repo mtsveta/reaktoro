@@ -331,6 +331,8 @@ struct ReactiveTransportSolver::Impl
 
         toc(0, result.timing.transport);
 
+        std::cout << "transport : " << result.timing.transport << std::endl;
+
         //---------------------------------------------------------------------------
         // Step 2: Perform a time step equilibrium calculation for each cell
         //---------------------------------------------------------------------------
@@ -385,6 +387,29 @@ struct ReactiveTransportSolver::Impl
         }
 
         toc(1, result.timing.kinetics);
+
+        std::cout << "kinetics  : " << result.timing.kinetics << std::endl;
+
+        double solve_time = 0.0;
+        double chemical_properties = 0.0;
+        double reaction_rates = 0.0;
+        double equilibration = 0.0;
+
+        auto sum = [&](const ReactiveTransportResult& res){
+
+            for(unsigned int i=0; i < num_cells; ++i)
+            {
+                solve_time += res.kinetics_at_cell.at(i).timing.solve;
+                chemical_properties += res.kinetics_at_cell.at(i).timing.chemical_properties;
+                reaction_rates += res.kinetics_at_cell.at(i).timing.reaction_rates;
+                equilibration += res.kinetics_at_cell.at(i).timing.equilibration;
+            }
+        };
+        std::cout << " - solve                 : " << solve_time << std::endl;
+        std::cout << "   - chemical properties : " << chemical_properties << " (" << chemical_properties / solve_time * 100 << " %)" << std::endl;
+        std::cout << "   - reaction_rates      : " << reaction_rates << " (" << reaction_rates / solve_time * 100 << " %)" << std::endl;
+        std::cout << "   - equilibration       : " << equilibration << " (" << equilibration / solve_time * 100 << " %)" << std::endl;
+        std::cout << "------------------------------------------------" << std::endl;
 
         /*
         //---------------------------------------------------------------------------

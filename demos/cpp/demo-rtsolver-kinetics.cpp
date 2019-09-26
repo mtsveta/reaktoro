@@ -464,7 +464,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
-        rtsolver.step(field);
+        rtsolver.stepKinetics(field);
 
         // Update the profiler after every call to step method
         profiler.update(rtsolver.result());
