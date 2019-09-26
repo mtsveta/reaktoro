@@ -32,7 +32,7 @@ class ReactionSystem;
 class ChemicalOutput;
 class ChemicalPlot;
 
-struct KineticOptions;
+struct SmartKineticOptions;
 struct KineticResult;
 
 /// A class that represents a solver for chemical kinetics problems.
@@ -44,7 +44,7 @@ public:
     SmartKineticSolver();
 
     /// Construct a SmartKineticSolver instance.
-    explicit SmartKineticSolver(const ReactionSystem& reactions, const KineticOptions& kin_options);
+    explicit SmartKineticSolver(const ReactionSystem& reactions);
 
     /// Construct a copy of a SmartKineticSolver instance.
     SmartKineticSolver(const SmartKineticSolver& other) = delete;
@@ -67,7 +67,7 @@ public:
     auto showTree(const Index& step) -> void;
 
     /// Set the options for the chemical kinetics calculation.
-    auto setOptions(const KineticOptions& options) -> void;
+    auto setOptions(const SmartKineticOptions& options) -> void;
 
     /// Set the partition of the chemical system.
     /// Use this method to specify the equilibrium, kinetic, and inert species.

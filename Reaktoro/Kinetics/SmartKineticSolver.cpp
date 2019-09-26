@@ -39,12 +39,40 @@ using namespace std::placeholders;
 #include <Reaktoro/Equilibrium/SmartEquilibriumSolver.hpp>
 #include <Reaktoro/Kinetics/KineticOptions.hpp>
 #include <Reaktoro/Kinetics/KineticProblem.hpp>
-#include <Reaktoro/Kinetics/KineticState.hpp>
 #include <Reaktoro/Kinetics/KineticResult.hpp>
 #include <Reaktoro/Thermodynamics/Water/WaterConstants.hpp>
 #include <Reaktoro/Transport.hpp>
 
 namespace Reaktoro {
+
+struct KineticState
+{
+    /// Start time of the integration t_k
+    double tk;
+    /// Finish time of the integration t_{k+1}
+    double tk1;
+
+    /// Initial species' amount
+    Vector n0;
+    /// Species' amount on the moment t_k
+    Vector nk;
+    /// Species' amount on the moment t_{k+1}
+    Vector nk1;
+
+    /// The partial derivatives @f$\left.\frac{\partial n}{\partial n_0}\right|@f$.
+    /// These derivatives provide a measure of how much the equilibrium amounts of the species,
+    /// @f$n@f$, change with an infinitesimal change in their initial condition, @f$n_0@f$.
+    /// They are used when solving kinetic paths of the cells that have similar initial condition
+    /// as the one already processed.
+    Matrix dndn0;
+
+    /// The right-hand size of ODE @f$\left.f(n) = \frac{\partial n}{\partial t}\right|@f$.
+    Vector dndt;
+
+    /// Jacobian of the the right-hand size f of ODE, i.e., @f$\left.J(n) = \frac{\partial f}{\partial n}\right|@f$.
+    Matrix dfdn;
+
+};
 
 struct SmartKineticSolver::Impl
 {
@@ -58,10 +86,10 @@ struct SmartKineticSolver::Impl
     Partition partition;
 
     /// The options of the kinetic solver
-    KineticOptions options;
+    SmartKineticOptions options;
 
-    /// The equilibrium solver instance
-    // EquilibriumSolver equilibrium;
+    /// The conventional kinetic solver instance
+    KineticSolver solver;
 
     // The solver for solving the equilibrium equations using classical approach
     std::unique_ptr<EquilibriumSolver> equilibrium;
@@ -277,14 +305,15 @@ struct SmartKineticSolver::Impl
     Impl()
     {}
 
-    Impl(const ReactionSystem& reactions, const KineticOptions& kin_options)
-            : reactions(reactions), system(reactions.system())
+    Impl(const ReactionSystem& reactions)
+    : reactions(reactions), system(reactions.system())
     {
+        /*
         // Initialize equilibrium solver based on the parameter
         // TODO: write it so that not both are initilized
-        if (kin_options.equilibrium.smart.is_smart) {
+        if (kin_options.use_smart_equilibrium_solver) {
             smart_equilibrium = std::make_unique<SmartEquilibriumSolver>(system);
-            smart_equilibrium->setOptions(kin_options.equilibrium);
+            smart_equilibrium->setOptions(kin_options.smart_equilibrium);
         }
         else {
             equilibrium = std::make_unique<EquilibriumSolver>(system);
@@ -293,7 +322,7 @@ struct SmartKineticSolver::Impl
         setOptions(kin_options);
 
         //setPartition(Partition(system));
-
+        */
     }
 
     auto summarize() -> void {
@@ -308,7 +337,7 @@ struct SmartKineticSolver::Impl
         std::cout << "   - time integration        : " << stats.integraion_time_total <<  " (" << stats.integraion_time_total / stats.kinetics_time_total * 100 << " %)" << std::endl;
         std::cout << "     - incr time prop. eval. : " << stats.prop_eval_time_total << " (" << stats.prop_eval_time_total / stats.integraion_time_total * 100 << " %)" << std::endl;
         std::cout << "     - incr time eq calls     : " << stats.eq_calls_time_total <<  " (" << stats.eq_calls_time_total / stats.integraion_time_total * 100 << " %)" << std::endl;
-        if (options.equilibrium.smart.is_smart) std::cout << "       - incr time eq search  : " << stats.eq_search_time_total <<  " (" << stats.eq_search_time / stats.integraion_time_total * 100 << " %)" << std::endl;
+        if (options.learning.use_smart_equilibrium_solver) std::cout << "       - incr time eq search  : " << stats.eq_search_time_total <<  " (" << stats.eq_search_time / stats.integraion_time_total * 100 << " %)" << std::endl;
         std::cout << " - time equilibration        : " << stats.equilibration_time_total <<  " (" << stats.equilibration_time_total / stats.time_total * 100 << " %)" << std::endl;
         std::cout << " - # of integration cell     : " << stats.conv_counter << " out of " << stats.conv_counter + stats.smart_counter
                   << " (" << float(stats.conv_counter) / float(stats.conv_counter + stats.smart_counter) * 100 << ") % " << std::endl;
@@ -317,7 +346,7 @@ struct SmartKineticSolver::Impl
         std::cout << "total time of SmartKineticSolver (without prop. evals and search) : "
                   << stats.time_total - stats.prop_eval_time_total - stats.search_time_total << std::endl;
         //<<  " -> speed-up of " << stats.time_total / (stats.time_total - stats.prop_eval_time_total - stats.search_time_total) << std::endl;
-        if (options.equilibrium.smart.is_smart) {
+        if (options.learning.use_smart_equilibrium_solver) {
             std::cout << "total time of SmartKineticSolver (without prop. evals, search, and eq search) : "
                       << stats.time_total - stats.prop_eval_time_total - stats.search_time_total - stats.eq_search_time_total << std::endl;
             //<<  " -> speed-up of " << stats.time_total / (stats.time_total - stats.prop_eval_time_total - stats.search_time_total - stats.eq_search_time_total) << std::endl;
@@ -341,7 +370,7 @@ struct SmartKineticSolver::Impl
         std::cout << "   - incr time integration   : " << stats.integraion_time <<  " (" << stats.integraion_time / total_time_kinetics * 100 << " %)" << std::endl;
         std::cout << "     - incr time prop. eval. : " << stats.prop_eval_time << " (" << stats.prop_eval_time / stats.integraion_time * 100 << " %)" << std::endl;
         std::cout << "     - incr time eq calls    : " << stats.eq_calls_time <<  " (" << stats.eq_calls_time / stats.integraion_time * 100 << " %)" << std::endl;
-        if (options.equilibrium.smart.is_smart)  std::cout << "       - incr time eq search : " << stats.eq_search_time <<  " (" << stats.eq_search_time / total_time_kinetics * 100 << " %)" << std::endl;
+        if (options.learning.use_smart_equilibrium_solver)  std::cout << "       - incr time eq search : " << stats.eq_search_time <<  " (" << stats.eq_search_time / total_time_kinetics * 100 << " %)" << std::endl;
         std::cout << " - incr time equilibration   : " << stats.equilibration_time <<  " (" << stats.equilibration_time / total_time * 100 << " %)" << std::endl;
         std::cout << " - # of integration cell     : " << stats.conv_counter << " out of " << stats.conv_counter + stats.smart_counter
                   << " (" << float(stats.conv_counter) / float(stats.conv_counter + stats.smart_counter) * 100 << ") % " << std::endl;
@@ -387,17 +416,19 @@ struct SmartKineticSolver::Impl
         // Empty the tree for the next step
         //tree.clear();
     }
-    auto setOptions(const KineticOptions& options_) -> void
+    auto setOptions(const SmartKineticOptions& options) -> void
     {
         // Initialise the options of the kinetic solver
-        options = options_;
+        this->options = options;
+
+
         /*
         options.smart.is_smart = opts.smart.is_smart;
         options.smart.pertubation_tol = opts.smart.pertubation_tol;
         options.smart.abstol = opts.smart.abstol;
         options.smart.reltol = opts.smart.reltol;
 
-        options.equilibrium.smart.is_smart = opts.equilibrium.smart.is_smart;
+        options.learning.use_smart_equilibrium_solver = opts.equilibrium.smart.is_smart;
         options.equilibrium.smart.reltol = opts.equilibrium.smart.reltol;
         options.equilibrium.smart.abstol = opts.equilibrium.smart.abstol;
         options.equilibrium.track_statistics = opts.equilibrium.track_statistics;
@@ -411,7 +442,7 @@ struct SmartKineticSolver::Impl
         partition = partition_;
 
         // Set the partition of the equilibrium solver
-        if (options.equilibrium.smart.is_smart)
+        if (options.learning.use_smart_equilibrium_solver)
             smart_equilibrium->setPartition(partition);
         else
             equilibrium->setPartition(partition);
@@ -641,7 +672,7 @@ struct SmartKineticSolver::Impl
         problem.setJacobian(ode_jacobian);
 
         // Define the options for the ODE solver
-        ODEOptions options_ode = options.ode;
+        ODEOptions options_ode = options.learning.ode;
 
         // Set the ODE problem and initialize the ODE solver
         ode.setProblem(problem);
@@ -649,8 +680,8 @@ struct SmartKineticSolver::Impl
         ode.initialize(tstart, benk);
 
         // Set the options of the equilibrium solver
-        if (options.equilibrium.smart.is_smart) smart_equilibrium->setOptions(options.equilibrium);
-        else                                    equilibrium->setOptions(options.equilibrium);
+        smart_equilibrium->setOptions(options.learning.smart_equilibrium);
+        equilibrium->setOptions(options.learning.equilibrium);
 
         // Initialize Jacobian and the right-hand side at the t0
         //problem.jacobian(tstart, benk0, benk_J);
@@ -665,12 +696,13 @@ struct SmartKineticSolver::Impl
 
         // Extract the composition of the equilibrium and kinetic species
         const auto& n = state.speciesAmounts();
-        ne = n(ies);
+        //ne = n(ies);
         nk = n(iks);
 
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
-        benk.head(Ee) = Ae * ne;
+        //benk.head(Ee) = Ae * ne;
+        benk.head(Ee) = be;
         benk.tail(Nk) = nk;
 
         // Initialize the initial state benk0
@@ -706,7 +738,7 @@ struct SmartKineticSolver::Impl
         problem.setJacobian(ode_jacobian);
 
         // Define the options for the ODE solver
-        ODEOptions options_ode = options.ode;
+        ODEOptions options_ode = options.learning.ode;
 
         // Set the ODE problem and initialize the ODE solver
         ode.setProblem(problem);
@@ -715,8 +747,8 @@ struct SmartKineticSolver::Impl
 
         // Set the options of the equilibrium solver
         //equilibrium->setOptions(options.equilibrium);
-        if (options.equilibrium.smart.is_smart) smart_equilibrium->setOptions(options.equilibrium);
-        else                                    equilibrium->setOptions(options.equilibrium);
+        if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->setOptions(options.learning.smart_equilibrium);
+        else                                    equilibrium->setOptions(options.learning.equilibrium);
 
         // Initialize Jacobian and the right-hand side
         // problem.jacobian(tstart, benk0, benk_J);
@@ -753,7 +785,7 @@ struct SmartKineticSolver::Impl
         const auto& tk_ref = closest_n0->state.tk;
 
         double distance = std::sqrt((benk0 - n0_ref).squaredNorm() + std::pow(t - tk_ref, 2));
-        auto confident = distance < options.smart.pertubation_tol;
+        auto confident = distance < 1e-4;
         //std::cout << "\nn0     : " << tr(n0) << " " << tk << std::endl;
         //std::cout << "n0_ref : " << tr(n0_ref) << " " << tk_ref << std::endl;
         //std::cout << "\ndis = " << distance << " > tol = " << options.smart.pertubation_tol << std::endl;
@@ -793,7 +825,7 @@ struct SmartKineticSolver::Impl
 
             // Profile estimation time of the cell
             stats.estimation_time += elapsed(start);
-            res.smart.stats.time_estimate = stats.estimation_time;
+            //res.smart.stats.time_estimate = stats.estimation_time;
 
             // Count the smartly predicted cell
             stats.smart_counter += 1;
@@ -818,8 +850,8 @@ struct SmartKineticSolver::Impl
         kin_state.tk = t;
 
         //ode.integrate(t, benk, tfinal, benk_S, benk_J, benk_f);
-        ode.solve(t, tfinal - t, benk, benk_S, benk_J, benk_f);
-
+        //ode.solve(t, tfinal - t, benk, benk_S, benk_J, benk_f);
+        ode.solve(t, tfinal - t, benk);
         // Updating the chemical state
         //be = benk.head(Ee);
         nk = benk.tail(Nk);
@@ -855,7 +887,7 @@ struct SmartKineticSolver::Impl
 
         Time start = time();
         // TODO: do we need to evaluate them here?
-        if (options.equilibrium.smart.is_smart) {
+        if (options.learning.use_smart_equilibrium_solver) {
             prop = smart_equilibrium->properties();
             eq_sens = smart_equilibrium->sensitivity();
         }
@@ -884,7 +916,7 @@ struct SmartKineticSolver::Impl
         // Profile estimation time of the cell
         //stats.integraion_time += elapsed(start);
         //res.smart.stats.time_integrate = stats.integraion_time;
-        res.smart.addLearningIndex(cell);
+        //res.smart.addLearningIndex(cell);
 
         // Count the conventionally integrated cell
         stats.conv_counter += 1;
@@ -976,7 +1008,7 @@ struct SmartKineticSolver::Impl
         Time start = time();
         bool result = estimate(t, res);
         stats.estimation_time += elapsed(start);
-        res.smart.stats.time_estimate = stats.estimation_time;
+        //res.smart.stats.time_estimate = stats.estimation_time;
 
         start = time();
         if (result)
@@ -984,7 +1016,7 @@ struct SmartKineticSolver::Impl
         else
             learn(state, t, tfinal, step, cell, res);
         stats.integraion_time += elapsed(start);
-        res.smart.stats.time_estimate = stats.integraion_time;
+        //res.smart.stats.time_estimate = stats.integraion_time;
 
     }
     auto estimateUsingResult(ChemicalState& state, double& t, KineticResult& res, Index step, Index cell) -> bool
@@ -1039,7 +1071,7 @@ struct SmartKineticSolver::Impl
         auto closest_n0 = std::min_element(tree.begin(), tree.end(), compare_nk);
 
         stats.search_time += elapsed(start);
-        res.smart.stats.time_search = stats.search_time;
+        //res.smart.stats.time_search = stats.search_time;
 
         start = time();
 
@@ -1093,7 +1125,7 @@ struct SmartKineticSolver::Impl
         state_new.setSpeciesAmounts(nk_new, iks);
         ChemicalProperties prop_new;
         Time start_prop = time();
-        if (options.equilibrium.smart.is_smart) prop_new = smart_equilibrium->properties();
+        if (options.learning.use_smart_equilibrium_solver) prop_new = smart_equilibrium->properties();
         else                                    prop_new = equilibrium->properties();
         stats.prop_eval_time += elapsed(start_prop);
         VectorConstRef lna_new = prop_new.lnActivities().val;
@@ -1130,8 +1162,8 @@ struct SmartKineticSolver::Impl
         // const ChemicalProperties& properties0 = it->properties;
         // const EquilibriumSensitivity& sensitivity0 = it->sensitivity;
 
-        auto reltol = options.smart.reltol;
-        auto abstol = options.smart.abstol;
+        auto reltol = options.reltol;
+        auto abstol = options.abstol;
         //auto reltol = options.equilibrium.smart.reltol;
         //auto abstol = options.equilibrium.smart.abstol;
         //const bool acceptance_eq = (delta_lna.array().abs() <= abstol + reltol * lna_ref.array().abs()).all();
@@ -1170,8 +1202,8 @@ struct SmartKineticSolver::Impl
         */
         // Check the variations of kinetics' rates
         // ---------------------------------------------------------------------------------------
-        reltol = options.smart.reltol;
-        abstol = options.smart.abstol;
+        reltol = options.reltol;
+        abstol = options.abstol;
 
         // Initialize delta_n = [delta_ne; delta_nk]
         Vector delta_n;
@@ -1190,7 +1222,7 @@ struct SmartKineticSolver::Impl
         const bool accaptance_kin = (delta_rk.array().abs() <= abstol + reltol * r_ref.val.array().abs()).all();
 
         stats.confidence_time += elapsed(start);
-        res.smart.stats.time_confidence = stats.confidence_time;
+        //res.smart.stats.time_confidence = stats.confidence_time;
 
         //std::cout << "++++++++++++++++++++++++++++++++++++++++++++++++++" << tr(benk) << std::endl;
         //bool confident = true;
@@ -1215,7 +1247,7 @@ struct SmartKineticSolver::Impl
         Time start = time();
         bool success = estimateUsingResult(state, t, res, step, cell);
         stats.estimation_time += elapsed(start);
-        res.smart.stats.time_estimate = stats.estimation_time;
+        //res.smart.stats.time_estimate = stats.estimation_time;
 
         start = time();
         if (success)
@@ -1223,7 +1255,7 @@ struct SmartKineticSolver::Impl
         else
             learn(state, t, tfinal, step, cell, res);
         stats.integraion_time += elapsed(start);
-        res.smart.stats.time_integrate = stats.integraion_time;
+        //res.smart.stats.time_integrate = stats.integraion_time;
     }
     auto solvePath(ChemicalState& state, double t0, double t1, std::string units, KineticResult& result) -> void
     {
@@ -1298,7 +1330,7 @@ struct SmartKineticSolver::Impl
         //equilibrium->solve(state, T, P, be);
         //Time start = time();
         EquilibriumResult res;
-        if (options.equilibrium.smart.is_smart) res += smart_equilibrium->solve(state, T, P, be);
+        if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->solve(state, T, P, be);
         else                                    equilibrium->solve(state, T, P, be);
         //stats.eq_calls_time += elapsed(start);
 
@@ -1329,17 +1361,19 @@ struct SmartKineticSolver::Impl
         //equilibrium->solve(state, T, P, be);
         if (postequilibrate) {
             // Update the composition of the equilibrium species
-            if (options.equilibrium.smart.is_smart) smart_equilibrium->solve(state, T, P, be, res.equilibrium, step, cell);
-            else res.equilibrium += equilibrium->solve(state, T, P, be);
+            if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->solve(state, T, P, be);
+            else equilibrium->solve(state, T, P, be);
 
             stats.equilibration_time += elapsed(start);
-            res.smart.stats.time_equilibrate = stats.equilibration_time;
+            //res.smart.stats.time_equilibrate = stats.equilibration_time;
 
             // Update the learning indices for the smart equilibrium
-            if (options.equilibrium.smart.is_smart && !res.equilibrium.smart.succeeded){
-                res.equilibrium.smart.addLearningIndex(cell);
-                res.equilibrium.smart.tree_size++;
+            /*
+            if (options.learning.use_smart_equilibrium_solver && !res.equilibrium.smart.succeeded){
+                //res.equilibrium.smart.addLearningIndex(cell);
+                //res.equilibrium.smart.tree_size++;
             }
+            */
         }
 
         if (postequilibrate) {
@@ -1365,28 +1399,28 @@ struct SmartKineticSolver::Impl
         be = b - Ak * nk;
 
         // Set the options of the equilibrium solver
-        if (options.equilibrium.smart.is_smart)
-            smart_equilibrium->setOptions(options.equilibrium);
+        if (options.learning.use_smart_equilibrium_solver)
+            smart_equilibrium->setOptions(options.learning.smart_equilibrium);
         else
-            equilibrium->setOptions(options.equilibrium);
+            equilibrium->setOptions(options.learning.equilibrium);
 
         Time start = time();
 
         // Update the composition of the equilibrium species
         //equilibrium->solve(state, T, P, be);
         /*
-        if (options.equilibrium.smart.is_smart)
+        if (options.learning.use_smart_equilibrium_solver)
             smart_equilibrium->solve(state, T, P, be, step, cell);
         else
             equilibrium->solve(state, T, P, be);
         */
-        if (options.equilibrium.smart.is_smart)
-            res.equilibrium += smart_equilibrium->solve(state, T, P, be, step, cell);
+        if (options.learning.use_smart_equilibrium_solver)
+            smart_equilibrium->solve(state, T, P, be);
         else
-            res.equilibrium += equilibrium->solve(state, T, P, be);
+            equilibrium->solve(state, T, P, be);
 
         stats.equilibration_time += elapsed(start);
-        res.smart.stats.time_equilibrate = stats.equilibration_time;
+        //res.smart.stats.time_equilibrate = stats.equilibration_time;
 
         // Initialise the chemical kinetics solver
         initialize(state, t, b);
@@ -1421,8 +1455,9 @@ struct SmartKineticSolver::Impl
         //auto result = equilibrium->solve(state, T, P, be);
         Time start = time();
         EquilibriumResult result;
-        if (options.equilibrium.smart.is_smart)
-            result = smart_equilibrium->solve(state, T, P, be);
+        SmartEquilibriumResult smart_results;
+        if (options.learning.use_smart_equilibrium_solver)
+            smart_results = smart_equilibrium->solve(state, T, P, be);
         else
             result = equilibrium->solve(state, T, P, be);
 
@@ -1431,12 +1466,12 @@ struct SmartKineticSolver::Impl
         {
             state.setSpeciesAmounts(0.0);
             //result = equilibrium->solve(state, T, P, be);
-            if (options.equilibrium.smart.is_smart) result = smart_equilibrium->solve(state, T, P, be);
+            if (options.learning.use_smart_equilibrium_solver) smart_results = smart_equilibrium->solve(state, T, P, be);
             else                                    result = equilibrium->solve(state, T, P, be);
 
         }
         stats.eq_calls_time += elapsed(start);
-        stats.eq_search_time += result.smart.estimate_stats.time_search;
+        //stats.eq_search_time += result.smart.estimate_stats.time_search;
 
         // Assert the equilibrium calculation did not fail
         Assert(result.optimum.succeeded,
@@ -1473,10 +1508,8 @@ struct SmartKineticSolver::Impl
         // Calculate the sensitivity of the equilibrium state
         //sensitivity = equilibrium->sensitivity();
 
-        if (options.equilibrium.smart.is_smart)
-            sensitivity = smart_equilibrium->sensitivity();
-        else
-            sensitivity = equilibrium->sensitivity();
+        if (options.learning.use_smart_equilibrium_solver)   sensitivity = smart_equilibrium->sensitivity();
+        else    sensitivity = equilibrium->sensitivity();
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
         drdne = cols(r.ddn, ies);
@@ -1512,7 +1545,7 @@ struct SmartKineticSolver::Impl
         return 0;
     }
     auto showTree(const Index& step) -> void{
-        if (options.equilibrium.smart.is_smart) smart_equilibrium->showTree(step);
+        //if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->showTree(step);
     }
 };
 
@@ -1520,8 +1553,8 @@ SmartKineticSolver::SmartKineticSolver()
         : pimpl(new Impl())
 {}
 
-SmartKineticSolver::SmartKineticSolver(const ReactionSystem& reactions, const KineticOptions& kin_options)
-        : pimpl(new Impl(reactions, kin_options))
+SmartKineticSolver::SmartKineticSolver(const ReactionSystem& reactions)
+        : pimpl(new Impl(reactions))
 {}
 
 SmartKineticSolver::~SmartKineticSolver()
@@ -1547,7 +1580,7 @@ auto SmartKineticSolver::refresh() -> void
     pimpl->refresh();
 }
 
-auto SmartKineticSolver::setOptions(const KineticOptions& options) -> void
+auto SmartKineticSolver::setOptions(const SmartKineticOptions& options) -> void
 {
     pimpl->setOptions(options);
 }
