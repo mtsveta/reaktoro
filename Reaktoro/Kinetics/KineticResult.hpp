@@ -25,6 +25,12 @@ struct KineticTiming {
     /// The time spent for solving the chemical kinetic problem.
     double solve = 0.0;
 
+    /// The time spent for initializing the chemical kinetic problem.
+    double initialize = 0.0;
+
+    /// The time spent for integrating the chemical kinetic problem.
+    double integrate = 0.0;
+
     /// The time spent for computing the chemical properties of the system.
     double chemical_properties = 0.0;
 

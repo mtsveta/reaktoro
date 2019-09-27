@@ -22,6 +22,8 @@ namespace Reaktoro {
 auto KineticTiming::operator+=(const KineticTiming& other) -> KineticTiming&
 {
     solve += other.solve;
+    initialize += other.initialize;
+    integrate += other.integrate;
     chemical_properties += other.chemical_properties;
     reaction_rates += other.reaction_rates;
     equilibration += other.equilibration;
