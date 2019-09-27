@@ -61,7 +61,7 @@ struct Params
 
 struct RTKineticsResults
 {
-     // Conventional kinetic and conventional equilibrium schemes' times
+    // Conventional kinetic and conventional equilibrium schemes' times
     // *********************************************************************************//
 
     /// Total CPU time (in s) required by conventional kinetic and equilibrium schemes.
@@ -71,7 +71,7 @@ struct RTKineticsResults
     /// excluding the costs for the chemical properties evaluation.
     double conv_kin_conv_eq_total_ideal_properties = 0.0;
 
-     // Smart kinetic and conventional equilibrium schemes' times
+    // Smart kinetic and conventional equilibrium schemes' times
     // *********************************************************************************//
 
     /// Total CPU time (in s) required by smart kinetic and conventional equilibrium schemes.
@@ -90,7 +90,7 @@ struct RTKineticsResults
     /// and the chemical properties evaluation.
     double smart_kin_conv_eq_total_ideal_search_store_properties = 0.0;
 
-     // Conventional kinetic and smart equilibrium schemes' times
+    // Conventional kinetic and smart equilibrium schemes' times
     // *********************************************************************************//
 
     double conv_kin_smart_eq_total = 0.0;
@@ -227,7 +227,6 @@ int main()
 }
 auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> void
 {
-
     // Step **: Create the results folder
     auto folder = makeResultsFolder(params);
 
@@ -246,8 +245,8 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 
     // Step **: Define smart chemical kinetic solver options
     SmartKineticOptions smart_kinetic_options;
-    smart_kinetic_options.reltol = params.smart_kinetics_reltol;
-    smart_kinetic_options.abstol = params.smart_kinetics_abstol;
+    smart_kinetic_options.reltol = params.smart_equilibrium_reltol;
+    smart_kinetic_options.abstol = params.smart_equilibrium_abstol;
     smart_kinetic_options.learning = kinetic_options;
     smart_kinetic_options.learning.equilibrium = equilibrium_options;
 
@@ -267,6 +266,12 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     reaction.addMechanism("logk = -0.30 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0");
     reaction.setSpecificSurfaceArea(5000, "cm2/g");
 
+    editor.addMineralReaction("Dolomite")
+            .setEquation("Dolomite = Ca++ + Mg++ + 2*CO3--")
+            .addMechanism("logk = -7.53 mol/(m2*s); Ea = 52.2 kJ/mol")
+            .addMechanism("logk = -3.19 mol/(m2*s); Ea = 36.1 kJ/mol; a[H+] = 0.5")
+            .setSpecificSurfaceArea(5000, "cm2/g");
+
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
 
@@ -278,7 +283,10 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 
     // Step **: Create the ReactionSystem instances
     Partition partition(system);
-    partition.setKineticSpecies({"Calcite"});
+    std::vector<std::string> kinetic_species;
+    kinetic_species.emplace_back(std::string("Calcite"));
+    kinetic_species.emplace_back(std::string("Dolomite"));
+    partition.setKineticSpecies(kinetic_species);
 
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumProblem problem_ic(system);
@@ -323,7 +331,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Step **: Define the options for the reactive transport solver
     ReactiveTransportOptions reactive_transport_options;
     reactive_transport_options.use_smart_equilibrium_solver = params.use_smart_equilibrium_solver;
-    reactive_transport_options.use_smart_kinetic_solver = params.use_smart_kinetic_solver;
+    reactive_transport_options.use_smart_kinetic_solver = params.use_smart_equilibrium_solver;
     reactive_transport_options.equilibrium = equilibrium_options;
     reactive_transport_options.smart_equilibrium = smart_equilibrium_options;
     reactive_transport_options.kinetics = kinetic_options; // TODO: think about better structure of the kinetic and equilibrium options
@@ -433,7 +441,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-nsteps-" + std::to_string(params.nsteps) +
                            "-conv-kin-conv-eq";
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
-    std::string folder = "../rt-sa-5000" + test_tag;
+    std::string folder = "../rt-sa-5000-reacts-2" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "\nsolver                         : "
@@ -454,10 +462,5 @@ auto outputConsole(const Params& params) -> void {
     std::cout << "CFD     : " << params.v * params.dt / params.dx << std::endl;
     std::cout << "T       : " << params.T << std::endl;
     std::cout << "P       : " << params.P << std::endl;
-    //std::cout << "equilibrium reltol   : " << params.smart_equilibrium_reltol << std::endl;
-    //std::cout << "equilibrium abstol   : " << params.smart_equilibrium_abstol << std::endl;
-    //std::cout << "kinetics reltol      : " << params.smart_kinetics_reltol << std::endl;
-    //std::cout << "kinetics abstol      : " << params.smart_kinetics_abstol << std::endl;
 
 }
-
