@@ -65,6 +65,7 @@ struct ODEOptions
 
     /// The lower bound on the magnitude of the step size.
     double min_step = 0.0;
+    //double min_step = 1e-16;
 
     /// The upper bound on the magnitude of the step size.
     double max_step = 0.0;
@@ -84,7 +85,9 @@ struct ODEOptions
     unsigned max_order_adams = 5;
 
     /// The maximum allowed number of steps before reaching the final time.
-    unsigned max_num_steps = 500;
+    //unsigned max_num_steps = 500;
+    ///unsigned max_num_steps = 1000;
+    unsigned max_num_steps = 5000;
 
     /// The maximum number of warnings for `t + h = t`, with `h` being too small compared to `t`.
     unsigned max_hnil_warnings = 10;

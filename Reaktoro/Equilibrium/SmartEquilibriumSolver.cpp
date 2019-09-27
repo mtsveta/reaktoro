@@ -477,8 +477,7 @@ struct SmartEquilibriumSolver::Impl
         return solve(state, T, P, be);
     }
 
-    auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult
-    {
+    auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult {
         tic(0);
 
         // Absolutely ensure an exact Hessian of the Gibbs energy function is used in the calculations
@@ -488,14 +487,20 @@ struct SmartEquilibriumSolver::Impl
         result = {};
 
         // Perform a smart estimate of the chemical state
-        timeit( estimate(state, T, P, be),
-            result.timing.estimate= );
+        timeit(estimate(state, T, P, be),
+               result.timing.estimate =);
 
         // Perform a learning step if the smart prediction is not sactisfatory
-        if(!result.estimate.accepted)
-            timeit( learn(state, T, P, be), result.timing.learn= );
+        if (!result.estimate.accepted)
+        {
+            timeit(learn(state, T, P, be), result.timing.learn =);
+        }
 
         toc(0, result.timing.solve);
+
+        std::cout << "Estimate accepted : " << result.estimate.accepted << std::endl;
+        std::cout << "GEMs succeeded    : " << result.learning.gibbs_energy_minimization.optimum.succeeded << std::endl;
+        getchar();
 
         return result;
     }

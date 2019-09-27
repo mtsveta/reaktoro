@@ -225,13 +225,15 @@ struct KineticSolver::Impl
         // Allocate memory for the partial derivatives of the source rates `q` w.r.t. to `u = [be nk]`
         dqdu.resize(system.numSpecies(), Ee + Nk);
 
-        /*
-         * TODO: remove when debugging is finished
         if (Nk)
         {
-            std::cout << "setPartition function :" << std::endl;
+            /*
+            * TODO: remove when debugging is finished
             std::cout << "ies :"; for (auto elem : ies) std::cout << elem << " "; std::cout << std::endl;
             std::cout << "iks :"; for (auto elem : iks) std::cout << elem << " "; std::cout << std::endl;
+
+
+            std::cout << "setPartition function :" << std::endl;
 
             std::cout << "iee :"; for (auto elem : iee) std::cout << elem << " "; std::cout << std::endl;
             std::cout << "ike :"; for (auto elem : ike) std::cout << elem << " "; std::cout << std::endl;
@@ -245,8 +247,8 @@ struct KineticSolver::Impl
             std::cout << "Ak \n" << Ak << std::endl;
 
             std::cout << "B \n" << B << std::endl;
+            */
         }
-         */
     }
 
     auto addSource(ChemicalState state, double volumerate, std::string units) -> void
@@ -340,14 +342,14 @@ struct KineticSolver::Impl
         const auto& n = state.speciesAmounts();
         nk = n(iks);
         ne = n(ies);
-        std::cout << "be =           " << tr(be) << std::endl;
+        /*
+        std::cout << "be           : " << tr(be) << std::endl;
         std::cout << "be = Ae * ne = " << tr(Ae * ne) << std::endl;
         std::cout << "bk =           " << tr(bk) << std::endl;
         std::cout << "bk = Ak * nk = " << tr(Ak * nk) << std::endl;
-
         std::cout << "b = Ae * ne + Ak * nk = " << tr(Ae * ne + Ak * nk) << std::endl;
-
         getchar();
+        */
 
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
@@ -423,17 +425,18 @@ struct KineticSolver::Impl
 
     auto solve(ChemicalState& state, double t, double dt) -> void
     {
+        // Initialize result structure
+        result = {};
+
         tic(0);
 
         // Initialise the chemical kinetics solver
-        initialize(state, t);
-
-        //std::cout << "solving  ..." << std::endl;
+        timeit(initialize(state, t), result.timing.initialize=);
 
         // Integrate the chemical kinetics ODE from `t` to `t + dt`
-        ode.solve(t, dt, benk);
+        timeit(ode.solve(t, dt, benk), result.timing.integrate=);
 
-        //std::cout << "updating be and nk  ..." << std::endl;
+        std::cout << "updating be and nk  ..." << std::endl;
 
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
@@ -449,6 +452,8 @@ struct KineticSolver::Impl
         // equilibrium.solve(state, T, P, be);
 
         toc(0, result.timing.solve);
+
+        getchar();
     }
 
     auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
@@ -496,16 +501,20 @@ struct KineticSolver::Impl
         {
             SmartEquilibriumResult res = {};
 
-            timeit(smart_equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+            timeit(res += smart_equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
 
             // If smart calculation failed, use cold-start
-            if(!res.estimate.accepted && res.learning.gibbs_energy_minimization.optimum.succeeded)
+            if(!res.estimate.accepted && !res.learning.gibbs_energy_minimization.optimum.succeeded)
             {
+                //std::cout << "restart smart_equilibrium: " << res.learning.gibbs_energy_minimization.optimum.succeeded << std::endl;
+
                 state.setSpeciesAmounts(0.0);
                 timeit( res = smart_equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+
             }
+
             // Assert the smart equilibrium calculation did not fail
-            Assert(!res.estimate.accepted && res.learning.gibbs_energy_minimization.optimum.succeeded,
+            Assert(res.estimate.accepted || res.learning.gibbs_energy_minimization.optimum.succeeded,
                    "Could not calculate the rates of the species.",
                    "The smart equilibrium calculation failed.");
 
@@ -514,13 +523,19 @@ struct KineticSolver::Impl
         {
             EquilibriumResult res = {};
 
-            timeit( res = equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+            timeit(res = equilibrium.solve(state, T, P, be), result.timing.equilibration +=);
 
             // Check if the calculation failed, if so, use cold-start
-            if(!res.optimum.succeeded)
-            {
+            if (!res.optimum.succeeded) {
                 state.setSpeciesAmounts(0.0);
-                timeit( res = equilibrium.solve(state, T, P, be), result.timing.equilibration+=);
+                timeit(res = equilibrium.solve(state, T, P, be), result.timing.equilibration +=);
+
+            }
+            if (!res.optimum.succeeded) {
+                std::cout << "n : " << tr(state.speciesAmounts()) << std::endl;
+                std::cout << "error : " << res.optimum.error << std::endl;
+                std::cout << "iterations : " << res.optimum.iterations << std::endl;
+
             }
             // Assert the equilibrium calculation did not fail
             Assert(res.optimum.succeeded,
@@ -528,9 +543,12 @@ struct KineticSolver::Impl
                    "The equilibrium calculation failed.");
         }
 
+
+        //std::cout << "properties ..." << std::endl;
         // Update the chemical properties of the system
         timeit(properties = state.properties(), result.timing.chemical_properties+=);
 
+        //std::cout << "reactions ..." << std::endl;
         // Calculate the kinetic rates of the reactions
         timeit(r = reactions.rates(properties), result.timing.reaction_rates+=);
 
@@ -553,6 +571,8 @@ struct KineticSolver::Impl
     auto jacobian(ChemicalState& state, double t, VectorConstRef u, MatrixRef res) -> int
     {
         // Calculate the sensitivity of the equilibrium state
+        std::cout << "in jacobian: options.use_smart_equilibrium_solver " << options.use_smart_equilibrium_solver << std::endl;
+        std::cout << "smart_equilibrium.sensitivity().dndb " << smart_equilibrium.sensitivity().dndb << std::endl;
         sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity();
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
