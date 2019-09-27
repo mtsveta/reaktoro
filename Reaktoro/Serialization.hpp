@@ -17,5 +17,6 @@
 
 #pragma once
 
+#include <Reaktoro/Serialization/JsonKinetics.hpp>
 #include <Reaktoro/Serialization/JsonEquilibrium.hpp>
 #include <Reaktoro/Serialization/JsonTransport.hpp>

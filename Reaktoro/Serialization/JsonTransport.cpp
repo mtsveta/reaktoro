@@ -17,6 +17,7 @@
 
 // Reaktoro includes
 #include <Reaktoro/Serialization/JsonEquilibrium.hpp>
+#include <Reaktoro/Serialization/JsonKinetics.hpp>
 #include <Reaktoro/Transport/TransportResult.hpp>
 #include <Reaktoro/Transport/ReactiveTransportAnalysis.hpp>
 
@@ -57,9 +58,13 @@ void to_json(json& j, const ReactiveTransportAnalysis& obj) {
     j["smart_equilibrium_estimate_acceptance_rate"] = obj.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
     j["cells_where_learning_was_required_at_step"] = obj.smart_equilibrium.cells_where_learning_was_required_at_step;
 
+    j["kinetics"] = json::object();
+    j["kinetics"]["timing"] = obj.kinetics.timing;
+
     j["computing_costs_per_time_step"] = json::object();
     j["computing_costs_per_time_step"]["transport"] = obj.computing_costs_per_time_step.transport;
     j["computing_costs_per_time_step"]["equilibrium"] = obj.computing_costs_per_time_step.equilibrium;
+    j["computing_costs_per_time_step"]["kinetics"] = obj.computing_costs_per_time_step.kinetics;
     j["computing_costs_per_time_step"]["smart_equilibrium"] = obj.computing_costs_per_time_step.smart_equilibrium;
     j["computing_costs_per_time_step"]["smart_equilibrium_with_ideal_search"] = obj.computing_costs_per_time_step.smart_equilibrium_with_ideal_search;
     j["computing_costs_per_time_step"]["smart_equilibrium_estimate"] = obj.computing_costs_per_time_step.smart_equilibrium_estimate;
@@ -74,6 +79,8 @@ void from_json(const json& j, ReactiveTransportAnalysis& obj) {
 
     j.at("equilibrium").at("timing").get_to(obj.equilibrium.timing);
 
+    j.at("kinetics").at("timing").get_to(obj.kinetics.timing);
+
     j.at("smart_equilibrium").at("timing").get_to(obj.smart_equilibrium.timing);
     j.at("num_equilibrium_calculations").get_to(obj.smart_equilibrium.num_equilibrium_calculations);
     j.at("num_smart_equilibrium_accepted_estimates").get_to(obj.smart_equilibrium.num_smart_equilibrium_accepted_estimates);
@@ -83,6 +90,7 @@ void from_json(const json& j, ReactiveTransportAnalysis& obj) {
 
     j.at("computing_costs_per_time_step").at("transport").get_to(obj.computing_costs_per_time_step.transport);
     j.at("computing_costs_per_time_step").at("equilibrium").get_to(obj.computing_costs_per_time_step.equilibrium);
+    j.at("computing_costs_per_time_step").at("kinetics").get_to(obj.computing_costs_per_time_step.kinetics);
     j.at("computing_costs_per_time_step").at("smart_equilibrium").get_to(obj.computing_costs_per_time_step.smart_equilibrium);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_with_ideal_search").get_to(obj.computing_costs_per_time_step.smart_equilibrium_with_ideal_search);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_estimate").get_to(obj.computing_costs_per_time_step.smart_equilibrium_estimate);
