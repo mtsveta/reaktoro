@@ -35,6 +35,7 @@
 #include <Reaktoro/Transport/TransportSolver.hpp>
 #include <Reaktoro/Transport/Mesh.hpp>
 #include <Reaktoro/Kinetics/KineticSolver.hpp>
+#include <Reaktoro/Kinetics/SmartKineticSolver.hpp>
 
 namespace Reaktoro {
 

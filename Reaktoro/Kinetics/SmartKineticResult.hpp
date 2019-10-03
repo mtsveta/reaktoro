@@ -20,6 +20,9 @@
 // C++ includes
 #include <string>
 
+#include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
+#include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
+
 namespace Reaktoro {
 
 /// Timing information of the operations during an kinetic calculation.
@@ -40,11 +43,17 @@ struct SmartKineticTiming {
     /// The time spent for computing the chemical properties of the system during a smart learning.
     double learn_chemical_properties = 0.0;
 
-    /// The time spent for computing the chemical properties of the system during a smart learning.
+    /// The time spent for computing the reaction rates of the system during a smart learning.
     double learn_reaction_rates = 0.0;
+
+    /// The time spent for computing the sensitivities of the system during a smart learning.
+    double learn_sensitivity = 0.0;
 
     /// The time spent for equilibration of the system during a smart learning.
     double learn_equilibration = 0.0;
+
+    /// The time spent for storing the learned smart state.
+    double learn_store = 0.0;
 
     /// The time spent for estimating the chemical kinetic path
     double estimate = 0.0;
@@ -88,6 +97,12 @@ struct SmartKineticResult
 
     /// The timing information of the operations during an equilibrium calculation.
     SmartKineticTiming timing;
+
+    /// Equilibrium information of the operations during the equilibrium calculation.
+    EquilibriumResult equilibrium;
+
+    /// Smart equilibrium information of the operations during smart equilibrium calculation.
+    SmartEquilibriumResult smart_equilibrium;
 
     /// Self addition assignment to accumulate results.
     auto operator+=(const SmartKineticResult& other) -> SmartKineticResult&;

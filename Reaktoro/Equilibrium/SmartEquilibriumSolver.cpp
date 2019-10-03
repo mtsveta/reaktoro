@@ -498,7 +498,7 @@ struct SmartEquilibriumSolver::Impl
         // Perform a smart estimate of the chemical state
         timeit(estimate(state, T, P, be), result.timing.estimate =);
 
-        // Perform a learning step if the smart prediction is not sactisfatory
+        // Perform a learning step if the smart prediction is not satisfactory
         if (!result.estimate.accepted)
             timeit(learn(state, T, P, be), result.timing.learn =);
 

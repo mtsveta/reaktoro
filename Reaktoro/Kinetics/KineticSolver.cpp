@@ -80,17 +80,14 @@ struct KineticSolver::Impl
     /// The number of equilibrium and kinetic species
     Index Ne, Nk;
 
-    /// The number of elements in the equilibrium and kinetic partition
-    Index Ee, Ek;
+    /// The number of elements in the equilibrium partition
+    Index Ee;
 
     /// The formula matrix of the equilibrium species
     Matrix Ae, Ak;
 
-    /// The stoichiometric matrix w.r.t. the equilibrium species
-    Matrix Se;
-
-    /// The stoichiometric matrix w.r.t. the kinetic species
-    Matrix Sk;
+    /// The stoichiometric matrix w.r.t. the equilibrium and kinetic species
+    Matrix Se, Sk;
 
     /// The coefficient matrix `A` of the kinetic rates
     Matrix A;
@@ -104,14 +101,11 @@ struct KineticSolver::Impl
     /// The pressure of the chemical system (in units of Pa)
     double P;
 
-    /// The molar composition of the equilibrium species
-    Vector ne;
-
-    /// The molar composition of the kinetic species
-    Vector nk;
+    /// The molar composition of the equilibrium and kinetic species
+    Vector ne, nk;
 
     /// The molar abundance of the elements in the equilibrium species
-    Vector be, bk;
+    Vector be;
 
     /// The combined vector of elemental molar abundance and composition of kinetic species [be nk]
     Vector benk;
@@ -177,7 +171,6 @@ struct KineticSolver::Impl
 
         // Set the number of equilibrium and kinetic elements
         Ee = iee.size();
-        Ek = ike.size();
 
         // Initialise the formula matrix of the equilibrium partition
         Ae = partition.formulaMatrixEquilibriumPartition();
@@ -476,11 +469,7 @@ struct KineticSolver::Impl
 
         // Update amounts of elements
         be = b - Ak * nk;
-        bk = b - be;
-
-        //VectorRef n_new = inv(A) * b;
-        //state.setSpeciesAmounts()
-        //state.setSpeciesAmounts(inv(A) * b);
+        //bk = b - be;
 
         /* TODO: block for debuggin, remove
         std::cout << "A : " << tr(A) << std::endl;
@@ -597,7 +586,8 @@ struct KineticSolver::Impl
     auto jacobian(ChemicalState& state, double t, VectorConstRef u, MatrixRef res) -> int
     {
         // Calculate the sensitivity of the equilibrium state
-        sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity();
+        timeit( sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity(),
+                result.timing.sensitivity+=);
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
         drdne = cols(r.ddn, ies);

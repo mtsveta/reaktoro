@@ -193,7 +193,7 @@ int main()
     //*/
     params.nsteps = 1000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
-    params.dt = 5 * minute; // the time step (in units of s)
+    params.dt = 50 * minute; // the time step (in units of s)
 
     // Define physical and chemical parameters
     params.D = 1.0e-9;     // the diffusion coefficient (in units of m2/s)
@@ -275,7 +275,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Step **: Create the ReactionSystem instances
     ReactionSystem reactions(editor);
 
-    // std::cout << "system = \n" << system << std:: endl;
+    std::cout << "system = \n" << system << std:: endl;
     // std::cout << "reactions number = " << reactions.numReactions() << std:: endl;
 
     // Step **: Create the ReactionSystem instances

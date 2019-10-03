@@ -22,9 +22,6 @@
 
 namespace Reaktoro{
 
-//struct EquilibriumResult;
-//struct SmartEquilibriumResult;
-
 /// Timing information of the operations during an kinetic calculation.
 struct KineticTiming {
 
@@ -42,6 +39,9 @@ struct KineticTiming {
 
     /// The time spent for computing the chemical properties of the system.
     double reaction_rates = 0.0;
+
+    /// The time spent for computing the chemical properties of the system.
+    double sensitivity = 0.0;
 
     /// The time spent for equilibration of the system.
     double equilibrate = 0.0;

@@ -54,7 +54,10 @@ option(ENABLE_TESTING "Enable testing." on)
 if(NOT CMAKE_BUILD_TYPE)
     # The build type selection for the project
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Choose the build type for ${PROJECT_NAME}." FORCE)
-
+    # set(CMAKE_BUILD_TYPE Debug)
+    # set(CMAKE_BUILD_TYPE Debug CACHE STRING "Choose the build type for ${PROJECT_NAME}." FORCE)
+    # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
+    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O0")
     # The build type options for the project
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release MinSizeRel RelWithDebInfo)
 endif()

@@ -18,7 +18,7 @@
 // C++ includes
 #include <memory>
 #include <string>
-#include <vector>
+//#include <vector>
 
 // Reaktoro includes
 #include <Reaktoro/Math/Matrix.hpp>
@@ -32,6 +32,7 @@ class ReactionSystem;
 class ChemicalOutput;
 class ChemicalPlot;
 
+// Forward declarations (structs)
 struct SmartKineticOptions;
 struct KineticResult;
 
@@ -47,24 +48,13 @@ public:
     explicit SmartKineticSolver(const ReactionSystem& reactions);
 
     /// Construct a copy of a SmartKineticSolver instance.
-    SmartKineticSolver(const SmartKineticSolver& other) = delete;
-
-    /// Destroy the SmartKineticSolver instance.
-    virtual ~SmartKineticSolver();
+    SmartKineticSolver(const SmartKineticSolver& other);
 
     /// Assign a SmartKineticSolver instance to this instance.
     auto operator=(SmartKineticSolver other) -> SmartKineticSolver&;
 
-    /// Set the options for the chemical kinetics calculation.
-    auto refresh() -> void;
-
-    /// Output the date to the console
-    auto console() -> void;
-
-    /// Output the date to the console
-    auto summarize() -> void;
-
-    auto showTree(const Index& step) -> void;
+    /// Destroy the SmartKineticSolver instance.
+    virtual ~SmartKineticSolver();
 
     /// Set the options for the chemical kinetics calculation.
     auto setOptions(const SmartKineticOptions& options) -> void;
@@ -107,21 +97,20 @@ public:
     /// @param tstart The start time of the integration.
     auto initialize(ChemicalState& state, double tstart) -> void;
 
-    /// Initialize the chemical kinetics solver (after transport).
-    /// This method should be invoked whenever the user intends to make a call to `KineticsSolver::step`.
-    /// @param state The state of the chemical system
-    /// @param tstart The start time of the integration.
-    /// @param be The elements amount.
-    auto initialize(ChemicalState& state, double tstart, VectorConstRef be) -> void;
+    /// Integrate one step of the chemical kinetics problem with a time step that does not go beyond a specified one.
+    /// @param state The kinetic state of the system
+    /// @param t The start time of the integration (in units of seconds)
+    /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
+    auto solve(ChemicalState& state, double t, double dt) -> void;
+
+    /// Update elements' amounts
+    /// @param b The amount of element
+    auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void;
+
+    /// Return the result of the last kinetic calculation.
+    auto result() const -> const SmartKineticResult&;
 
     /*
-    /// Integrate one step of the chemical kinetics problem.
-    /// @param state The kinetic state of the system
-    /// @param[in,out] t The current time of the integration (in units of seconds)
-    /// @return The updated current time after the kinetic step.
-    auto step(ChemicalState& state, double t) -> double;
-    */
-
     /// Solve the chemical kinetics problem from a given initial time to a final time.
     /// @param state The kinetic state of the system
     /// @param[in,out] t The current time of the integration (in units of seconds)
@@ -193,30 +182,7 @@ public:
     /// @param t1 The final time of the kinetic path
     /// @param units The time units of `t0` and `t1` (e.g., `s`, `minute`, `day`, `year`, etc.).
     auto solvePath(ChemicalState& state, double t0, double t1, std::string units, KineticResult& result) -> void;
-
-    /// Return a ChemicalPlot instance.
-    /// The returned ChemicalOutput instance must be properly configured
-    /// before the method EquilibriumPath::solve is called.
-    /// Changes in this ChemicalOutput instance are observed by the
-    /// EquilibriumPath object.
-    auto output() -> ChemicalOutput;
-
-    /// Return a ChemicalPlot instance.
-    /// The returned ChemicalPlot instance must be properly configured
-    /// before the method EquilibriumPath::solve is called.
-    /// Changes in this ChemicalPlot instance are observed by the
-    /// EquilibriumPath object.
-    auto plot() -> ChemicalPlot;
-
-    /// Return a collection of ChemicalPlot instances.
-    /// The returned ChemicalPlot instances must be properly configured
-    /// before the method EquilibriumPath::solve is called.
-    /// Changes in theses ChemicalPlot instances are observed by the
-    /// EquilibriumPath object.
-    auto plots(unsigned num) -> std::vector<ChemicalPlot>;
-
-
-
+    */
 private:
     struct Impl;
 

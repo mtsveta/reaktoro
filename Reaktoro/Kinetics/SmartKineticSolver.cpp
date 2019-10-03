@@ -22,56 +22,48 @@ using namespace std::placeholders;
 // Reaktoro includes
 #include <Reaktoro/Common/ChemicalVector.hpp>
 #include <Reaktoro/Common/Exception.hpp>
-#include <Reaktoro/Common/StringUtils.hpp>
+//#include <Reaktoro/Common/StringUtils.hpp>
+#include <Reaktoro/Common/Profiling.hpp>
 #include <Reaktoro/Common/Units.hpp>
-#include <Reaktoro/Common/TimeUtils.hpp>
 #include <Reaktoro/Core/ChemicalProperties.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
 #include <Reaktoro/Core/ChemicalSystem.hpp>
 #include <Reaktoro/Core/Partition.hpp>
 #include <Reaktoro/Core/ReactionSystem.hpp>
-#include <Reaktoro/Core/ChemicalOutput.hpp>
-#include <Reaktoro/Core/ChemicalPlot.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumProblem.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumSensitivity.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumSolver.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumSolver.hpp>
-#include <Reaktoro/Kinetics/KineticOptions.hpp>
-#include <Reaktoro/Kinetics/KineticProblem.hpp>
-#include <Reaktoro/Kinetics/KineticResult.hpp>
-#include <Reaktoro/Thermodynamics/Water/WaterConstants.hpp>
-#include <Reaktoro/Transport.hpp>
+#include <Reaktoro/Kinetics/SmartKineticOptions.hpp>
+#include <Reaktoro/Kinetics/SmartKineticResult.hpp>
+#include <Reaktoro/Kinetics/KineticState.hpp>
 
 namespace Reaktoro {
 
-struct KineticState
-{
-    /// Start time of the integration t_k
-    double tk;
-    /// Finish time of the integration t_{k+1}
-    double tk1;
+/// A class used to store the node of tree for smart equilibrium calculations.
+struct TreeNode{
 
-    /// Initial species' amount
-    Vector n0;
-    /// Species' amount on the moment t_k
-    Vector nk;
-    /// Species' amount on the moment t_{k+1}
-    Vector nk1;
+    KineticState state;
+    ChemicalState chemical_state;
+    ChemicalProperties properties;
+    EquilibriumSensitivity sensitivity;
+    ChemicalVector rates;
 
-    /// The partial derivatives @f$\left.\frac{\partial n}{\partial n_0}\right|@f$.
-    /// These derivatives provide a measure of how much the equilibrium amounts of the species,
-    /// @f$n@f$, change with an infinitesimal change in their initial condition, @f$n_0@f$.
-    /// They are used when solving kinetic paths of the cells that have similar initial condition
-    /// as the one already processed.
-    Matrix dndn0;
+    TreeNode(KineticState state, ChemicalState chemical_state, ChemicalProperties properties,
+             EquilibriumSensitivity sensitivity, ChemicalVector rates)
+            : state(state), chemical_state(chemical_state), properties(properties), sensitivity(sensitivity), rates(rates){}
 
-    /// The right-hand size of ODE @f$\left.f(n) = \frac{\partial n}{\partial t}\right|@f$.
-    Vector dndt;
+    TreeNode& operator=(const TreeNode& other){
 
-    /// Jacobian of the the right-hand size f of ODE, i.e., @f$\left.J(n) = \frac{\partial f}{\partial n}\right|@f$.
-    Matrix dfdn;
+        this->state = other.state;
+        this->chemical_state = other.chemical_state;
+        this->properties = other.properties;
+        this->sensitivity = other.sensitivity;
+        this->rates = other.rates;
 
+        return *this;
+    }
 };
 
 struct SmartKineticSolver::Impl
@@ -88,20 +80,17 @@ struct SmartKineticSolver::Impl
     /// The options of the kinetic solver
     SmartKineticOptions options;
 
-    /// The conventional kinetic solver instance
-    KineticSolver solver;
+    /// The result of the smart kinetic solver
+    SmartKineticResult result;
 
     // The solver for solving the equilibrium equations using classical approach
-    std::unique_ptr<EquilibriumSolver> equilibrium;
+    EquilibriumSolver equilibrium;
 
     /// The solver for solving the equilibrium equations using smart on-demand learning algorithm
-    std::unique_ptr<SmartEquilibriumSolver> smart_equilibrium;
+    SmartEquilibriumSolver smart_equilibrium;
 
     /// The sensitivity of the equilibrium state
     EquilibriumSensitivity sensitivity;
-
-    /// The sensitivity of the equilibrium state
-    KineticState forward_sensitivity;
 
     /// The ODE solver instance
     ODESolver ode;
@@ -115,20 +104,14 @@ struct SmartKineticSolver::Impl
     /// The number of equilibrium and kinetic species
     Index Ne, Nk;
 
-    /// The number of elements in the equilibrium and kinetic partition
-    Index Ee, Ek;
+    /// The number of elements in the equilibrium partition
+    Index Ee;
 
     /// The formula matrix of the equilibrium species
-    Matrix Ae;
+    Matrix Ae, Ak;
 
-    /// The formula matrix of the kinetic species
-    Matrix Ak;
-
-    /// The stoichiometric matrix w.r.t. the equilibrium species
-    Matrix Se;
-
-    /// The stoichiometric matrix w.r.t. the kinetic species
-    Matrix Sk;
+    /// The stoichiometric matrix w.r.t. the equilibrium and kinetic species
+    Matrix Se, Sk;
 
     /// The coefficient matrix `A` of the kinetic rates
     Matrix A;
@@ -142,29 +125,14 @@ struct SmartKineticSolver::Impl
     /// The pressure of the chemical system (in units of Pa)
     double P;
 
-    /// The molar composition of the equilibrium species
-    Vector ne;
-
-    /// The molar composition of the kinetic species
-    Vector nk;
+    /// The molar composition of the equilibrium and kinetic species
+    Vector ne, nk;
 
     /// The molar abundance of the elements in the equilibrium species
     Vector be;
 
     /// The combined vector of elemental molar abundance and composition of kinetic species [be nk]
     Vector benk;
-
-    /// The initial state of combined vector of elemental molar abundance and composition of kinetic species [be nk]
-    Vector benk0;
-
-    /// The vector of right-hand side  values at benk
-    Vector benk_f;
-
-    /// The matrix of sensitivities of combined vector [be nk]
-    Matrix benk_S;
-
-    /// The Jacobian matrix of combined vector [be nk]
-    Matrix benk_J;
 
     /// The chemical properties of the system
     ChemicalProperties properties;
@@ -184,147 +152,19 @@ struct SmartKineticSolver::Impl
     /// The function that calculates the source term in the problem
     std::function<ChemicalVector(const ChemicalProperties&)> source_fn;
 
-    /// The output instance of the kinetic path calculation
-    ChemicalOutput output;
-
-    /// The plots of the kinetic path calculation
-    std::vector<ChemicalPlot> plots;
-
-    double postequilibrate;
-
-    /// A class used to store the node of tree for smart equilibrium calculations.
-    struct TreeNode{
-
-        KineticState state;
-        ChemicalState chemical_state;
-        ChemicalProperties properties;
-        EquilibriumSensitivity sensitivity;
-        ChemicalVector rates;
-
-        Index num_predicted = 0;
-        Index step = 0;
-        Index cell = 0;
-
-        TreeNode(KineticState state,
-                 ChemicalState chemical_state,
-                 ChemicalProperties properties,
-                 EquilibriumSensitivity sensitivity,
-                 ChemicalVector rates,
-                 Index num_predicted, Index step, Index cell)
-                : state(state), chemical_state(chemical_state),
-                  properties(properties), sensitivity(sensitivity), rates(rates),
-                  num_predicted(num_predicted), step(step), cell(cell){}
-
-        TreeNode& operator=(const TreeNode& other){
-            this->state = other.state;
-            this->chemical_state = other.chemical_state;
-            this->properties = other.properties;
-            this->sensitivity = other.sensitivity;
-            this->num_predicted = other.num_predicted;
-            this->step = other.step;
-            this->cell = other.cell;
-
-            return *this;
-        }
-
-
-    };
-
-    double dt_in = 0;
-
-    struct Statistics{
-
-        // Vector that stores number of smartly predicted on each step
-        std::vector<int> smart_numbers;
-
-        // Counter of smartly predicted cells on the current step
-        int smart_counter = 0;
-
-        // Counter of conventionaly integrated cells on the current step
-        int conv_counter = 0;
-
-        // Total time spent to search for the reference state and access its confidence
-        double confidence_time = 0.0;
-
-        // Total time spent to estimate new states
-        double estimation_time = 0.0;
-
-        // Total time spent to search for the nearest states
-        double search_time = 0.0;
-
-        // Total time spent to integrate new states
-        double integraion_time = 0.0;
-
-        // Time for properties evals
-        double prop_eval_time = 0.0;
-
-        double eq_calls_time  = 0.0;
-        double eq_search_time = 0.0;
-
-
-        // Total time spent to integrate new states
-        double equilibration_time = 0.0;
-
-        // Total time spent to integrate new states
-        double kinetics_time = 0.0;
-
-        // Total time spent to search for the reference state and access its confidence
-        double confidence_time_total = 0.0;
-
-        // Total time spent to estimate new states
-        double estimation_time_total = 0.0;
-
-        // Total time spent to search for the nearest states
-        double search_time_total = 0.0;
-
-        // Total time spent to integrate new states
-        double integraion_time_total = 0.0;
-
-        // Total time spent to integrate new states
-        double equilibration_time_total = 0.0;
-
-        // Total time for properties evals
-        double prop_eval_time_total = 0.0;
-
-        double eq_calls_time_total  = 0.0;
-        double eq_search_time_total  = 0.0;
-
-        // Total time spent to integrate new states
-        double kinetics_time_total = 0.0;
-
-        // Total time spent to integrate new states
-        double time_total = 0.0;
-
-    };
-
-    Statistics stats;
-
-    /// The tree used to save the calculated equilibrium states and respective sensitivities
+     /// The tree used to save the calculated equilibrium states and respective sensitivities
     std::list<TreeNode> tree;
 
     Impl()
     {}
 
     Impl(const ReactionSystem& reactions)
-    : reactions(reactions), system(reactions.system())
+    : reactions(reactions), system(reactions.system()), equilibrium(system), smart_equilibrium(system)
     {
-        /*
-        // Initialize equilibrium solver based on the parameter
-        // TODO: write it so that not both are initilized
-        if (kin_options.use_smart_equilibrium_solver) {
-            smart_equilibrium = std::make_unique<SmartEquilibriumSolver>(system);
-            smart_equilibrium->setOptions(kin_options.smart_equilibrium);
-        }
-        else {
-            equilibrium = std::make_unique<EquilibriumSolver>(system);
-            equilibrium->setOptions(kin_options.equilibrium);
-        }
-        setOptions(kin_options);
-
-        //setPartition(Partition(system));
-        */
+        setPartition(Partition(system));
     }
 
+    /*
     auto summarize() -> void {
 
         std::cout << "***********************************************************************************" << std::endl;
@@ -416,23 +256,16 @@ struct SmartKineticSolver::Impl
         // Empty the tree for the next step
         //tree.clear();
     }
+    */
+
     auto setOptions(const SmartKineticOptions& options) -> void
     {
         // Initialise the options of the kinetic solver
         this->options = options;
 
-
-        /*
-        options.smart.is_smart = opts.smart.is_smart;
-        options.smart.pertubation_tol = opts.smart.pertubation_tol;
-        options.smart.abstol = opts.smart.abstol;
-        options.smart.reltol = opts.smart.reltol;
-
-        options.learning.use_smart_equilibrium_solver = opts.equilibrium.smart.is_smart;
-        options.equilibrium.smart.reltol = opts.equilibrium.smart.reltol;
-        options.equilibrium.smart.abstol = opts.equilibrium.smart.abstol;
-        options.equilibrium.track_statistics = opts.equilibrium.track_statistics;
-        */
+        // Set options for the equilibrium calculations
+        equilibrium.setOptions(options.equilibrium);
+        smart_equilibrium.setOptions(options.smart_equilibrium);
 
     }
 
@@ -442,10 +275,8 @@ struct SmartKineticSolver::Impl
         partition = partition_;
 
         // Set the partition of the equilibrium solver
-        if (options.learning.use_smart_equilibrium_solver)
-            smart_equilibrium->setPartition(partition);
-        else
-            equilibrium->setPartition(partition);
+        smart_equilibrium.setPartition(partition);
+        equilibrium.setPartition(partition);
 
         // Set the indices of the equilibrium and kinetic species
         ies = partition.indicesEquilibriumSpecies();
@@ -461,24 +292,24 @@ struct SmartKineticSolver::Impl
 
         // Set the number of equilibrium and kinetic elements
         Ee = iee.size();
-        Ek = ike.size();
 
         // Initialise the formula matrix of the equilibrium partition
         Ae = partition.formulaMatrixEquilibriumPartition();
 
-        // Initialise the formula matrix of the kinetic partitions
-        Indices ike = partition.indicesKineticElements();
-        Matrix Ak_ = partition.formulaMatrixKineticPartition();
-
-        if (Nk) {
-            //std::cout << "Ae  :" << Ae << std::endl;
-            //std::cout << "A   :" << system.formulaMatrix() << std::endl;
-            //std::cout << "ike :"; for (auto elem : ike) std::cout << elem << " "; std::cout << std::endl;
-            //std::cout << "Ak_ :" << Ak_ << std::endl;
-            //std::cout << "Ak :" << Ak << std::endl;
-
+        // Initialise the formula matrix of the kinetic partition
+        // Ak_tmp is of the size (Indices of elements that are included in kinetic species) x Nk
+        Matrix Ak_tmp = partition.formulaMatrixKineticPartition();
+        if(Nk)
+        {
+            // Initialize formula matrix of the kinetic partition
+            // Ak is of the size N x Nk
             Ak = Matrix::Zero(system.numElements(), Nk);
-            for (unsigned i = 0; i < ike.size(); i++)   Ak.row(ike[i]) << Ak_.row(i);
+
+            for(Index i = 0; i < ike.size(); ++i)
+            {
+                // Copy the rows of Ak_tmp to the positions of the kinetic elements
+                Ak.row(ike[i]) << Ak_tmp.row(i);
+            }
         }
 
         // Initialise the stoichiometric matrices w.r.t. the equilibrium and kinetic species
@@ -508,18 +339,26 @@ struct SmartKineticSolver::Impl
         // Allocate memory for the partial derivatives of the source rates `q` w.r.t. to `u = [be nk]`
         dqdu.resize(system.numSpecies(), Ee + Nk);
 
-        if (Nk)
         {
             /*
-            std::cout << "setPartition function of SmartKineticSolver:" << std::endl;
+            * TODO: remove when debugging is finished
             std::cout << "ies :"; for (auto elem : ies) std::cout << elem << " "; std::cout << std::endl;
             std::cout << "iks :"; for (auto elem : iks) std::cout << elem << " "; std::cout << std::endl;
+
+
+            std::cout << "setPartition function :" << std::endl;
+
+            std::cout << "iee :"; for (auto elem : iee) std::cout << elem << " "; std::cout << std::endl;
+            std::cout << "ike :"; for (auto elem : ike) std::cout << elem << " "; std::cout << std::endl;
+
             std::cout << "S \n" << reactions.stoichiometricMatrix() << std::endl;
             std::cout << "Se \n" << Se << std::endl;
             std::cout << "Sk \n" << Sk << std::endl;
 
             std::cout << "A \n" << A << std::endl;
             std::cout << "Ae \n" << Ae << std::endl;
+            std::cout << "Ak \n" << Ak << std::endl;
+
             std::cout << "B \n" << B << std::endl;
             */
         }
@@ -606,7 +445,7 @@ struct SmartKineticSolver::Impl
         };
     }
 
-    auto initialize(ChemicalState& state, double tstart, VectorConstRef b) -> void
+    auto initialize(ChemicalState& state, double tstart) -> void
     {
         // Initialise the temperature and pressure variables
         T = state.temperature();
@@ -617,41 +456,10 @@ struct SmartKineticSolver::Impl
         ne = n(ies);
         nk = n(iks);
 
-        // Let kinetics know about the change in transport
-        /*
-        std::cout << "b   : " << tr(b) << std::endl;
-        std::cout << "Ae   : " << Ae << std::endl;
-        std::cout << "ne   : " << ne << std::endl;
-        std::cout << "Ak   : " << Ak << std::endl;
-        std::cout << "nk   : " << nk << std::endl;
-        std::cout << "Ak * nk   : " << tr(Ak * nk) << std::endl;
-        std::cout << "Ae * ne   : " << tr(Ae * ne) << std::endl;
-        std::cout << "iks :"; for (auto elem : iks) std::cout << elem << " "; std::cout << std::endl;
-        std::cout << "ies :"; for (auto elem : ies) std::cout << elem << " "; std::cout << std::endl;
-        */
-        be = b - Ak * nk;
-        //std::cout << "b   : " << tr(b) << std::endl;
-        //std::cout << "be : " << tr(be) << std::endl;
-        //std::cout << "bk  : " << tr(Ak * nk) << std::endl;
-
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
         benk.head(Ee) = be;
         benk.tail(Nk) = nk;
-
-        // Initialize the initial state benk0
-        benk0.resize(Ee + Nk);
-        benk0 = benk;
-
-        // Allocate the memory for the sensitivity matrix
-        benk_S.resize(Ee + Nk, Ee + Nk);
-        benk_S.setIdentity();
-
-        // Allocate the memory for the sensitivity matrix
-        benk_J.resize(Ee + Nk, Ee + Nk);
-
-        // Allocate the memory for the right-hand side
-        benk_f.resize(Ee + Nk);
 
         // Define the ODE function
         ODEFunction ode_function = [&](double t, VectorConstRef u, VectorRef res)
@@ -680,168 +488,42 @@ struct SmartKineticSolver::Impl
         ode.initialize(tstart, benk);
 
         // Set the options of the equilibrium solver
-        smart_equilibrium->setOptions(options.learning.smart_equilibrium);
-        equilibrium->setOptions(options.learning.equilibrium);
-
-        // Initialize Jacobian and the right-hand side at the t0
-        //problem.jacobian(tstart, benk0, benk_J);
-        //problem.function(tstart, benk0, benk_f);
+        smart_equilibrium.setOptions(options.learning.smart_equilibrium);
+        equilibrium.setOptions(options.learning.equilibrium);
 
     }
-    auto initialize(ChemicalState& state, double tstart) -> void
-    {
-        // Initialise the temperature and pressure variables
-        T = state.temperature();
-        P = state.pressure();
 
-        // Extract the composition of the equilibrium and kinetic species
+    auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
+    {
+        // Fetch the amounts of spacies from the chemical state
         const auto& n = state.speciesAmounts();
-        //ne = n(ies);
         nk = n(iks);
+        ne = n(ies);
 
-        // Assemble the vector benk = [be nk]
-        benk.resize(Ee + Nk);
-        //benk.head(Ee) = Ae * ne;
-        benk.head(Ee) = be;
-        benk.tail(Nk) = nk;
+        // Update amounts of elements
+        be = b - Ak * nk;
+
+    }
+
+    auto learn(ChemicalState& state, double t, double dt) -> void
+    {
+        SmartKineticResult res = {};
+
+        /// The initial state, rhf, Jacobian, and sensitivity matrix of
+        /// combined vector of elemental molar abundance and composition of kinetic species [be nk]
+        Vector benk0, benk_f, benk_J, benk_S;
 
         // Initialize the initial state benk0
         benk0.resize(Ee + Nk);
         benk0 = benk;
 
-        // Allocate the memory for the sensitivity matrix
-        benk_S.resize(Ee + Nk, Ee + Nk);
-        benk_S.setIdentity();
-
-        // Allocate the memory for the sensitivity matrix
-        benk_J.resize(Ee + Nk, Ee + Nk);
-
-        // Allocate the memory for the right-hand side
+        // Allocate the memory for the rhs, Jacobian, and sensitivity matrix
         benk_f.resize(Ee + Nk);
+        benk_J.resize(Ee + Nk, Ee + Nk);
+        benk_S.resize(Ee + Nk, Ee + Nk);
 
-        // Define the ODE function
-        ODEFunction ode_function = [&](double t, VectorConstRef u, VectorRef res)
-        {
-            return function(state, t, u, res);
-        };
-
-        // Define the jacobian of the ODE function
-        ODEJacobian ode_jacobian = [&](double t, VectorConstRef u, MatrixRef res)
-        {
-            return jacobian(state, t, u, res);
-        };
-
-        // Initialise the ODE problem
-        ODEProblem problem;
-        problem.setNumEquations(Ee + Nk);
-        problem.setFunction(ode_function);
-        problem.setJacobian(ode_jacobian);
-
-        // Define the options for the ODE solver
-        ODEOptions options_ode = options.learning.ode;
-
-        // Set the ODE problem and initialize the ODE solver
-        ode.setProblem(problem);
-        ode.setOptions(options_ode);
-        ode.initialize(tstart, benk);
-
-        // Set the options of the equilibrium solver
-        //equilibrium->setOptions(options.equilibrium);
-        if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->setOptions(options.learning.smart_equilibrium);
-        else                                    equilibrium->setOptions(options.learning.equilibrium);
-
-        // Initialize Jacobian and the right-hand side
-        // problem.jacobian(tstart, benk0, benk_J);
-        // problem.function(tstart, benk0, benk_f);
-
-    }
-
-    auto estimate(double& t, KineticResult& res) -> bool
-    {
-        // If the tree is empty abort estimation
-        if(tree.empty())
-            return false;
-
-        // Comparison function based on the Euclidean distance
-        auto compare_n0_tk = [&](const TreeNode& a, const TreeNode& b)
-        {
-            const auto& n0_a = a.state.n0;
-            const auto& n0_b = b.state.n0;
-
-            const auto& tk_a = a.state.tk;
-            const auto& tk_b = b.state.tk;
-
-            double dist_to_a = std::pow((n0_a - benk0).squaredNorm(), 2.0) + std::pow(t - tk_a, 2);
-            double dist_to_b = std::pow((n0_b - benk0).squaredNorm(), 2.0) + std::pow(t - tk_b, 2);
-
-            return dist_to_a < dist_to_b;
-        };
-
-        // Find the reference element (closest to the new state be)
-        auto closest_n0 = std::min_element(tree.begin(), tree.end(), compare_n0_tk);
-
-        // Get all the data stored in the reference element
-        const auto& n0_ref = closest_n0->state.n0;
-        const auto& tk_ref = closest_n0->state.tk;
-
-        double distance = std::sqrt((benk0 - n0_ref).squaredNorm() + std::pow(t - tk_ref, 2));
-        auto confident = distance < 1e-4;
-        //std::cout << "\nn0     : " << tr(n0) << " " << tk << std::endl;
-        //std::cout << "n0_ref : " << tr(n0_ref) << " " << tk_ref << std::endl;
-        //std::cout << "\ndis = " << distance << " > tol = " << options.smart.pertubation_tol << std::endl;
-
-        if (confident) // Try estimating using sensitivities
-        {
-            Time start = time();
-            // Algorithm:
-            // the reference state: n, n0, S = dn/dn0, t, f = dn/dt
-            // new initial values :  n0_tilde, t_tilde
-            // the predicted state: n_tilde = n + S * (n0_tilde - n0) + f * (t_tilde - t)
-
-            // Clarification:
-            // benk0 is new initial condition (n0_tilde)
-            // t     is new time (t_tilde)
-            // ref_node.state.nk1   is already calculated by integration vector  (n)
-            // ref_node.state.dndn0 is the sensitivity w.r.t. the initial condition (S)
-            // ref_node.state.n0    is the initial condition of reference vector (n0)
-            // ref_node.state.dndt  is the sensitivity w.r.t. the change in time (S)
-            // ref_node.state.tk1   is the time, at which reference state is constructed (t)
-            const auto& nk1_ref = closest_n0->state.nk1;
-            const auto& tk1_ref = closest_n0->state.tk1;
-            const auto& dndn0 = closest_n0->state.dndn0;
-            const auto& dndt = closest_n0->state.dndt;
-            double dt = tk1_ref - tk_ref;
-
-            benk = nk1_ref + dndn0 * (benk0 - n0_ref) + dndt * (t + tk_ref);
-
-            //std::cout << "tk    : " << ref_node.state.tk << std::endl;
-            //std::cout << "tk1    : " << ref_node.state.tk1 << std::endl;
-            //std::cout << "tfinal : " << tfinal << std::endl;
-            //std::cout << "dt     : " << dt << std::endl;
-            //std::cout << "benk               : " << tr(benk) << std::endl;
-            //std::cout << "benk (estimation)  : " << tr(benk) << std::endl;
-
-            t += dt;
-
-            // Profile estimation time of the cell
-            stats.estimation_time += elapsed(start);
-            //res.smart.stats.time_estimate = stats.estimation_time;
-
-            // Count the smartly predicted cell
-            stats.smart_counter += 1;
-            // Update the number of predicted cells
-            closest_n0->num_predicted += 1;
-
-            return true;
-        }
-        else{
-            return false;
-        }
-    }
-
-    auto learn(ChemicalState& state, double t, double tfinal, Index step, Index cell, KineticResult& res) -> bool
-    {
-        //Time start = time();
+        // Initialize sensitivity matrix by the identity matrix
+        benk_S.setIdentity();
 
         // Initialize the kinetics state with the data at times t0 and tk
         KineticState kin_state;
@@ -849,78 +531,30 @@ struct SmartKineticSolver::Impl
         kin_state.nk = benk;
         kin_state.tk = t;
 
-        //ode.integrate(t, benk, tfinal, benk_S, benk_J, benk_f);
-        //ode.solve(t, tfinal - t, benk, benk_S, benk_J, benk_f);
-        ode.solve(t, tfinal - t, benk);
-        // Updating the chemical state
-        //be = benk.head(Ee);
-        nk = benk.tail(Nk);
+        // Reconstract `benk` by the conventional numerical integration
+        timeit(ode.solve(t, dt, benk, benk_f, benk_S), result.timing.learn_integrate +=);
 
         // Update the composition of the kinetic species
+        nk = benk.tail(Nk);
         state.setSpeciesAmounts(nk, iks);
-
-        /*
-        double t0 = t;
-        double dt = 0.0, dt_in = 0.0;
-
-        while (t <= tfinal){
-            ode.integrate_(t, benk, tfinal, dt, benk_S, benk_J, benk_f);
-            std::cout << "dt = " << dt << std:: endl;
-            dt = (dt > dt_in) ? dt : dt_in;
-        }
-        */
 
         // Save the sensitivity values, the result time, and the obtain species' amount
         kin_state.tk1 = t;
         kin_state.nk1 = benk;
         kin_state.dndn0 = benk_S;
         kin_state.dndt = benk_f;
-        //state.dfdn = benk_J;
+        kin_state.dfdn = benk_J;
 
-        //std::cout << "\ntk     : " << state.tk << std::endl;
-        //std::cout << "tk1    : " << state.tk1 << std::endl;
-        //std::cout << "tfinal : " << tfinal << std::endl;
+        // Evaluate chemical properties, reaction rate, and sensitivities
+        timeit(properties = state.properties(), result.timing.learn_chemical_properties +=);
+        timeit(r = reactions.rates(properties), result.timing.learn_reaction_rates+=);
+        timeit(sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity(),
+                result.timing.learn_sensitivity +=);
 
-        // Save the kinetic state as the tree node
-        ChemicalProperties prop;
-        EquilibriumSensitivity eq_sens;
-
-        Time start = time();
-        // TODO: do we need to evaluate them here?
-        if (options.learning.use_smart_equilibrium_solver) {
-            prop = smart_equilibrium->properties();
-            eq_sens = smart_equilibrium->sensitivity();
-        }
-        else {
-            prop = equilibrium->properties();
-            eq_sens = equilibrium->sensitivity();
-        }
-        stats.prop_eval_time += elapsed(start);
-        //ChemicalVector rates = reactions.rates(prop);
-        //std::cout << "rates : " << rates.val << std::endl;
-        //std::cout << "r     : " << r.val << std::endl;
-
-        //node.properties = properties;
-        //node.sensitivity = sensitivity;
-        // TODO: can I initialize with state.properties() and state.sensitivities()?
-        //tree.emplace_back(TreeNode(kin_state, state, properties, sensitivity, step, cell, 0));
-        tree.emplace_back(TreeNode(kin_state, state, prop, eq_sens, r, step, cell, 0));
-        //std::cout << "tk    : " << state.tk << std::endl;
-        //std::cout << "tk1    : " << state.tk1 << std::endl;
-        //std::cout << "tfinal : " << tfinal << std::endl;
-        //std::cout << "dt     : " << state.tk1 - state.tk << std::endl;
-        //std::cout << "benk (integration) : " << tr(benk) << std::endl;
-        //std::cout << "time for integrating     : " << elapsed(start) << std::endl;
-        //if (confident) std::cout << "error (estim - integr)   : " << (benk_est - benk).squaredNorm() << std::endl;
-
-        // Profile estimation time of the cell
-        //stats.integraion_time += elapsed(start);
-        //res.smart.stats.time_integrate = stats.integraion_time;
-        //res.smart.addLearningIndex(cell);
-
-        // Count the conventionally integrated cell
-        stats.conv_counter += 1;
+        // Save the kinetic state to the tree of learned states
+        timeit(tree.emplace_back(TreeNode(kin_state, state, properties, sensitivity, r)), result.timing.learn_store+=);
     }
+    /*
     auto stepSmart(ChemicalState& state, double t, double tfinal) -> double
     {
         // TODO: rewrite this method.
@@ -998,7 +632,7 @@ struct SmartKineticSolver::Impl
             //std::cout << "benk (after integration) : " << tr(benk) << std::endl;
             //std::cout << "time for integrating     : " << elapsed(start) << std::endl;//if (confident) std::cout << "error (estim - integr)   : " << (benk_est - benk).squaredNorm() << std::endl;
         }
-        */
+
         return t;
     }
 
@@ -1019,78 +653,65 @@ struct SmartKineticSolver::Impl
         //res.smart.stats.time_estimate = stats.integraion_time;
 
     }
-    auto estimateUsingResult(ChemicalState& state, double& t, KineticResult& res, Index step, Index cell) -> bool
+    */
+    auto estimate(ChemicalState& state, double& t, VectorConstRef benk0) -> void
     {
-        // If the tree is empty abort estimation
+        // Skip estimation if no previous full computation has been done
         if(tree.empty())
-            return false;
+            return;
+
+        // Relative and absolute tolerance parameters
+        // TODO: should they be different scale?
+        auto kinetics_reltol = options.reltol;
+        auto kinetics_abstol = options.abstol;
+        auto equilibrium_reltol = options.reltol;
+        auto equilibrium_abstol = options.abstol;
+        auto equilibrium_cutoff = options.cutoff;
 
         // Comparison function based on the Euclidean distance
-        auto compare_nk = [&](const TreeNode& a, const TreeNode& b)
+        auto distancefn = [&](const TreeNode& a, const TreeNode& b)
         {
-            const auto& nk1_a = a.state.nk;
-            const auto& nk1_b = b.state.nk;
+            const auto& nk_a = a.state.nk;
+            const auto& nk_b = b.state.nk;
 
-            double dist_to_a = std::pow((nk1_a - benk).squaredNorm(), 0.5);
-            double dist_to_b = std::pow((nk1_b - benk).squaredNorm(), 0.5);
-
-            return dist_to_a < dist_to_b;
-        };
-        // Comparison function based on the Euclidean distance
-        auto compare_nk_tk = [&](const TreeNode& a, const TreeNode& b)
-        {
-            const auto& nk1_a = a.state.nk;
-            const auto& nk1_b = b.state.nk;
-
-            const auto& tk_a = a.state.tk;
-            const auto& tk_b = b.state.tk;
-
-            double dist_to_a = std::sqrt(std::pow((nk1_a - benk).squaredNorm(), 2.0) + std::pow(t - tk_a, 2));
-            double dist_to_b = std::sqrt(std::pow((nk1_a - benk).squaredNorm(), 2.0) + std::pow(t - tk_b, 2));
-
-            return dist_to_a < dist_to_b;
-        };
-        // Comparison function based on the Euclidean distance
-        auto compare_n0_tk = [&](const TreeNode& a, const TreeNode& b)
-        {
-            const auto& n0_a = a.state.n0;
-            const auto& n0_b = b.state.n0;
-
-            const auto& tk_a = a.state.tk;
-            const auto& tk_b = b.state.tk;
-
-            double dist_to_a = std::pow((n0_a - benk0).squaredNorm(), 2.0) + std::pow(t - tk_a, 2);
-            double dist_to_b = std::pow((n0_b - benk0).squaredNorm(), 2.0) + std::pow(t - tk_b, 2);
+            double dist_to_a = std::pow((nk_a - benk0).squaredNorm(), 0.5);
+            double dist_to_b = std::pow((nk_b - benk0).squaredNorm(), 0.5);
 
             return dist_to_a < dist_to_b;
         };
 
-        Time start = time();
+        //---------------------------------------------------------------------------------------
+        // Step 1: Search for the reference element (closest to the new state input conditions)
+        //---------------------------------------------------------------------------------------
+        tic(0);
 
         // Find the reference element (nearest to the new state benk)
-        auto closest_n0 = std::min_element(tree.begin(), tree.end(), compare_nk);
+        auto it = std::min_element(tree.begin(), tree.end(), distancefn);
 
-        stats.search_time += elapsed(start);
-        //res.smart.stats.time_search = stats.search_time;
+        toc(0, result.timing.estimate_search);
 
-        start = time();
+
+        //----------------------------------------------------------------------------
+        // Step 2: Calculate predicted state with a first-order Taylor approximation
+        //----------------------------------------------------------------------------
+        tic(1);
 
         // Get all the data stored in the reference element
-        const auto& benk0_ref = closest_n0->state.n0;
-        const auto& benkk1_ref = closest_n0->state.nk1;
-        const auto& benkk_ref = closest_n0->state.nk;
-        const auto& tk_ref = closest_n0->state.tk;
-        const auto& tk1_ref = closest_n0->state.tk1;
-        const auto& dndn0_ref = closest_n0->state.dndn0;
-        const auto& dndt_ref = closest_n0->state.dndt;
-        const ChemicalState& state_ref = closest_n0->chemical_state;
-        const ChemicalProperties& prop_ref = closest_n0->properties;
-        const EquilibriumSensitivity& eqsens_ref = closest_n0->sensitivity;
-        const ChemicalVector& r_ref = closest_n0->rates;
+        const auto& benk0_ref = it->state.n0;
+        const auto& benkk_ref = it->state.nk;
+        const auto& benkk1_ref = it->state.nk1;
+        const auto& tk_ref = it->state.tk;
+        const auto& tk1_ref = it->state.tk1;
+        const auto& dndn0_ref = it->state.dndn0;
+        const auto& dndt_ref = it->state.dndt;
+        const auto& state_ref = it->chemical_state;
+        const auto& properties_ref = it->properties;
+        const auto& sensitivity_ref = it->sensitivity;
+        const auto& r_ref = it->rates;
 
+        const auto& N = ies.size() + iks.size();
         const auto& be_ref = benkk_ref.head(Ee);
         const auto& n_ref = state_ref.speciesAmounts();
-        const auto& N = ies.size() + iks.size();
         const auto& ne_ref = n_ref(ies);
         const auto& nk_ref = n_ref(iks);
 
@@ -1108,38 +729,30 @@ struct SmartKineticSolver::Impl
         // ref_node.state.dndt  is the sensitivity w.r.t. the change in time (S)
         // ref_node.state.tk1   is the time, at which reference state is constructed (t)
 
+        // Perform smart estimation of benk
         double dt = tk1_ref - tk_ref;
         benk = benkk1_ref + dndn0_ref * (benk0 - benk0_ref) + dndt_ref * (t - tk_ref);
-        //std::cout << "++++++++++++++++++++++++++++++++++++++++++++++++++" << tr(benk) << std::endl;
 
-        VectorConstRef be_new = benk.head(Ee);
-        VectorConstRef nk_new = benk.tail(Nk);
-
-        double dist_nk = std::pow((nk_ref - nk_new).squaredNorm(), 0.5);
-        //std::cout << "nk_new: " << tr(nk_new) << std::endl;
-        //std::cout << "nk_ref: " << tr(nk_ref) << std::endl;
-        //std::cout << "dist(nk_new, nk_ref): " << dist_nk  << std::endl;
+        // Fetch the be and nk unknows from vector benk = [be; nk]
+        VectorConstRef be = benk.head(Ee);
+        VectorConstRef nk = benk.tail(Nk);
 
         // Update the composition of the kinetic species
-        ChemicalState& state_new = state;
-        state_new.setSpeciesAmounts(nk_new, iks);
-        ChemicalProperties prop_new;
-        Time start_prop = time();
-        if (options.learning.use_smart_equilibrium_solver) prop_new = smart_equilibrium->properties();
-        else                                    prop_new = equilibrium->properties();
-        stats.prop_eval_time += elapsed(start_prop);
-        VectorConstRef lna_new = prop_new.lnActivities().val;
-        VectorConstRef lnae_new = lna_new(ies);
-        ChemicalVector r_new = reactions.rates(prop_new);
+        state.setSpeciesAmounts(nk, iks);
 
-        // Retreval of kinetic and equilibrium species out of
         // Get the sensitivity derivatives dln(a) / dn
-        MatrixConstRef dlnadn_ref = prop_ref.lnActivities().ddn; // TODO: this line is assuming all species are equilibrium specie! get the rows and columns corresponding to equilibrium species
-        VectorConstRef lna_ref = prop_ref.lnActivities().val;
+        MatrixConstRef dlnadn_ref = properties_ref.lnActivities().ddn; // TODO: this line is assuming all species are equilibrium specie! get the rows and columns corresponding to equilibrium species
+        VectorConstRef lna_ref = properties_ref.lnActivities().val;
 
         // Get the sensitivity derivatives w.r.t. the equilibrium species dln(a) / dne
         MatrixConstRef dlnadne_ref = dlnadn_ref(ies, ies);
         VectorConstRef lnae_ref = lna_ref(ies);
+
+        properties = state.properties();
+        r = reactions.rates(properties);
+
+        VectorConstRef lna = properties.lnActivities().val;
+        VectorConstRef lnae = lna(ies);
 
         //VectorConstRef diff_lnae = lnae_ref - lnae_new;
         //double dist_lnae = std::pow((lnae_ref - lnae_new).squaredNorm(), 2.0);
@@ -1148,35 +761,36 @@ struct SmartKineticSolver::Impl
         //std::cout << "diff_lnae: " << tr(diff_lnae) << std::endl;
         //std::cout << "dist(lnae_new, lnae_ref): " << dist_lnae  << std::endl;
 
-        Vector delta_ne;
-        delta_ne.noalias() = eqsens_ref.dndb * (be_new - be_ref);    // delta(n) = dn/db * (b - b0)
+        // Define vectors of equilibirium species, delta(ne), delta(lnae)
+        Vector ne, delta_ne, delta_lnae;
+
+        delta_ne.noalias() = sensitivity_ref.dndb * (be - be_ref);    // delta(n) = dn/db * (b - b0)
+        ne.noalias() = ne_ref + delta_ne;                             // n = n0 + delta(n)
+        delta_lnae.noalias() = dlnadne_ref * delta_ne;                // delta(delta_lnae) = d (ln ae) / d(ne)
+
         //std::cout << "delta_ne: " << tr(delta_ne) << std::endl;
-        Vector ne_new;
-        ne_new.noalias() = ne_ref + delta_ne;                             // n = n0 + delta(n)
-        Vector delta_lna;
-        delta_lna.noalias() = dlnadne_ref * delta_ne;
         //std::cout << "delta_lna: " << tr(delta_lna) << std::endl;
         //std::cout << "ne_new: " << tr(ne_new) << std::endl;
 
-        // const ChemicalState& state0 = it->state;
-        // const ChemicalProperties& properties0 = it->properties;
-        // const EquilibriumSensitivity& sensitivity0 = it->sensitivity;
+        toc(1, result.timing.estimate_mat_vec_mul);
 
-        auto reltol = options.reltol;
-        auto abstol = options.abstol;
-        //auto reltol = options.equilibrium.smart.reltol;
-        //auto abstol = options.equilibrium.smart.abstol;
-        //const bool acceptance_eq = (delta_lna.array().abs() <= abstol + reltol * lna_ref.array().abs()).all();
+        //----------------------------------------------
+        // Step 3: Checking the acceptance criterion
+        //----------------------------------------------
+        tic(2);
 
-        const double cutoff = -1e-5;    // relaxation parameter
-        const bool amount_check = ne_new.minCoeff() > cutoff;
-        const auto& x = prop_ref.moleFractions();
-        //std::cout << "x: " << x << std::endl;
+
+        //const bool amount_check = ne.minCoeff() > equilibrium_cutoff;
+        const auto& x = properties_ref.moleFractions().val;
+        const auto& xe = x(ies);
+
 
         // Check the variations of equilibrium species
-        bool acceptance_eq = true;
-        const double fraction_tol = abstol * 1e-2;
-        for(int i = 0; i < ne_new.size(); ++i){
+        bool equilibrium_amount_check = true;
+        bool equilibrium_variation_check = true;
+
+        const double fraction_tol = equilibrium_abstol * 1e-2;
+        for(int i = 0; i < ne.size(); ++i){
             // If the fraction is too small, skip the variational check
             if(x[i] < fraction_tol) continue;
 
@@ -1184,9 +798,22 @@ struct SmartKineticSolver::Impl
             //std::cout << "abstol + reltol * std::abs(lnae_ref[i])): " << abstol + reltol * std::abs(lnae_ref[i]) << std::endl;
 
             // Perform the variational check
-            if(std::abs(delta_lna[i]) > abstol + reltol * std::abs(lnae_ref[i])) {
-                acceptance_eq = false;    // variation test failed
-                i = ne_new.size();        // finish running through the loop
+            if(std::abs(delta_lnae[i]) > equilibrium_abstol + equilibrium_reltol * std::abs(lnae_ref[i])) {
+                equilibrium_variation_check = false;
+                result.estimate.failed_with_species = system.species(i).name();
+                result.estimate.failed_with_amount = ne[i];
+                result.estimate.failed_with_chemical_potential = lnae_ref[i] + delta_lnae[i]; // TODO: change to the chemical potential
+
+                //result.estimate.accepted = false;    // variation test failed
+                //i = ne.size();        // finish running through the loop
+            }
+            if(ne[i] < equilibrium_cutoff){
+                equilibrium_amount_check = false;
+                //std::cout << "neg amount in i: " << i << std::endl;
+                //std::cout << "xe(i) : " << xe(i, 0) << " < fraction_tol : " << fraction_tol << std::endl;
+                //std::cout << "ne[i] : " << ne[i] << std::endl;
+                //std::cout << "Species: " << system.species(i).name() << std::endl;
+                //getchar();
             }
         }
         /*
@@ -1202,16 +829,16 @@ struct SmartKineticSolver::Impl
         */
         // Check the variations of kinetics' rates
         // ---------------------------------------------------------------------------------------
-        reltol = options.reltol;
-        abstol = options.abstol;
+        //reltol = options.reltol;
+        //abstol = options.abstol;
 
         // Initialize delta_n = [delta_ne; delta_nk]
         Vector delta_n;
         delta_n.resize(N);
+        delta_n(ies) << delta_ne;
+        delta_n(iks) << nk - nk_ref;
         //std::cout << "delta_ne: " << tr(delta_ne) << std::endl;
         //std::cout << "nk_new - nk_ref: " << nk_new - nk_ref << std::endl;
-        delta_n(ies) << delta_ne;
-        delta_n(iks) << nk_new - nk_ref;
         //std::cout << "delta_n: " << tr(delta_n) << std::endl;
 
         // Compute delta_rk = drdn * delta_n
@@ -1219,29 +846,64 @@ struct SmartKineticSolver::Impl
         delta_rk.noalias() = r_ref.ddn * delta_n;
         //std::cout << "delta_rk.array().abs(): " << delta_rk.array().abs() << std::endl;
         //std::cout << "abstol + reltol * r_ref.val.array().abs(): " << abstol + reltol * r_ref.val.array().abs() << std::endl;
-        const bool accaptance_kin = (delta_rk.array().abs() <= abstol + reltol * r_ref.val.array().abs()).all();
-
-        stats.confidence_time += elapsed(start);
-        //res.smart.stats.time_confidence = stats.confidence_time;
+        const bool kinetics_variation_check
+        = (delta_rk.array().abs() <= kinetics_abstol + kinetics_reltol * r_ref.val.array().abs()).all();
 
         //std::cout << "++++++++++++++++++++++++++++++++++++++++++++++++++" << tr(benk) << std::endl;
         //bool confident = true;
-        if (acceptance_eq && amount_check && accaptance_kin) {
-
-            //std::cout << "benk (estimation) : " << tr(benk) << std::endl;
-            //benk = benk_new;
-            // Count the smartly predicted cell
-            stats.smart_counter += 1;
+        if (equilibrium_variation_check && equilibrium_amount_check && kinetics_variation_check)
+        {
             t += dt;
-            return true;
-        }else{
-            //std::cout << "(" << step << ", " << cell << ") : ";
-            //std::cout << "accept_eq  = " << acceptance_eq << "\t";
-            //std::cout << "accapt_kin = " << accaptance_kin << std::endl;
-            return false;
+            return ;
         }
+
+        result.estimate.accepted = true;
     }
 
+    // learn(ChemicalState& state, double t, double dt)
+    // auto estimate(ChemicalState& state, double& t, VectorConstRef benk0) -> SmartKineticResult&
+    auto solve(ChemicalState& state, double t, double dt) -> SmartKineticResult
+    {
+        // Initialise the chemical kinetics solver
+        initialize(state, t);
+
+        tic(0);
+
+        // Reset the result of the last smart equilibrium calculation
+        result = {};
+
+        // Perform a smart estimate for the chemical state
+        timeit(estimate(state, t), result.timing.estimate =);
+
+        // Perform a learning step if the smart prediction is not satisfactory
+        if (!result.estimate.accepted)
+            timeit(learn(state, t, dt), result.timing.learn =);
+
+
+        toc(0, result.timing.solve);
+
+        //std::cout << "benk: " << tr(benk) << std::endl;
+        //std::cout << "t: " << t << std::endl;
+
+        // Extract the `be` and `nk` entries of the vector `benk`
+        be = benk.head(Ee);
+        nk = benk.tail(Nk);
+
+        // Update the composition of the kinetic species
+        state.setSpeciesAmounts(nk, iks);
+
+        return result;
+
+        // Update the composition of the equilibrium species
+        //equilibrium->solve(state, T, P, be);
+        //Time start = time();
+        //EquilibriumResult res;
+        //if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->solve(state, T, P, be);
+        //else                                    equilibrium->solve(state, T, P, be);
+        //stats.eq_calls_time += elapsed(start);
+
+    }
+    /*
     auto solveSmartPostprocess(ChemicalState& state, double& t, double tfinal, Index step, Index cell, KineticResult& res) -> void
     {
         Time start = time();
@@ -1280,13 +942,6 @@ struct SmartKineticSolver::Impl
             // Update the plots with current state
             for(auto& plot : plots) plot.update(state, t);
 
-            /*
-            result.times.emplace_back(t);
-            result.calcite.emplace_back(state.speciesAmount("Calcite"));
-            result.hco3.emplace_back(state.speciesAmount("HCO3-"));
-            result.ca.emplace_back(state.speciesAmount("Ca++"));
-            */
-
             // Integration time step
             t = stepSmart(state, t, t1);
         }
@@ -1297,45 +952,8 @@ struct SmartKineticSolver::Impl
         // Update the plots with the final state
         for(auto& plot : plots) plot.update(state, t1);
 
-        /*
-        result.times.emplace_back(t);
-        result.calcite.emplace_back(state.speciesAmount("Calcite"));
-        result.hco3.emplace_back(state.speciesAmount("HCO3-"));
-        result.ca.emplace_back(state.speciesAmount("Ca++"));
-        */
-    }
-
-    auto solve(ChemicalState& state, double t, double dt) -> void
-    {
-        // Initialise the chemical kinetics solver
-        initialize(state, t);
-
-        std::cout << "\nbenk0: " << tr(benk) << std::endl;
-        std::cout << "t0: " << t << std::endl;
-
-        // Integrate the chemical kinetics ODE from `t` to `t + dt`
-        ode.solve(t, dt, benk);
-
-        std::cout << "benk: " << tr(benk) << std::endl;
-        std::cout << "t: " << t << std::endl;
-
-        // Extract the `be` and `nk` entries of the vector `benk`
-        be = benk.head(Ee);
-        nk = benk.tail(Nk);
-
-        // Update the composition of the kinetic species
-        state.setSpeciesAmounts(nk, iks);
-
-        // Update the composition of the equilibrium species
-        //equilibrium->solve(state, T, P, be);
-        //Time start = time();
-        EquilibriumResult res;
-        if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->solve(state, T, P, be);
-        else                                    equilibrium->solve(state, T, P, be);
-        //stats.eq_calls_time += elapsed(start);
 
     }
-
 
     auto solveKineticsEquilibrium(ChemicalState &state, double t, double dt, VectorConstRef b, Index step, Index cell, KineticResult& res) -> void
     {
@@ -1368,12 +986,7 @@ struct SmartKineticSolver::Impl
             //res.smart.stats.time_equilibrate = stats.equilibration_time;
 
             // Update the learning indices for the smart equilibrium
-            /*
-            if (options.learning.use_smart_equilibrium_solver && !res.equilibrium.smart.succeeded){
-                //res.equilibrium.smart.addLearningIndex(cell);
-                //res.equilibrium.smart.tree_size++;
-            }
-            */
+
         }
 
         if (postequilibrate) {
@@ -1408,12 +1021,7 @@ struct SmartKineticSolver::Impl
 
         // Update the composition of the equilibrium species
         //equilibrium->solve(state, T, P, be);
-        /*
-        if (options.learning.use_smart_equilibrium_solver)
-            smart_equilibrium->solve(state, T, P, be, step, cell);
-        else
-            equilibrium->solve(state, T, P, be);
-        */
+
         if (options.learning.use_smart_equilibrium_solver)
             smart_equilibrium->solve(state, T, P, be);
         else
@@ -1436,7 +1044,7 @@ struct SmartKineticSolver::Impl
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
     }
-
+    */
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
     {
         // Extract the `be` and `nk` entries of the vector [be, nk]
@@ -1444,7 +1052,7 @@ struct SmartKineticSolver::Impl
         nk = u.tail(Nk);
 
         // Check for non-finite values in the vector `benk`
-        for(int i = 0; i < u.rows(); ++i)
+        for(Index i = 0; i < u.rows(); ++i)
             if(!std::isfinite(u[i]))
                 return 1; // ensure the ode solver will reduce the time step
 
@@ -1452,39 +1060,73 @@ struct SmartKineticSolver::Impl
         state.setSpeciesAmounts(nk, iks);
 
         // Solve the equilibrium problem using the elemental molar abundance `be`
-        //auto result = equilibrium->solve(state, T, P, be);
-        Time start = time();
-        EquilibriumResult result;
-        SmartEquilibriumResult smart_results;
-        if (options.learning.use_smart_equilibrium_solver)
-            smart_results = smart_equilibrium->solve(state, T, P, be);
-        else
-            result = equilibrium->solve(state, T, P, be);
-
-        // Check if the calculation failed, if so, use cold-start
-        if(!result.optimum.succeeded)
+        if(options.use_smart_equilibrium_solver) // using smart equilibrium solver
         {
-            state.setSpeciesAmounts(0.0);
-            //result = equilibrium->solve(state, T, P, be);
-            if (options.learning.use_smart_equilibrium_solver) smart_results = smart_equilibrium->solve(state, T, P, be);
-            else                                    result = equilibrium->solve(state, T, P, be);
+            SmartEquilibriumResult res = {};
+
+            // smart_equilibrium_result
+            timeit(res += smart_equilibrium.solve(state, T, P, be), result.timing.learn_equilibration+=);
+
+            /*
+            std::cout << " - learn    : " << res.timing.learn << std::endl;
+            std::cout << " - estimate : " << res.timing.estimate << std::endl;
+            std::cout << "   - search : " << res.timing.estimate_search << std::endl;
+            getchar();
+            */
+            result.smart_equilibrium += res;
+
+            // If smart calculation failed, use cold-start
+            if(!res.estimate.accepted && !res.learning.gibbs_energy_minimization.optimum.succeeded)
+            {
+                //std::cout << "restart smart_equilibrium: " << res.learning.gibbs_energy_minimization.optimum.succeeded << std::endl;
+
+                state.setSpeciesAmounts(0.0);
+                timeit( res = smart_equilibrium.solve(state, T, P, be), result.timing.learn_equilibration+=);
+
+            }
+
+            // Assert the smart equilibrium calculation did not fail
+            Assert(res.estimate.accepted || res.learning.gibbs_energy_minimization.optimum.succeeded,
+                   "Could not calculate the rates of the species.",
+                   "The smart equilibrium calculation failed.");
 
         }
-        stats.eq_calls_time += elapsed(start);
-        //stats.eq_search_time += result.smart.estimate_stats.time_search;
+        else  // using conventional equilibrium solver
+        {
+            EquilibriumResult res = {};
 
-        // Assert the equilibrium calculation did not fail
-        Assert(result.optimum.succeeded,
-               "Could not calculate the rates of the species.",
-               "The equilibrium calculation failed.");
+            timeit(res += equilibrium.solve(state, T, P, be), result.timing.learn_equilibration +=);
 
-        start = time();
+            result.equilibrium += res;
+
+            // Check if the calculation failed, if so, use cold-start
+            if (!res.optimum.succeeded) {
+                state.setSpeciesAmounts(0.0);
+                timeit(res = equilibrium.solve(state, T, P, be), result.timing.learn_equilibration +=);
+
+            }
+            if (!res.optimum.succeeded) {
+                std::cout << "t : " << t << std::endl;
+                std::cout << "n : " << tr(state.speciesAmounts()) << std::endl;
+                //std::cout << "n : " << state.speciesAmount("H+") << std::endl;
+                //std::cout << "error : " << res.optimum.error << std::endl;
+                //std::cout << "iterations : " << res.optimum.iterations << std::endl;
+                return 1; // ensure the ode solver will reduce the time step
+            }
+            // Assert the equilibrium calculation did not fail
+            Assert(res.optimum.succeeded,
+                   "Could not calculate the rates of the species.",
+                   "The equilibrium calculation failed.");
+        }
+
+
+        //std::cout << "properties ..." << std::endl;
         // Update the chemical properties of the system
-        properties = state.properties();
-        stats.prop_eval_time += elapsed(start);
+        timeit(properties = state.properties(), result.timing.learn_chemical_properties+=);
 
+        //std::cout << "reactions ..." << std::endl;
         // Calculate the kinetic rates of the reactions
-        r = reactions.rates(properties);
+        timeit(r = reactions.rates(properties), result.timing.learn_reaction_rates+=);
 
         // Calculate the right-hand side function of the ODE
         res = A * r.val;
@@ -1498,7 +1140,8 @@ struct SmartKineticSolver::Impl
             // Add the contribution of the source rates
             res += B * q.val;
         }
-        //std::cout << "fun res :" << tr(res) << std::endl;
+
+        //std::cout << "end of func u: " << tr(u) << std::endl;
 
         return 0;
     }
@@ -1508,8 +1151,8 @@ struct SmartKineticSolver::Impl
         // Calculate the sensitivity of the equilibrium state
         //sensitivity = equilibrium->sensitivity();
 
-        if (options.learning.use_smart_equilibrium_solver)   sensitivity = smart_equilibrium->sensitivity();
-        else    sensitivity = equilibrium->sensitivity();
+        if (options.learning.use_smart_equilibrium_solver)   sensitivity = smart_equilibrium.sensitivity();
+        else    sensitivity = equilibrium.sensitivity();
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
         drdne = cols(r.ddn, ies);
@@ -1544,13 +1187,19 @@ struct SmartKineticSolver::Impl
 
         return 0;
     }
+    /*
     auto showTree(const Index& step) -> void{
         //if (options.learning.use_smart_equilibrium_solver) smart_equilibrium->showTree(step);
     }
+    */
 };
 
 SmartKineticSolver::SmartKineticSolver()
-        : pimpl(new Impl())
+: pimpl(new Impl())
+{}
+
+SmartKineticSolver::SmartKineticSolver(const SmartKineticSolver& other)
+: pimpl(new Impl(*other.pimpl))
 {}
 
 SmartKineticSolver::SmartKineticSolver(const ReactionSystem& reactions)
@@ -1564,20 +1213,6 @@ auto SmartKineticSolver::operator=(SmartKineticSolver other) -> SmartKineticSolv
 {
     pimpl = std::move(other.pimpl);
     return *this;
-}
-
-auto SmartKineticSolver::console() -> void
-{
-    pimpl->console();
-}
-
-auto SmartKineticSolver::summarize() -> void
-{
-    pimpl->summarize();
-}
-auto SmartKineticSolver::refresh() -> void
-{
-    pimpl->refresh();
 }
 
 auto SmartKineticSolver::setOptions(const SmartKineticOptions& options) -> void
@@ -1614,94 +1249,5 @@ auto SmartKineticSolver::initialize(ChemicalState& state, double tstart) -> void
 {
     pimpl->initialize(state, tstart);
 }
-auto SmartKineticSolver::initialize(ChemicalState& state, double tstart, VectorConstRef be) -> void
-{
-    pimpl->initialize(state, tstart, be);
-}
-
-/*
-auto SmartKineticSolver::step(ChemicalState& state, double t) -> double
-{
-    return pimpl->step(state, t);
-}
-*/
-
-auto SmartKineticSolver::stepSmart(ChemicalState& state, double t, double tfinal) -> double
-{
-    return pimpl->stepSmart(state, t, tfinal);
-}
-/*
-auto SmartKineticSolver::solveSmart(ChemicalState& state, double t, double dt) -> double
-{
-    return pimpl->solveSmart(state, t, dt);
-}
-*/
-/*
-auto SmartKineticSolver::stepKinetics(ChemicalState& state, double t, double dt, VectorConstRef be) -> double
-{
-    return pimpl->stepKinetics(state, t, dt,be);
-}
-*/
-
-auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt) -> void
-{
-    pimpl->solve(state, t, dt);
-}
-
-auto SmartKineticSolver::solveSmart(ChemicalState& state, double& t, double dt, Index step, Index cell, KineticResult& result) -> void
-{
-    pimpl->solveSmart(state, t, dt, step, cell, result);
-}
-auto SmartKineticSolver::solveSmartPostprocess(ChemicalState& state, double& t, double dt, Index step, Index cell, KineticResult& result) -> void
-{
-    pimpl->solveSmartPostprocess(state, t, dt, step, cell, result);
-}
-
-auto SmartKineticSolver::solveEquilibriumKinetics(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index cell,  KineticResult& result) -> void
-{
-    pimpl->solveEquilibriumKinetics(state, t, dt, b, step, cell, result);
-}
-auto SmartKineticSolver::solveKineticsEquilibrium(ChemicalState& state, double t, double dt, VectorConstRef b,  Index step, Index icell, KineticResult& result) -> void
-{
-    pimpl->solveKineticsEquilibrium(state, t, dt, b, step, icell, result);
-}
-auto SmartKineticSolver::solvePath(ChemicalState& state, double t, double tfinal, std::string units, KineticResult& result) -> void
-{
-    pimpl->solvePath(state, t, tfinal, units, result);
-}
-/*
-auto SmartKineticSolver::solveCustom(ChemicalState& state, double t, double tfinal, std::string units, VectorConstRef be, KineticPathResult& result) -> void
-{
-    pimpl->solveCustom(state, t, tfinal, units, be, result);
-}
- */
-/*
-auto SmartKineticSolver::solveCustom(ChemicalState& state, double t, double tfinal, std::string units, KineticPathResult& result) -> void
-{
-    pimpl->solveKineticsEquilibrium(state, t, tfinal, units, result);
-}
-*/
-
-auto SmartKineticSolver::output() -> ChemicalOutput
-{
-    pimpl->output = ChemicalOutput(pimpl->reactions);
-    return pimpl->output;
-}
-
-auto SmartKineticSolver::plot() -> ChemicalPlot
-{
-    pimpl->plots.push_back(ChemicalPlot(pimpl->reactions));
-    return pimpl->plots.back();
-}
-
-auto SmartKineticSolver::plots(unsigned num) -> std::vector<ChemicalPlot>
-{
-    for(unsigned i = 0; i < num; ++i) plot();
-    return pimpl->plots;
-}
-auto  SmartKineticSolver::showTree(const Index& step) -> void {
-    pimpl->showTree(step);
-}
-
 
 } // namespace Reaktoro

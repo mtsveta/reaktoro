@@ -323,7 +323,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Step **: Define the options for the reactive transport solver
     ReactiveTransportOptions reactive_transport_options;
     reactive_transport_options.use_smart_equilibrium_solver = params.use_smart_equilibrium_solver;
-    reactive_transport_options.use_smart_kinetic_solver = params.use_smart_kinetic_solver;
+    reactive_transport_options.use_smart_kinetic_solver = params.use_smart_kinetics_solver;
     reactive_transport_options.equilibrium = equilibrium_options;
     reactive_transport_options.smart_equilibrium = smart_equilibrium_options;
     reactive_transport_options.kinetics = kinetic_options; // TODO: think about better structure of the kinetic and equilibrium options

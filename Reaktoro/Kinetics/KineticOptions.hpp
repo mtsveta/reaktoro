@@ -41,7 +41,7 @@ struct KineticOptions
     /// The options for the equilibrium solver.
     EquilibriumOptions equilibrium;
 
-    /// The options for the equilibrium solver.
+    /// The options for the smart equilibrium solver.
     SmartEquilibriumOptions smart_equilibrium;
 
     /// The options for the ODE solver.

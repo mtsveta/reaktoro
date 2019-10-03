@@ -17,6 +17,8 @@
 
 #include "ODE.hpp"
 
+#include <iostream>
+
 // Sundials includes
 #include <cvode/cvode.h>
 #include <cvode/cvode_dense.h>
@@ -24,6 +26,7 @@
 
 // Reaktoro includes
 #include <Reaktoro/Common/Exception.hpp>
+#include <Reaktoro/Math.hpp>
 
 namespace Reaktoro {
 
@@ -97,6 +100,9 @@ struct ODESolver::Impl
     /// The auxiliary matrix J for the Jacobian evaluation
     Matrix J;
 
+    /// The auxiliary matrix S for the sensitivites of y
+    Matrix S;
+
     /// Construct a default ODESolver::Impl instance
     Impl()
     : cvode_mem(nullptr), cvode_y(nullptr)
@@ -130,6 +136,10 @@ struct ODESolver::Impl
         // Allocate memory for f and J
         f.resize(num_equations);
         J.resize(num_equations, num_equations);
+        S.resize(num_equations, num_equations);
+
+        // Initialize sensitivities by the identity matrix
+        S.setIdentity();
 
         // Free any dynamic memory allocated for cvode_mem context
         if(cvode_mem) CVodeFree(&cvode_mem);
@@ -249,12 +259,58 @@ struct ODESolver::Impl
         // Set the user-defined data to cvode_mem
         CheckIntegration(CVodeSetUserData(cvode_mem, &data));
 
+        //std::cout << "t      : " << t << std::endl;
+        //std::cout << "t + dt : " << t + dt << std::endl;
         // Solve the ode problem from `tstart` to `tfinal`
+        // CV_NORMAL - indicates that the step is controled by `tstart` and `tfinal`
+        // CVODE will trigger integration from t until t + dt
         CheckIntegration(CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL));
 
         // Transfer the result from cvode_y to y
         for(int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
+
+        //std::cout << "y        : " << tr(y) << std::endl;
+        //getchar();
+    }
+
+    /// Solve the ODE equations from a given start time to a final one.
+    auto solve(double& t, double dt, VectorRef y, VectorRef f_, MatrixRef S_) -> void
+    {
+        // Initialize the cvode context
+        initialize(t, y);
+
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        // Set the user-defined data to cvode_mem
+        CheckIntegration(CVodeSetUserData(cvode_mem, &data));
+
+        // Solve the ode problem from `tstart` to `tfinal`
+        // CV_NORMAL - indicates that the step is controled by `tstart` and `tfinal`
+        // CVODE will trigger integration from t until t + dt
+        CheckIntegration(CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL));
+
+        // Transfer the result from cvode_y to y
+        for(int i = 0; i < data.num_equations; ++i)
+            y[i] = VecEntry(this->cvode_y, i);
+
+        // Identity matrix
+        Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
+
+        // Set the value of the current jacobian
+        Matrix J;
+        problem.jacobian(t, y, J);
+
+        // Initialize system matrix A = I - dt * J^{k+1}
+        Matrix A;
+        A = I - dt * J;
+
+        // Perform LU decomposition for matrix A
+        LU lu(A);
+
+        // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
+        S_ = lu.solve(S);
     }
 };
 
@@ -421,9 +477,19 @@ auto ODESolver::integrate(double& t, VectorRef y, double tfinal) -> void
     pimpl->integrate(t, y, tfinal);
 }
 
+auto ODESolver::integrate(double& t, VectorRef y, double tfinal, MatrixRef S, MatrixRef J, VectorRef f) -> void
+{
+    pimpl->integrate(t, y, tfinal, S, J, f);
+}
+
 auto ODESolver::solve(double& t, double dt, VectorRef y) -> void
 {
     pimpl->solve(t, dt, y);
+}
+
+auto ODESolver::solve(double& t, double dt, VectorRef y, VectorRef f, MatrixRef S) -> void
+{
+    pimpl->solve(t, dt, y, f, S);
 }
 
 } // namespace Reaktoro

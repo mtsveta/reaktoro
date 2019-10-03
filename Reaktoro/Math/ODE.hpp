@@ -71,7 +71,7 @@ struct ODEOptions
     double max_step = 0.0;
 
     /// The scalar relative error tolerance.
-    double reltol = 1e-4;
+    double reltol = 1.0e-4;
 
     /// The scalar absolute error tolerance.
     double abstol = 1.0e-6;
@@ -208,11 +208,29 @@ public:
     /// @param tfinal The final time that the integration must satisfy
     auto integrate(double& t, VectorRef y, double tfinal) -> void;
 
+    /// Integrate the ODE performing a single step not going over a given time.
+    /// @param[in,out] t The current time of the integration as input, the new current time as output
+    /// @param[in,out] y The current variables as input, the new current variables as output
+    /// @param tfinal The final time that the integration must satisfy
+    /// @param S The new sensitivity as output
+    /// @param J The new Jacobian as output
+    /// @param f The new right-hand side values as output
+    auto integrate(double& t, VectorRef y, double tfinal, MatrixRef S, MatrixRef J, VectorRef f) -> void;
+
     /// Solve the ODE equations from a given start time to a final one.
     /// @param[in,out] t The current time of the integration as input, the new current time as output
     /// @param dt The value of the time step
     /// @param[in,out] y The current variables as input, the new current variables as output
     auto solve(double& t, double dt, VectorRef y) -> void;
+
+    /// Solve the ODE equations from a given start time to a final one.
+    /// @param[in,out] t The current time of the integration as input, the new current time as output
+    /// @param dt The value of the time step
+    /// @param[in,out] y The current variables as input, the new current variables as output
+    /// @param S The new sensitivity as output
+    /// @param J The new Jacobian as output
+    /// @param f The new right-hand side values as output
+    auto solve(double& t, double dt, VectorRef y, VectorRef, MatrixRef S) -> void;
 
 private:
     struct Impl;

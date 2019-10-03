@@ -24,11 +24,9 @@
 // Reaktoro includes
 #include <Reaktoro/Math/Matrix.hpp>
 
-
 namespace Reaktoro {
 
 // Forward declarations (classes)
-class ChemicalState;
 class ChemicalState;
 class Partition;
 class ReactionSystem;
