@@ -82,6 +82,15 @@ struct ReactiveTransportAnalysis
         /// The time spent (in s) in each time step for chemical kinetic calculations.
         std::vector<double> kinetics;
 
+        /// The time spent (in s) in each time step for equilibrium in chemical kinetic calculations.
+        std::vector<double> kinetics_equilibration;
+
+        /// The time spent (in s) in each time step for chemical properties evaluation in chemical kinetic calculations.
+        std::vector<double> kinetics_properties;
+
+        /// The time spent (in s) in each time step for chemical kinetic calculations without chemical properties evaluation.
+        std::vector<double> kinetics_with_ideal_properties;
+
         /// The time spent (in s) in each time step for chemical equilibrium calculations.
         std::vector<double> equilibrium;
 

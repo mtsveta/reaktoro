@@ -103,7 +103,7 @@ struct ReactiveTransportProfiler::Impl
 
         info.transport.resize(num_time_steps);
         info.equilibrium.resize(num_time_steps);
-        info.kinetics.resize(num_time_steps);
+
         info.smart_equilibrium.resize(num_time_steps);
         info.smart_equilibrium_with_ideal_search.resize(num_time_steps);
 
@@ -114,10 +114,16 @@ struct ReactiveTransportProfiler::Impl
         info.smart_equilibrium_gibbs_energy_minimization.resize(num_time_steps);
         info.smart_equilibrium_storage.resize(num_time_steps);
 
+        info.kinetics.resize(num_time_steps);
+        info.kinetics_equilibration.resize(num_time_steps);
+        info.kinetics_properties.resize(num_time_steps);
+        info.kinetics_with_ideal_properties.resize(num_time_steps);
+
         for(Index i = 0; i < num_time_steps; ++i)
         {
             info.transport[i] = timing_transport_at_step[i].step;
             info.equilibrium[i] = timing_equilibrium_at_step[i].solve;
+
             info.smart_equilibrium[i] = timing_smart_equilibrium_at_step[i].solve;
             info.smart_equilibrium_with_ideal_search[i] = info.smart_equilibrium[i] - timing_smart_equilibrium_at_step[i].estimate_search;
             info.smart_equilibrium_estimate[i] = timing_smart_equilibrium_at_step[i].estimate;
@@ -127,6 +133,10 @@ struct ReactiveTransportProfiler::Impl
             info.smart_equilibrium_storage[i] = timing_smart_equilibrium_at_step[i].learn_storage;
 
             info.kinetics[i] = timing_kinetics_at_step[i].solve;
+            info.kinetics_equilibration[i] = timing_kinetics_at_step[i].equilibrate;
+            info.kinetics_properties[i] = timing_kinetics_at_step[i].chemical_properties;
+            info.kinetics_with_ideal_properties[i] = timing_kinetics_at_step[i].solve - timing_kinetics_at_step[i].chemical_properties;
+
 
         }
 
@@ -189,7 +199,7 @@ struct ReactiveTransportProfiler::Impl
             // For each cell, check if the smart estimation was accepted at current time step number
             const auto num_cells = results[i].smart_equilibrium_at_cell.size();
             for(Index j = 0; j < num_cells; ++j)
-                if(results[i].smart_equilibrium_at_cell[j].estimate.accepted == false)
+                if(!results[i].smart_equilibrium_at_cell[j].estimate.accepted)
                     info.cells_where_learning_was_required_at_step[i].push_back(j);
         }
 
