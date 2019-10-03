@@ -50,5 +50,6 @@ auto SmartEquilibriumResult::operator+=(const SmartEquilibriumResult& other) -> 
 {
     estimate += other.estimate;
     learning += other.learning;
+    timing   += other.timing;
 }
 } // namespace Reaktoro

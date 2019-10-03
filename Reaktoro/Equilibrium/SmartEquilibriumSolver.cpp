@@ -140,7 +140,7 @@ struct SmartEquilibriumSolver::Impl
     {
         // Calculate the equilibrium state using conventional Gibbs energy minimization approach
         timeit( solver.solve(state, T, P, be),
-            result.timing.learn_gibbs_energy_minimization= );
+            result.timing.learn_gibbs_energy_minimization+= );
 
         // Store the result of the Gibbs energy minimization calculation performed during learning
         result.learning.gibbs_energy_minimization = solver.result();
@@ -165,7 +165,7 @@ struct SmartEquilibriumSolver::Impl
         // Relative and absolute tolerance parameters
         const auto reltol = options.reltol;
         const auto abstol = options.abstol;
-
+        const auto cutoff = options.cutoff;
 
         MatrixConstRef Ae = partition.formulaMatrixEquilibriumPartition();
 
@@ -430,6 +430,13 @@ struct SmartEquilibriumSolver::Impl
             */
         }
 
+        //std::cout << "sensitivity0.dndb:\n" << sensitivity0.dndb << std::endl;
+        //std::cout << "sensitivity0.dndb * (be - be0) :\n" << sensitivity0.dndb * (be - be0) << std::endl;
+
+        //std::cout << "dn of a size " << delta_ne.size() << ":\n" << tr(delta_ne) << std::endl;
+        //std::cout << "ne:\n" << tr(ne) << std::endl;
+        //getchar();
+
         toc(1, result.timing.estimate_mat_vec_mul);
 
         //----------------------------------------------
@@ -477,7 +484,9 @@ struct SmartEquilibriumSolver::Impl
         return solve(state, T, P, be);
     }
 
-    auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult {
+    auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult
+    {
+
         tic(0);
 
         // Absolutely ensure an exact Hessian of the Gibbs energy function is used in the calculations
@@ -487,20 +496,14 @@ struct SmartEquilibriumSolver::Impl
         result = {};
 
         // Perform a smart estimate of the chemical state
-        timeit(estimate(state, T, P, be),
-               result.timing.estimate =);
+        timeit(estimate(state, T, P, be), result.timing.estimate =);
 
         // Perform a learning step if the smart prediction is not sactisfatory
         if (!result.estimate.accepted)
-        {
             timeit(learn(state, T, P, be), result.timing.learn =);
-        }
+
 
         toc(0, result.timing.solve);
-
-        std::cout << "Estimate accepted : " << result.estimate.accepted << std::endl;
-        std::cout << "GEMs succeeded    : " << result.learning.gibbs_energy_minimization.optimum.succeeded << std::endl;
-        getchar();
 
         return result;
     }
@@ -509,6 +512,11 @@ struct SmartEquilibriumSolver::Impl
         solver.properties();
     }
 
+    /// Set the partition of the chemical system.
+    auto getSolver() -> EquilibriumSolver&
+    {
+        return solver;
+    }
     auto sensitivity() -> const EquilibriumSensitivity&
     {
         solver.sensitivity();
@@ -563,7 +571,7 @@ auto SmartEquilibriumSolver::solve(ChemicalState& state, const EquilibriumProble
 
 auto SmartEquilibriumSolver::sensitivity() -> const EquilibriumSensitivity&
 {
-    return pimpl->sensitivity();
+    return pimpl->getSolver().sensitivity();
 }
 
 auto SmartEquilibriumSolver::properties() const -> const ChemicalProperties&
