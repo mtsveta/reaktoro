@@ -17,7 +17,13 @@
 
 #pragma once
 
-namespace Reaktoro {
+#include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
+#include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
+
+namespace Reaktoro{
+
+//struct EquilibriumResult;
+//struct SmartEquilibriumResult;
 
 /// Timing information of the operations during an kinetic calculation.
 struct KineticTiming {
@@ -38,7 +44,7 @@ struct KineticTiming {
     double reaction_rates = 0.0;
 
     /// The time spent for equilibration of the system.
-    double equilibration = 0.0;
+    double equilibrate = 0.0;
 
     /// Self addition assignment to accumulate kinetic timing.
     auto operator+=(const KineticTiming& other) -> KineticTiming&;
@@ -49,6 +55,12 @@ struct KineticResult
 {
     /// The timing information of the operations during an equilibrium calculation.
     KineticTiming timing;
+
+    /// Equilibrium information of the operations during an equilibrium calculation.
+    EquilibriumResult equilibrium;
+
+    /// Equilibrium information of the operations during an equilibrium calculation.
+    SmartEquilibriumResult smart_equilibrium;
 
     /// Self addition assignment to accumulate results.
     auto operator+=(const KineticResult& other) -> KineticResult&;

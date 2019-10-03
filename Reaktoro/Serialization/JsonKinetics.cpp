@@ -37,7 +37,7 @@ void to_json(json& j, const KineticTiming& obj) {
     j["integrate"] = obj.integrate;
     j["chemical_properties"] = obj.chemical_properties;
     j["reaction_rates"] = obj.reaction_rates;
-    j["equilibration"] = obj.equilibration;
+    j["equilibration"] = obj.equilibrate;
 
 }
 
@@ -47,7 +47,7 @@ void from_json(const json& j, KineticTiming& obj) {
     j.at("integrate").get_to(obj.integrate);
     j.at("chemical_properties").get_to(obj.chemical_properties);
     j.at("reaction_rates").get_to(obj.reaction_rates);
-    j.at("equilibration").get_to(obj.equilibration);
+    j.at("equilibration").get_to(obj.equilibrate);
 }
 
 void to_json(json& j, const SmartKineticResult& obj) {

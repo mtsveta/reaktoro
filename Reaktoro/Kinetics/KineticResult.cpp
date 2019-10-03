@@ -26,13 +26,16 @@ auto KineticTiming::operator+=(const KineticTiming& other) -> KineticTiming&
     integrate += other.integrate;
     chemical_properties += other.chemical_properties;
     reaction_rates += other.reaction_rates;
-    equilibration += other.equilibration;
+    equilibrate += other.equilibrate;
     return *this;
 }
 
 auto KineticResult::operator+=(const KineticResult& other) -> KineticResult&
 {
     timing += other.timing;
+    equilibrium += other.equilibrium;
+    smart_equilibrium += other.smart_equilibrium;
+
     return *this;
 }
 } // namespace Reaktoro
