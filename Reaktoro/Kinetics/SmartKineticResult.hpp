@@ -50,7 +50,7 @@ struct SmartKineticTiming {
     double learn_sensitivity = 0.0;
 
     /// The time spent for equilibration of the system during a smart learning.
-    double learn_equilibration = 0.0;
+    double learn_equilibrate = 0.0;
 
     /// The time spent for storing the learned smart state.
     double learn_store = 0.0;

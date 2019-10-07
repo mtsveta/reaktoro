@@ -34,7 +34,7 @@ class ChemicalPlot;
 
 // Forward declarations (structs)
 struct SmartKineticOptions;
-struct KineticResult;
+struct SmartKineticResult;
 
 /// A class that represents a solver for chemical kinetics problems.
 /// @see KineticProblem

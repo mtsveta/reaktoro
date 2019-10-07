@@ -154,8 +154,8 @@ struct KineticSolver::Impl
         partition = partition_;
 
         // Set the partition of the equilibrium and smart equilibrium solver
-        equilibrium.setPartition(partition);
         smart_equilibrium.setPartition(partition);
+        equilibrium.setPartition(partition);
 
         // Set the indices of the equilibrium and kinetic species
         ies = partition.indicesEquilibriumSpecies();
@@ -484,6 +484,8 @@ struct KineticSolver::Impl
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
     {
+        // std::cout << "f(t) = f(" << t << ")" << std::endl;
+
         // Extract the `be` and `nk` entries of the vector [be, nk]
         be = u.head(Ee);
         nk = u.tail(Nk);

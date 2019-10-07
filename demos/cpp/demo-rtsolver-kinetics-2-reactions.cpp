@@ -270,7 +270,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
             .setEquation("Dolomite = Ca++ + Mg++ + 2*CO3--")
             .addMechanism("logk = -7.53 mol/(m2*s); Ea = 52.2 kJ/mol")
             .addMechanism("logk = -3.19 mol/(m2*s); Ea = 36.1 kJ/mol; a[H+] = 0.5")
-            .setSpecificSurfaceArea(100, "cm2/g");
+            .setSpecificSurfaceArea(10000, "cm2/g");
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
@@ -441,7 +441,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-nsteps-" + std::to_string(params.nsteps) +
                            "-conv-kin-conv-eq-T-160";
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
-    std::string folder = "../rt-sa-100-reacts-2" + test_tag;
+    std::string folder = "../rt-sa-10000-reacts-2" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "\nsolver                         : "

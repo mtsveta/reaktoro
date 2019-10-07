@@ -65,7 +65,6 @@ struct ODEOptions
 
     /// The lower bound on the magnitude of the step size.
     double min_step = 0.0;
-    //double min_step = 1e-16;
 
     /// The upper bound on the magnitude of the step size.
     double max_step = 0.0;
@@ -208,14 +207,7 @@ public:
     /// @param tfinal The final time that the integration must satisfy
     auto integrate(double& t, VectorRef y, double tfinal) -> void;
 
-    /// Integrate the ODE performing a single step not going over a given time.
-    /// @param[in,out] t The current time of the integration as input, the new current time as output
-    /// @param[in,out] y The current variables as input, the new current variables as output
-    /// @param tfinal The final time that the integration must satisfy
-    /// @param S The new sensitivity as output
-    /// @param J The new Jacobian as output
-    /// @param f The new right-hand side values as output
-    auto integrate(double& t, VectorRef y, double tfinal, MatrixRef S, MatrixRef J, VectorRef f) -> void;
+    auto integrate(double& t, VectorRef y, double tfinal, VectorRef f_, MatrixRef J_, MatrixRef S_) -> void;
 
     /// Solve the ODE equations from a given start time to a final one.
     /// @param[in,out] t The current time of the integration as input, the new current time as output
@@ -230,7 +222,7 @@ public:
     /// @param S The new sensitivity as output
     /// @param J The new Jacobian as output
     /// @param f The new right-hand side values as output
-    auto solve(double& t, double dt, VectorRef y, VectorRef, MatrixRef S) -> void;
+    auto solve(double& t, double dt, VectorRef y, VectorRef f, MatrixRef J, MatrixRef S) -> void;
 
 private:
     struct Impl;

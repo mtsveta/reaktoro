@@ -77,7 +77,7 @@ void to_json(json& j, const SmartKineticTiming& obj) {
     j["learn_integrate"] = obj.learn_integrate;
     j["learn_chemical_properties"] = obj.learn_chemical_properties;
     j["learn_reaction_rates"] = obj.learn_reaction_rates;
-    j["learn_equilibration"] = obj.learn_equilibration;
+    j["learn_equilibration"] = obj.learn_equilibrate;
     j["estimate"] = obj.estimate;
     j["estimate_search"] = obj.estimate_search;
     j["estimate_mat_vec_mul"] = obj.estimate_mat_vec_mul;
@@ -91,7 +91,7 @@ void from_json(const json& j, SmartKineticTiming& obj) {
     j.at("learn_integrate").get_to(obj.learn_integrate);
     j.at("learn_chemical_properties").get_to(obj.learn_chemical_properties);
     j.at("learn_reaction_rates").get_to(obj.learn_reaction_rates);
-    j.at("learn_equilibration").get_to(obj.learn_equilibration);
+    j.at("learn_equilibration").get_to(obj.learn_equilibrate);
     j.at("estimate").get_to(obj.estimate);
     j.at("estimate_search").get_to(obj.estimate_search);
     j.at("estimate_mat_vec_mul").get_to(obj.estimate_mat_vec_mul);

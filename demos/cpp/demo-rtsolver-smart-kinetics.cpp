@@ -199,7 +199,7 @@ int main()
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 150; // the number of steps in the reactive transport simulation
+    params.nsteps = 100; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -226,6 +226,7 @@ int main()
 
 
 
+    /*
     // Execute reactive transport with different solvers
     params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = true; runReactiveTransport(params, results);
 
@@ -262,8 +263,8 @@ int main()
                                                                 - results.kinetic_timing.chemical_properties
                                                                 - results.smart_equilibrium_timing.learn_storage
                                                                 - results.smart_equilibrium_timing.estimate_search << std::endl;
-
-    ///*
+    */
+    /*
     // Execute reactive transport with different solvers
     params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
@@ -279,24 +280,25 @@ int main()
     std::cout << "     - reaction_rates      : " << results.kinetic_timing.reaction_rates << " (" << results.kinetic_timing.reaction_rates / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "     - equilibration       : " << results.kinetic_timing.equilibrate << " (" << results.kinetic_timing.equilibrate / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "------------------------------------------------" << std::endl;
-    //*/
-    /*
-    // Execute reactive transport with different solvers
-    params.use_smart_equilibrium_solver = true; params.use_smart_kinetics_solver = true; runReactiveTransport(params, results);
-
-    results.smart_kin_conv_eq_total = 0.0;
-    results.smart_kin_conv_eq_total_ideal_search = 0.0;
-    results.smart_kin_conv_eq_total_ideal_search_store = 0.0;
-    results.smart_kin_conv_eq_total_ideal_search_store_properties = 0.0;
-
-    // Execute reactive transport with different solvers
+    */
+     // Execute reactive transport with different solvers
     params.use_smart_kinetics_solver = true; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conv_kin_smart_eq_total = 0.0;
     results.conv_kin_smart_eq_total_ideal_search = 0.0;
     results.conv_kin_smart_eq_total_ideal_search_store = 0.0;
     results.conv_kin_smart_eq_total_ideal_search_store_properties = 0.0;
+
+    /*
+    // Execute reactive transport with different solvers
+    params.use_smart_kinetics_solver = true;  params.use_smart_equilibrium_solver = true;  runReactiveTransport(params, results);
+
+    results.smart_kin_conv_eq_total = 0.0;
+    results.smart_kin_conv_eq_total_ideal_search = 0.0;
+    results.smart_kin_conv_eq_total_ideal_search_store = 0.0;
+    results.smart_kin_conv_eq_total_ideal_search_store_properties = 0.0;
     */
+
 
     /*
     // Summarise the profiling results
@@ -405,6 +407,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     SmartKineticOptions smart_kinetic_options;
     smart_kinetic_options.reltol = params.smart_kinetics_reltol;
     smart_kinetic_options.abstol = params.smart_kinetics_abstol;
+    smart_kinetic_options.cutoff = params.smart_equilibrium_cutoff;
     smart_kinetic_options.learning = kinetic_options;
     smart_kinetic_options.learning.equilibrium = equilibrium_options;
 
@@ -606,7 +609,6 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-eqabs-" + eqabstol_stream.str() +
                            "-kinrel-" + kinreltol_stream.str() +
                            "-kinabs-" + kinabstol_stream.str() +
-                           "-bdf-3" +
                            (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                            (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
