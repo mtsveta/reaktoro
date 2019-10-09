@@ -769,10 +769,10 @@ struct SmartKineticSolver::Impl
         //std::cout << "t - tk_ref   : " << t - tk_ref << std::endl;
         //std::cout << "benk  after  : " << tr(benk_estimated) << std::endl;
         Vector benk_estimated_;
-        benk_estimated.noalias() = benkk1_ref + dndn0_ref * db + dndt_ref * (t - tk_ref); // + dndt_ref * (t - tk_ref);
+        benk_estimated_.noalias() = benkk1_ref + dndn0_ref * db + dndt_ref * (t - tk_ref); // + dndt_ref * (t - tk_ref);
 
         Vector benk_estimated__;
-        benk_estimated.noalias() = benkk1_ref + dndn0_ref * db
+        benk_estimated__.noalias() = benkk1_ref + dndn0_ref * db
                 + dndt_ref * (t - tk_ref)
                 + 0.5 * dfdn_ref * dndt_ref * (t - tk_ref) * (t - tk_ref); // + dndt_ref * (t - tk_ref);
 
@@ -798,8 +798,6 @@ struct SmartKineticSolver::Impl
         VectorConstRef be = benk_estimated.head(Ee);
         VectorConstRef nk = benk_estimated.tail(Nk);
 
-        // Update the composition of the kinetic species
-        state.setSpeciesAmounts(nk, iks);
 
         // Get the sensitivity derivatives dln(a) / dn
         MatrixConstRef dlnadn_ref = properties_ref.lnActivities().ddn; // TODO: this line is assuming all species are equilibrium specie! get the rows and columns corresponding to equilibrium species
@@ -809,11 +807,9 @@ struct SmartKineticSolver::Impl
         MatrixConstRef dlnadne_ref = dlnadn_ref(ies, ies);
         VectorConstRef lnae_ref = lna_ref(ies);
 
-        properties = state.properties();
-        r = reactions.rates(properties);
-
-        VectorConstRef lna = properties.lnActivities().val;
-        VectorConstRef lnae = lna(ies);
+        //properties = state.properties();
+        //VectorConstRef lna = properties.lnActivities().val;
+        //VectorConstRef lnae = lna(ies);
 
         //VectorConstRef diff_lnae = lnae_ref - lnae_new;
         //double dist_lnae = std::pow((lnae_ref - lnae_new).squaredNorm(), 2.0);
@@ -889,21 +885,32 @@ struct SmartKineticSolver::Impl
         //abstol = options.abstol;
 
         // Initialize delta_n = [delta_ne; delta_nk]
-        Vector delta_n;
+        Vector delta_n, delta_nk;
+        delta_nk = nk - nk_ref;
         delta_n.resize(N);
         delta_n(ies) << delta_ne;
-        delta_n(iks) << nk - nk_ref;
-        //std::cout << "delta_n: " << tr(delta_n) << std::endl;
-        //getchar();
+        delta_n(iks) << delta_nk;
+
 
         // Compute delta_rk = drdn * delta_n
+        Vector delta_r;
+        delta_r.noalias() = r_ref.ddn * delta_n;
+        Vector rk_ref_ddn;
+        rk_ref_ddn.noalias() = r_ref.ddn(iks, 0);
         Vector delta_rk;
-        delta_rk.noalias() = r_ref.ddn * delta_n;
+        delta_rk.noalias() = rk_ref_ddn * delta_nk;
 
-        bool kinetics_variation_check = (delta_rk.array().abs() <= kinetics_abstol + kinetics_reltol * r_ref.val.array().abs()).all();
+        bool kinetics_nk_variation_check = (delta_nk.array().abs() <= kinetics_abstol + kinetics_reltol * nk_ref.array().abs()).all();
+        bool kinetics_r_variation_check = (delta_r.array().abs() <= kinetics_abstol + kinetics_reltol * r_ref.val.array().abs()).all();
+        bool kinetics_rk_variation_check = (delta_rk.array().abs() <= kinetics_abstol + kinetics_reltol * r_ref.val.array().abs()).all();
 
+        //std::cout << "delta_nk  : " << tr(delta_nk) << std::endl;
+        //std::cout << "nk_ref    : " << tr(nk_ref) << std::endl;
+
+        //std::cout << "delta_r.array().abs(): " << delta_r.array().abs() << std::endl;
         //std::cout << "delta_rk.array().abs(): " << delta_rk.array().abs() << std::endl;
-        //std::cout << "r_ref.val.array().abs(): " << r_ref.val.array().abs() << std::endl;
+
+        //std::cout << "delta_r.array().abs(): " << r_ref.val.array().abs() << std::endl;
 
         /*
         kinetics_variation_check = true;
@@ -926,13 +933,18 @@ struct SmartKineticSolver::Impl
         //bool confident = true;
 
          //getchar();
-        if (!equilibrium_variation_check || !equilibrium_amount_check || !kinetics_variation_check)
+        if (!equilibrium_variation_check || !equilibrium_amount_check || !kinetics_r_variation_check)
         //if(!kinetics_variation_check)
         //if (!equilibrium_variation_check || !kinetics_variation_check)
         {
-            //std::cout << "eq_var_check     : " << equilibrium_variation_check;
-            //std::cout << ", eq_amount_check  : " << equilibrium_amount_check;
-            //std::cout << ", kin_var_check    : " << kinetics_variation_check;
+            /*
+            std::cout << "lnae_var_check     : " << equilibrium_variation_check;
+            std::cout << ", eq_amount_check  : " << equilibrium_amount_check;
+            std::cout << ", nk_var_check  : " << kinetics_nk_variation_check;
+            std::cout << ", rk_var_check    : " << kinetics_rk_variation_check;
+            std::cout << ", r_var_check    : " << kinetics_r_variation_check << std::endl;
+            getchar();
+            */
             return;
         }
 
@@ -941,6 +953,9 @@ struct SmartKineticSolver::Impl
 
         // Update the solution of kinetic problem
         benk = benk_estimated;
+
+        // Update the composition of the kinetic species
+        state.setSpeciesAmounts(nk, iks);
 
         toc(2, result.timing.estimate_acceptance);
 

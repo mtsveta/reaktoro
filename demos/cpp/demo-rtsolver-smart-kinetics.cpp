@@ -201,9 +201,9 @@ int main()
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 50; // the number of steps in the reactive transport simulation
+    params.nsteps = 1000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
-    params.dt = 30 * minute; // the time step (in units of s)
+    params.dt = 5 * minute; // the time step (in units of s)
 
     // Define physical and chemical parameters
     params.D = 1.0e-9;     // the diffusion coefficient (in units of m2/s)
@@ -218,7 +218,7 @@ int main()
 
     // Define parameters of the kinetics solvers
     params.smart_kinetics_reltol = 1e-1;
-    params.smart_kinetics_abstol = 1e-2;
+    params.smart_kinetics_abstol = 1e-12;
 
     // Output
     outputConsole(params);
