@@ -356,6 +356,7 @@ struct ODESolver::Impl
 
         // Set the value of the current jacobian
         problem.jacobian(t, y, J_);
+        problem.function(t, y, f_);
         //std::cout << "J_" << J_ << std::endl;
 
         // Initialize system matrix A = I - dt * J^{k+1}

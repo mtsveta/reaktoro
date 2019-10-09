@@ -23,6 +23,7 @@
 #include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
 #include <Reaktoro/Kinetics/KineticResult.hpp>
+#include <Reaktoro/Kinetics/SmartKineticResult.hpp>
 #include <Reaktoro/Transport/TransportResult.hpp>
 
 namespace Reaktoro {
@@ -73,6 +74,28 @@ struct ReactiveTransportAnalysis
         std::vector<std::vector<Index>> cells_where_learning_was_required_at_step;
     };
 
+    /// Provide a summary of the performance analysis of all smart kinetic calculations.
+    struct SmartKineticsAnalysis
+    {
+        /// The accumulated timing for the operations during smart kinetic calculations.
+        SmartKineticTiming timing;
+
+        /// The total number of chemical kinetic calculations.
+        Index num_kinetics_calculations = 0;
+
+        /// The total number of accepted smart chemical kinetic estimates.
+        Index num_smart_kinetics_accepted_estimates = 0;
+
+        /// The total number of required smart chemical kinetic trainings.
+        Index num_smart_kinetics_required_learnings = 0;
+
+        /// The success rate at which smart kinetic estimates were accepted.
+        double smart_kinetics_estimate_acceptance_rate = 0.0;
+
+        /// The indices of the cell at each time step where learning was required.
+        std::vector<std::vector<Index>> cells_where_learning_was_required_at_step;
+    };
+
     /// Provide computing costs (in seconds) for the operations in a reactive transport calculation for each time step.
     struct ComputingCostsPerTimeStep
     {
@@ -90,6 +113,21 @@ struct ReactiveTransportAnalysis
 
         /// The time spent (in s) in each time step for chemical kinetic calculations without chemical properties evaluation.
         std::vector<double> kinetics_with_ideal_properties;
+
+        /// The time spent (in s) in each time step for smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics;
+
+        /// The time spent (in s) in each time step for learning in smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics_learn;
+
+        /// The time spent (in s) in each time step for chemical properties evaluation as part of learning in smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics_learn_chemical_properties;
+
+        /// The time spent (in s) in each time step for estimating in smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics_estimate;
+
+        /// The time spent (in s) in each time step for searching as part of estimating in smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics_estimate_search;
 
         /// The time spent (in s) in each time step for chemical equilibrium calculations.
         std::vector<double> equilibrium;
@@ -123,6 +161,8 @@ struct ReactiveTransportAnalysis
     SmartEquilibriumAnalysis smart_equilibrium;
 
     KineticsAnalysis kinetics;
+
+    SmartKineticsAnalysis smart_kinetics;
 
     ComputingCostsPerTimeStep computing_costs_per_time_step;
 };

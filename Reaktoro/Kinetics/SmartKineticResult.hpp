@@ -35,10 +35,10 @@ struct SmartKineticTiming {
     double learn = 0.0;
 
     /// The time spent for initializing the chemical kinetic problem during a smart learning.
-    double learn_initialize = 0.0;
+    double learn_initialization = 0.0;
 
     /// The time spent for integrating the chemical kinetic problem during a smart learning.
-    double learn_integrate = 0.0;
+    double learn_integration = 0.0;
 
     /// The time spent for computing the chemical properties of the system during a smart learning.
     double learn_chemical_properties = 0.0;
@@ -50,10 +50,10 @@ struct SmartKineticTiming {
     double learn_sensitivity = 0.0;
 
     /// The time spent for equilibration of the system during a smart learning.
-    double learn_equilibrate = 0.0;
+    double learn_equilibration = 0.0;
 
     /// The time spent for storing the learned smart state.
-    double learn_store = 0.0;
+    double learn_storage = 0.0;
 
     /// The time spent for estimating the chemical kinetic path
     double estimate = 0.0;
