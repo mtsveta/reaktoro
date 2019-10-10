@@ -34,6 +34,9 @@ struct SmartKineticTiming {
     /// The time spent for learning the chemical kinetic path
     double learn = 0.0;
 
+    /// The time spent for equilibrating equilibrium species
+    double equilibrate = 0.0;
+
     /// The time spent for initializing the chemical kinetic problem during a smart learning.
     double learn_initialization = 0.0;
 

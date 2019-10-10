@@ -21,30 +21,27 @@ namespace Reaktoro {
 
 struct KineticState
 {
-    /// Start time of the integration t_k
-    double tk;
-    /// Finish time of the integration t_{k+1}
-    double tk1;
 
-    /// Initial species' amount
-    Vector n0;
+    /// Start time of the integration
+    double t0;
+    /// Finish time of the integration
+    double t;
+
+    /// Initial species' amount at time t_0
+    Vector u0;
     /// Species' amount on the moment t_k
-    Vector nk;
-    /// Species' amount on the moment t_{k+1}
-    Vector nk1;
+    Vector u;
 
-    /// The partial derivatives @f$\left.\frac{\partial n}{\partial n_0}\right|@f$.
-    /// These derivatives provide a measure of how much the equilibrium amounts of the species,
-    /// @f$n@f$, change with an infinitesimal change in their initial condition, @f$n_0@f$.
-    /// They are used when solving kinetic paths of the cells that have similar initial condition
-    /// as the one already processed.
-    Matrix dndn0;
+    /// The partial derivatives @f$\left.\frac{\partial u}{\partial u_0}\right|@f$.
+    /// These derivatives provide a measure of how much @f$u@f$ changes with an infinitesimal
+    /// change in their initial condition @f$u_0@f$.
+    Matrix dudu0;
 
-    /// The right-hand size of ODE @f$\left.f(n) = \frac{\partial n}{\partial t}\right|@f$.
-    Vector dndt;
+    /// The right-hand size of ODE @f$\left.f(u) = \frac{\partial u}{\partial t}\right|@f$.
+    Vector dudt;
 
-    /// Jacobian of the the right-hand size f of ODE, i.e., @f$\left.J(n) = \frac{\partial f}{\partial n}\right|@f$.
-    Matrix dfdn;
+    /// Jacobian of the the right-hand size f of ODE, i.e., @f$\left.J(f(u)) = \frac{\partial f}{\partial u}\right|@f$.
+    Matrix dfdu;
 };
 
 } // namespace Reaktoro

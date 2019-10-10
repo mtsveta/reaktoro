@@ -272,6 +272,12 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
             .addMechanism("logk = -3.19 mol/(m2*s); Ea = 36.1 kJ/mol; a[H+] = 0.5")
             .setSpecificSurfaceArea(5000, "cm2/g");
 
+    editor.addMineralReaction("Magnesite")
+            .setEquation("Magnesite = Mg++ + CO3--")
+            .addMechanism("logk = -9.34 mol/(m2*s); Ea = 23.5 kJ/mol")
+            .addMechanism("logk = -6.38 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0")
+            .setSpecificSurfaceArea(5000, "cm2/g");
+
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
 
@@ -441,7 +447,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-nsteps-" + std::to_string(params.nsteps) +
                            "-conv-kin-conv-eq-T-160";
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
-    std::string folder = "../rt-sa-10000-reacts-2" + test_tag;
+    std::string folder = "../rt-sa-10000-reacts-33" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "\nsolver                         : "

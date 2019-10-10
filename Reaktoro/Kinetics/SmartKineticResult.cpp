@@ -21,6 +21,8 @@ auto SmartKineticTiming::operator+=(const SmartKineticTiming &other) -> SmartKin
     learn_reaction_rates += other.learn_reaction_rates;
     learn_chemical_properties += other.learn_chemical_properties;
 
+    equilibrate += other.equilibrate;
+
     return *this;
 }
 auto SmartKineticResult::operator+=(const Reaktoro::SmartKineticResult &other) -> SmartKineticResult&

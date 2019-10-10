@@ -35,15 +35,18 @@ struct KineticTiming {
     double integrate = 0.0;
 
     /// The time spent for computing the chemical properties of the system.
-    double chemical_properties = 0.0;
+    double integrate_chemical_properties = 0.0;
 
     /// The time spent for computing the chemical properties of the system.
-    double reaction_rates = 0.0;
+    double integrate_reaction_rates = 0.0;
 
     /// The time spent for computing the chemical properties of the system.
-    double sensitivity = 0.0;
+    double integrate_sensitivity = 0.0;
 
-    /// The time spent for equilibration of the system.
+    /// The time spent for equilibration of the system triggered during evaluation of rhs.
+    double integrate_equilibration = 0.0;
+
+    /// The time spent for equilibration of the system that is required after integration of kinetic species.
     double equilibrate = 0.0;
 
     /// Self addition assignment to accumulate kinetic timing.

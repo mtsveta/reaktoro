@@ -147,9 +147,9 @@ struct ReactiveTransportProfiler::Impl
             info.smart_equilibrium_storage[i] = timing_smart_equilibrium_at_step[i].learn_storage;
 
             info.kinetics[i] = timing_kinetics_at_step[i].solve;
-            info.kinetics_equilibration[i] = timing_kinetics_at_step[i].equilibrate;
-            info.kinetics_properties[i] = timing_kinetics_at_step[i].chemical_properties;
-            info.kinetics_with_ideal_properties[i] = timing_kinetics_at_step[i].solve - timing_kinetics_at_step[i].chemical_properties;
+            info.kinetics_equilibration[i] = timing_kinetics_at_step[i].integrate_equilibration;
+            info.kinetics_properties[i] = timing_kinetics_at_step[i].integrate_chemical_properties;
+            info.kinetics_with_ideal_properties[i] = timing_kinetics_at_step[i].solve - timing_kinetics_at_step[i].integrate_chemical_properties;
 
             info.smart_kinetics[i] = timing_smart_kinetics_at_step[i].solve;
             info.smart_kinetics_learn[i] = timing_smart_kinetics_at_step[i].learn;

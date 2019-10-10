@@ -452,9 +452,10 @@ struct KineticSolver::Impl
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
 
-        // TODO: is this  equiliration needed?
-        // Update the composition of the equilibrium species
-        // equilibrium.solve(state, T, P, be);
+        timeit({
+                   if(options.use_smart_equilibrium_solver) smart_equilibrium.solve(state, T, P, be);
+                   else equilibrium.solve(state, T, P, be);
+               }, result.timing.equilibrate +=);
 
         toc(0, result.timing.solve);
 
@@ -499,12 +500,13 @@ struct KineticSolver::Impl
         state.setSpeciesAmounts(nk, iks);
 
         // Solve the equilibrium problem using the elemental molar abundance `be`
-        if(options.use_smart_equilibrium_solver) // using smart equilibrium solver
+        //if(options.use_smart_equilibrium_solver) // using smart equilibrium solver
+        if(0) // using smart equilibrium solver
         {
             SmartEquilibriumResult res = {};
 
             // smart_equilibrium_result
-            timeit(res += smart_equilibrium.solve(state, T, P, be), result.timing.equilibrate+=);
+            timeit(res += smart_equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration+=);
 
             /*
             std::cout << " - learn    : " << res.timing.learn << std::endl;
@@ -520,7 +522,7 @@ struct KineticSolver::Impl
                 //std::cout << "restart smart_equilibrium: " << res.learning.gibbs_energy_minimization.optimum.succeeded << std::endl;
 
                 state.setSpeciesAmounts(0.0);
-                timeit( res = smart_equilibrium.solve(state, T, P, be), result.timing.equilibrate+=);
+                timeit( res = smart_equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration+=);
 
             }
 
@@ -534,14 +536,14 @@ struct KineticSolver::Impl
         {
             EquilibriumResult res = {};
 
-            timeit(res += equilibrium.solve(state, T, P, be), result.timing.equilibrate +=);
+            timeit(res += equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration +=);
 
             result.equilibrium += res;
 
             // Check if the calculation failed, if so, use cold-start
             if (!res.optimum.succeeded) {
                 state.setSpeciesAmounts(0.0);
-                timeit(res = equilibrium.solve(state, T, P, be), result.timing.equilibrate +=);
+                timeit(res = equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration +=);
 
             }
             if (!res.optimum.succeeded) {
@@ -561,11 +563,11 @@ struct KineticSolver::Impl
 
         //std::cout << "properties ..." << std::endl;
         // Update the chemical properties of the system
-        timeit(properties = state.properties(), result.timing.chemical_properties+=);
+        timeit(properties = state.properties(), result.timing.integrate_chemical_properties+=);
 
         //std::cout << "reactions ..." << std::endl;
         // Calculate the kinetic rates of the reactions
-        timeit(r = reactions.rates(properties), result.timing.reaction_rates+=);
+        timeit(r = reactions.rates(properties), result.timing.integrate_reaction_rates+=);
 
         // Calculate the right-hand side function of the ODE
         res = A * r.val;
@@ -589,7 +591,7 @@ struct KineticSolver::Impl
     {
         // Calculate the sensitivity of the equilibrium state
         timeit( sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity(),
-                result.timing.sensitivity+=);
+                result.timing.integrate_sensitivity+=);
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
         drdne = cols(r.ddn, ies);

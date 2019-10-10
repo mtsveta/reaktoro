@@ -23,11 +23,15 @@ auto KineticTiming::operator+=(const KineticTiming& other) -> KineticTiming&
 {
     solve += other.solve;
     initialize += other.initialize;
+
     integrate += other.integrate;
-    chemical_properties += other.chemical_properties;
-    reaction_rates += other.reaction_rates;
-    sensitivity += other.sensitivity;
-    equilibrate += other.equilibrate;
+    integrate_chemical_properties += other.integrate_chemical_properties;
+    integrate_reaction_rates += other.integrate_reaction_rates;
+    integrate_sensitivity += other.integrate_sensitivity;
+    integrate_equilibration += other.integrate_equilibration;
+
+    integrate += other.integrate;
+
     return *this;
 }
 
