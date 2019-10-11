@@ -44,7 +44,7 @@ target_include_directories(Reaktoro
 target_link_libraries(Reaktoro
     PRIVATE ${THIRDPARTY_LIBS}
     PRIVATE nlohmann_json::nlohmann_json
-    PRIVATE nanoflann::nanoflann
+    #PRIVATE nanoflann::nanoflann
     PUBLIC Boost::boost)
 
 # Set compilation features to be propagated to dependent codes.
