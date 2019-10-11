@@ -1,6 +1,6 @@
 find_package(Boost REQUIRED)
 find_package(nlohmann_json 3.6.1 REQUIRED)
-#find_package(nanoflann 1.2.2 REQUIRED)
+find_package(nanoflann REQUIRED)
 
 if(REAKTORO_BUILD_PYTHON)
     set(PYBIND11_CPP_STANDARD -std=c++17)  # Ensure pybind11 really uses c++17

@@ -69,9 +69,3 @@ ExternalProject_Add(GEMS
     PREFIX build
     SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/gems
     CMAKE_ARGS ${REAKTORO_THIRDPARTY_COMMON_INSTALL_ARGS})
-
-# Build and install the Gems library
-ExternalProject_Add(NANOFLANN
-        PREFIX build
-        SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/nanoflann
-        CMAKE_ARGS ${REAKTORO_THIRDPARTY_COMMON_INSTALL_ARGS})

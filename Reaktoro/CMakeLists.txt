@@ -9,8 +9,8 @@ set(REAKTORO_SHARED_LIB ${PROJECT_NAME}${SUFFIX_SHARED_LIBS})
 set(REAKTORO_STATIC_LIB ${PROJECT_NAME}${SUFFIX_STATIC_LIBS})
 
 # Set the list of names of the third-party targets and libraries
-set(THIRDPARTY_TARGETS PUGIXML MINIZ CVODE PHREEQC GEMS NANOFLANN)
-set(THIRDPARTY_LIBS pugixml miniz sundials_cvode sundials_nvecserial phreeqc gems nanoflann)
+set(THIRDPARTY_TARGETS PUGIXML MINIZ CVODE PHREEQC GEMS)
+set(THIRDPARTY_LIBS pugixml miniz sundials_cvode sundials_nvecserial phreeqc gems)
 
 # Enable automatic creation of a module definition (.def) file for a SHARED library on Windows.
 set(CMAKE_WINDOWS_EXPORT_ALL_SYMBOLS TRUE)
@@ -44,6 +44,7 @@ target_include_directories(Reaktoro
 target_link_libraries(Reaktoro
     PRIVATE ${THIRDPARTY_LIBS}
     PRIVATE nlohmann_json::nlohmann_json
+    PRIVATE nanoflann::nanoflann
     PUBLIC Boost::boost)
 
 # Set compilation features to be propagated to dependent codes.
