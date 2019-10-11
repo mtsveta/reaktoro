@@ -452,10 +452,13 @@ struct KineticSolver::Impl
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
 
-        timeit({
-                   if(options.use_smart_equilibrium_solver) smart_equilibrium.solve(state, T, P, be);
-                   else equilibrium.solve(state, T, P, be);
-               }, result.timing.equilibrate +=);
+        // Equilibrate equilibrium species
+        tic(1);
+
+        if(options.use_smart_equilibrium_solver) smart_equilibrium.solve(state, T, P, be);
+        else equilibrium.solve(state, T, P, be);
+
+        toc(1, result.timing.equilibrate);
 
         toc(0, result.timing.solve);
 
@@ -501,7 +504,7 @@ struct KineticSolver::Impl
 
         // Solve the equilibrium problem using the elemental molar abundance `be`
         //if(options.use_smart_equilibrium_solver) // using smart equilibrium solver
-        if(0) // using smart equilibrium solver
+        if(false) // using smart equilibrium solver
         {
             SmartEquilibriumResult res = {};
 
@@ -590,8 +593,9 @@ struct KineticSolver::Impl
     auto jacobian(ChemicalState& state, double t, VectorConstRef u, MatrixRef res) -> int
     {
         // Calculate the sensitivity of the equilibrium state
-        timeit( sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity(),
-                result.timing.integrate_sensitivity+=);
+        //timeit( sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity(),
+        //        result.timing.integrate_sensitivity+=);
+        sensitivity = equilibrium.sensitivity();
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
         drdne = cols(r.ddn, ies);

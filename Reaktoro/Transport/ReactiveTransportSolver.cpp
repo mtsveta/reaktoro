@@ -536,6 +536,7 @@ struct ReactiveTransportSolver::Impl
         std::cout << "------------------------------------------------" << std::endl;
         //getchar();
         */
+        /*
         if(options.use_smart_kinetic_solver) {
             auto sum_learnings = [&](const ReactiveTransportResult &res) {
                 unsigned int number_learnings = 0;
@@ -543,10 +544,11 @@ struct ReactiveTransportSolver::Impl
                     number_learnings += static_cast<int>(res.smart_kinetics_at_cell.at(i).estimate.accepted);
                 return number_learnings;
             };
-            //std::cout << "number of learnings on step " << steps << " : " << num_cells - sum_learnings(result)
-            //          << " out of " << num_cells << std::endl;
-            //getchar();
+            std::cout << "number of learnings on step " << steps << " : " << num_cells - sum_learnings(result)
+                      << " out of " << num_cells << std::endl;
+            if (!(steps % 10)) getchar();
         }
+         */
 
         /*
         if(steps == 49) {

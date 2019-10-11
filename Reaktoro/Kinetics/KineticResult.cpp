@@ -30,7 +30,7 @@ auto KineticTiming::operator+=(const KineticTiming& other) -> KineticTiming&
     integrate_sensitivity += other.integrate_sensitivity;
     integrate_equilibration += other.integrate_equilibration;
 
-    integrate += other.integrate;
+    equilibrate += other.equilibrate;
 
     return *this;
 }
