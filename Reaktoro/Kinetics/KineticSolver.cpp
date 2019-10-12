@@ -335,19 +335,14 @@ struct KineticSolver::Impl
         const auto& n = state.speciesAmounts();
         nk = n(iks);
         ne = n(ies);
-        /*
-        std::cout << "be           : " << tr(be) << std::endl;
-        std::cout << "be = Ae * ne = " << tr(Ae * ne) << std::endl;
-        std::cout << "bk =           " << tr(bk) << std::endl;
-        std::cout << "bk = Ak * nk = " << tr(Ak * nk) << std::endl;
-        std::cout << "b = Ae * ne + Ak * nk = " << tr(Ae * ne + Ak * nk) << std::endl;
-        getchar();
-        */
 
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
-        //benk.head(Ee) = Ae * ne;
-        benk.head(Ee) = be;
+
+        // Check if `be` has been set from the transport problem
+        if(be.size())   benk.head(Ee) = be; // set already existing be
+        else    benk.head(Ee) = Ae * ne;    // define be = Ae * ne
+        // Set `nk` part of `benk`
         benk.tail(Nk) = nk;
 
         // Define the ODE function
@@ -473,17 +468,6 @@ struct KineticSolver::Impl
 
         // Update amounts of elements
         be = b - Ak * nk;
-        //bk = b - be;
-
-        /* TODO: block for debuggin, remove
-        std::cout << "A : " << tr(A) << std::endl;
-        std::cout << "Ae : " << tr(Ae) << std::endl;
-        std::cout << "Ak : " << tr(Ak) << std::endl;
-        std::cout << "nk : " << tr(nk) << std::endl;
-        std::cout << "set be : " << tr(be) << std::endl;
-        std::cout << "set bk : " << tr(bk) << std::endl;
-        //getchar();
-        */
     }
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int

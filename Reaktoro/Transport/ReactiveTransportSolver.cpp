@@ -17,14 +17,11 @@
 
 // C++ includes
 #include <algorithm>
-#include <fstream>
-#include <iomanip>
 
 // Eigen includes
 #include <Reaktoro/deps/eigen3/Eigen/Dense>
 
 // Reaktoro includes
-#include <Reaktoro/Common/Exception.hpp>
 #include <Reaktoro/Common/Profiling.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
 
@@ -73,9 +70,6 @@ struct ReactiveTransportSolver::Impl
 
     /// The current number of steps in the solution of the reactive transport equations.
     Index steps = 0;
-
-    /// Name of the file and folder with a status output
-    std::string folder;
 
     /// Construct a ReactiveTransportSolver::Impl instance.
     Impl(const ChemicalSystem& system)

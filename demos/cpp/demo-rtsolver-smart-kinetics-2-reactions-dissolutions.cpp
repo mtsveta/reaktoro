@@ -217,13 +217,13 @@ int main()
     // Define physical and chemical parameters
     params.D = 1.0e-9;     // the diffusion coefficient (in units of m2/s)
     params.v = 1.0 / week; // the Darcy velocity (in units of m/s)
-    params.T = 60.0;                     // the temperature (in units of degC)
+    params.T = 160.0;                     // the temperature (in units of degC)
     params.P = 100;                      // the pressure (in units of bar)
 
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_abstol = 1e-10;
-    params.smart_equilibrium_cutoff = -1e-10;
+    params.smart_equilibrium_abstol = 1e-12;
+    params.smart_equilibrium_cutoff = -1e-12;
 
     // Define parameters of the kinetics solvers
     params.smart_kinetics_reltol = 1e-1;
@@ -308,14 +308,14 @@ int main()
 
     results.smart_kin_conv_eq_total = results.smart_kinetic_timing.solve;
     results.smart_kin_conv_eq_total_ideal_search = results.smart_kinetic_timing.solve
-            - results.smart_kinetic_timing.estimate_search;
+                                                   - results.smart_kinetic_timing.estimate_search;
     results.smart_kin_conv_eq_total_ideal_search_store = results.smart_kinetic_timing.solve
-            - results.smart_kinetic_timing.estimate_search
-            - results.smart_kinetic_timing.learn_storage;
+                                                         - results.smart_kinetic_timing.estimate_search
+                                                         - results.smart_kinetic_timing.learn_storage;
     results.smart_kin_conv_eq_total_ideal_search_store_properties = results.smart_kinetic_timing.solve
-            - results.smart_kinetic_timing.learn_chemical_properties
-            - results.smart_kinetic_timing.estimate_search
-            - results.smart_kinetic_timing.learn_storage;
+                                                                    - results.smart_kinetic_timing.learn_chemical_properties
+                                                                    - results.smart_kinetic_timing.estimate_search
+                                                                    - results.smart_kinetic_timing.learn_storage;
 
     std::cout << "-----------------------------------------------------" << std::endl;
     std::cout << " - solve                : " << results.smart_kinetic_timing.solve << std::endl;
@@ -444,7 +444,7 @@ int main()
         std::cout << "time RT smart.kin.& smart.eq. : " << results.time_reactive_transport_smart_kin_smart_eq << std::endl;
         std::cout << "time RT conv.kin.& conv.eq.  : " << results.time_reactive_transport_conv_kin_conv_eq << std::endl;
         std::cout << "speedup                      : " << results.time_reactive_transport_conv_kin_conv_eq
-                                                            / results.time_reactive_transport_smart_kin_smart_eq << std::endl;
+                                                          / results.time_reactive_transport_smart_kin_smart_eq << std::endl;
     }
     std::cout << "total time                          : " << elapsed(start) << std::endl;
 
@@ -487,6 +487,8 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     editor.addMineralPhase("Dolomite");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Quartz");
+    editor.addMineralPhase("Magnesite");
+    editor.addMineralPhase("Halite");
 
     MineralReaction reaction = editor.addMineralReaction("Calcite");
     reaction.setEquation("Calcite = Ca++ + CO3--");
@@ -494,18 +496,24 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     reaction.addMechanism("logk = -0.30 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0");
     reaction.setSpecificSurfaceArea(5000, "cm2/g");
 
+    editor.addMineralReaction("Dolomite")
+            .setEquation("Dolomite = Ca++ + Mg++ + 2*CO3--")
+            .addMechanism("logk = -7.53 mol/(m2*s); Ea = 52.2 kJ/mol")
+            .addMechanism("logk = -3.19 mol/(m2*s); Ea = 36.1 kJ/mol; a[H+] = 0.5")
+            .setSpecificSurfaceArea(5000, "cm2/g");
+
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
 
     // Step **: Create the ReactionSystem instances
     ReactionSystem reactions(editor);
 
-    // std::cout << "system = \n" << system << std:: endl;
-    // std::cout << "reactions number = " << reactions.numReactions() << std:: endl;
-
     // Step **: Create the ReactionSystem instances
     Partition partition(system);
-    partition.setKineticSpecies({"Calcite"});
+    std::vector<std::string> kinetic_species;
+    kinetic_species.emplace_back(std::string("Calcite"));
+    kinetic_species.emplace_back(std::string("Dolomite"));
+    partition.setKineticSpecies(kinetic_species);
 
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumProblem problem_ic(system);
@@ -539,8 +547,9 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 
     // Step **: Scale the volumes of the phases in the initial condition
     state_ic.scalePhaseVolume("Aqueous", 0.1, "m3");    // 10% if the 1.0m3
-    state_ic.scalePhaseVolume("Quartz", 0.882, "m3");   // 0.882 = 0.98 * 0.9 (0.9 is 90% of 1.0m3, 0.98 is 98% quartz of the rock)
-    state_ic.scalePhaseVolume("Calcite", 0.018, "m3");  // 0.018 = 0.02 * 0.9 (0.9 is 90% of 1.0m3, 0.02 is 2% calcite of the rock)
+    state_ic.scalePhaseVolume("Quartz", 0.81, "m3");   // 0.81 = 0.90 * 0.9 (0.9 is 90% of 1.0m3, 0.98 is 98% quartz of the rock)
+    state_ic.scalePhaseVolume("Calcite", 0.054, "m3");  // 0.054 = 0.06 * 0.9 (0.9 is 90% of 1.0m3, 0.02 is 2% calcite of the rock)
+    state_ic.scalePhaseVolume("Dolomite", 0.036, "m3");  // 0.036 = 0.04 * 0.9 (0.9 is 90% of 1.0m3, 0.02 is 2% calcite of the rock)
 
     // Step **: Create the mesh for the column
     Mesh mesh(params.ncells, params.xl, params.xr);
@@ -632,7 +641,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         results.smart_equilibrium_timing = analysis.smart_equilibrium.timing;
         results.smart_kin_smart_eq_acceptance_rate = analysis.smart_kinetics.smart_kinetics_estimate_acceptance_rate;
         results.smart_kin_smart_eq_equilibrium_acceptance_rate
-            = analysis.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
+                = analysis.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
     }
     if(!params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) {
         results.kinetic_timing = analysis.kinetics.timing;
@@ -642,7 +651,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         results.smart_equilibrium_timing = analysis.smart_equilibrium.timing;
         results.kinetic_timing = analysis.kinetics.timing;
         results.conv_kin_smart_eq_equilibrium_acceptance_rate
-            = analysis.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
+                = analysis.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
     }
     if(params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) {
         results.smart_kinetic_timing = analysis.smart_kinetics.timing;
@@ -682,25 +691,25 @@ auto makeResultsFolder(const Params& params) -> std::string
                            (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                            (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
     std::string smart_test_tag = "-dt-" + dt_stream.str() +
-                           "-ncells-" + std::to_string(params.ncells) +
-                           "-nsteps-" + std::to_string(params.nsteps) +
-                           "-eqrel-" + eqreltol_stream.str() +
-                           "-eqabs-" + eqabstol_stream.str() +
-                           "-kinrel-" + kinreltol_stream.str() +
-                           "-kinabs-" + kinabstol_stream.str() +
-                           (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
-                           (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
+                                 "-ncells-" + std::to_string(params.ncells) +
+                                 "-nsteps-" + std::to_string(params.nsteps) +
+                                 "-eqrel-" + eqreltol_stream.str() +
+                                 "-eqabs-" + eqabstol_stream.str() +
+                                 "-kinrel-" + kinreltol_stream.str() +
+                                 "-kinabs-" + kinabstol_stream.str() +
+                                 (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
+                                 (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
     std::string folder =
-                (params.use_smart_kinetics_solver || params.use_smart_equilibrium_solver) ?
-                "../rt-sa-5000" + smart_test_tag :
-                "../rt-sa-5000" + test_tag;
+            (params.use_smart_kinetics_solver || params.use_smart_equilibrium_solver) ?
+            "../rt-sa-5000-2-reacts-diss" + smart_test_tag :
+            "../rt-sa-5000-2-reacts-diss" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "*********************************************************************" << std::endl;
     std::cout << "*********************************************************************" << std::endl;
-    std::cout << "\nsolver                         : "
+    std::cout << "solver                         : "
               << (params.use_smart_kinetics_solver ? "smart_kin & " : "conv_kin & ")
               << (params.use_smart_equilibrium_solver ? "smart_eq" : "conv_eq") << std::endl;
 
@@ -724,3 +733,7 @@ auto outputConsole(const Params& params) -> void {
     std::cout << "kinetics abstol      : " << params.smart_kinetics_abstol << std::endl;
 
 }
+//
+// Created by root on 12/10/19.
+//
+
