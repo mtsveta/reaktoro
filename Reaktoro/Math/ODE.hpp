@@ -207,7 +207,7 @@ public:
     /// @param tfinal The final time that the integration must satisfy
     auto integrate(double& t, VectorRef y, double tfinal) -> void;
 
-    auto integrate(double& t, VectorRef y, double tfinal, VectorRef f_, MatrixRef J_, MatrixRef S_) -> void;
+    auto integrate(double& t, VectorRef y, double tfinal, MatrixRef S_) -> void;
 
     /// Solve the ODE equations from a given start time to a final one.
     /// @param[in,out] t The current time of the integration as input, the new current time as output
@@ -222,7 +222,7 @@ public:
     /// @param S The new sensitivity as output
     /// @param J The new Jacobian as output
     /// @param f The new right-hand side values as output
-    auto solve(double& t, double dt, VectorRef y, VectorRef f, MatrixRef J, MatrixRef S) -> void;
+    auto solve(double& t, double dt, VectorRef y, MatrixRef S) -> void;
 
 private:
     struct Impl;

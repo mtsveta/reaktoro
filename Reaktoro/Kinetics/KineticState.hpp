@@ -37,11 +37,6 @@ struct KineticState
     /// change in their initial condition @f$u_0@f$.
     Matrix dudu0;
 
-    /// The right-hand size of ODE @f$\left.f(u) = \frac{\partial u}{\partial t}\right|@f$.
-    Vector dudt;
-
-    /// Jacobian of the the right-hand size f of ODE, i.e., @f$\left.J(f(u)) = \frac{\partial f}{\partial u}\right|@f$.
-    Matrix dfdu;
 };
 
 } // namespace Reaktoro

@@ -248,9 +248,8 @@ struct ODESolver::Impl
     }
 
     /// Integrate the ODE performing a single step not going over a given time.
-    auto integrate(double& t, VectorRef y, double tfinal, VectorRef f_, MatrixRef J_, MatrixRef S_) -> void
+    auto integrate(double& t, VectorRef y, double tfinal, MatrixRef S_) -> void
     {
-
         // Initialize the cvode context
         initialize(t, y);
 
@@ -287,20 +286,18 @@ struct ODESolver::Impl
             Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
 
             // Set the value of the current jacobian
-            problem.jacobian(t, y, J_);
+            problem.jacobian(t, y, J);
 
             // Initialize system matrix A = I - dt * J^{k+1}
             Matrix A;
-            A = I - dt * J_;
+            A = I - dt * J;
 
             // Perform LU decomposition for matrix A
             LU lu(A);
 
             // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
-            S = lu.solve(S);
+            S_ = lu.solve(S_);
         }
-
-        S_ = S;
     }
 
     /// Solve the ODE equations from a given start time to a final one.
@@ -326,12 +323,10 @@ struct ODESolver::Impl
         for(int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
 
-        //std::cout << "y        : " << tr(y) << std::endl;
-        //getchar();
     }
 
     /// Solve the ODE equations from a given start time to a final one.
-    auto solve(double& t, double dt, VectorRef y, VectorRef f_, MatrixRef J_, MatrixRef S_) -> void
+    auto solve(double& t, double dt, VectorRef y, MatrixRef S_) -> void
     {
         // Initialize the cvode context
         initialize(t, y);
@@ -353,22 +348,20 @@ struct ODESolver::Impl
 
         // Identity matrix
         Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
+        Matrix J = Matrix::Identity(data.num_equations, data.num_equations);
 
-        // Set the value of the current jacobian
-        problem.jacobian(t, y, J_);
-        problem.function(t, y, f_);
-        //std::cout << "J_" << J_ << std::endl;
+        // Set the value of the current Jacobian
+        problem.jacobian(t, y, J);
 
         // Initialize system matrix A = I - dt * J^{k+1}
         Matrix A;
-        A = I - dt * J_;
+        A = I - dt * J;
 
         // Perform LU decomposition for matrix A
         LU lu(A);
 
         // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
-        S_ = lu.solve(S);
-        //std::cout << "S_" << S_ << std::endl;
+        S_ = lu.solve(S_);
     }
 
     /// Solve the ODE equations from a given start time to a final one
@@ -399,7 +392,7 @@ struct ODESolver::Impl
         LU lu(A);
 
         // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
-        S_ = lu.solve(S);
+        S_ = lu.solve(S_);
     }
 };
 
@@ -566,9 +559,9 @@ auto ODESolver::integrate(double& t, VectorRef y, double tfinal) -> void
     pimpl->integrate(t, y, tfinal);
 }
 
-auto ODESolver::integrate(double& t, VectorRef y, double tfinal, VectorRef f_, MatrixRef J_, MatrixRef S_) -> void
+auto ODESolver::integrate(double& t, VectorRef y, double tfinal, MatrixRef S_) -> void
 {
-    pimpl->integrate(t, y, tfinal, f_, J_, S_);
+    pimpl->integrate(t, y, tfinal, S_);
 }
 
 auto ODESolver::solve(double& t, double dt, VectorRef y) -> void
@@ -576,9 +569,9 @@ auto ODESolver::solve(double& t, double dt, VectorRef y) -> void
     pimpl->solve(t, dt, y);
 }
 
-auto ODESolver::solve(double& t, double dt, VectorRef y, VectorRef f, MatrixRef J, MatrixRef S) -> void
+auto ODESolver::solve(double& t, double dt, VectorRef y, MatrixRef S) -> void
 {
-    pimpl->solve(t, dt, y, f, J, S);
+    pimpl->solve(t, dt, y, S);
 }
 
 } // namespace Reaktoro

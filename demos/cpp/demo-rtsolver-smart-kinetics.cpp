@@ -210,7 +210,7 @@ int main()
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 10000; // the number of steps in the reactive transport simulation
+    params.nsteps = 1000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -223,7 +223,7 @@ int main()
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
     params.smart_equilibrium_abstol = 1e-10;
-    params.smart_equilibrium_cutoff = -1e-10;
+    params.smart_equilibrium_cutoff = -1e-5;
 
     // Define parameters of the kinetics solvers
     params.smart_kinetics_reltol = 1e-1;
@@ -238,7 +238,7 @@ int main()
     /// **************************************************************************************************************///
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     /// **************************************************************************************************************///
-    ///*
+    /*
     params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conv_kin_conv_eq_total = results.kinetic_timing.solve;
@@ -254,7 +254,7 @@ int main()
     std::cout << "     - equilibration            : " << results.kinetic_timing.integrate_equilibration << " (" << results.kinetic_timing.integrate_equilibration / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "   - equilibrate           : " << results.kinetic_timing.equilibrate << " (" << results.kinetic_timing.equilibrate / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
-    //*/
+    */
 
 
     /*
@@ -302,7 +302,7 @@ int main()
     // **************************************************************************************************************///
     // SMART kinetics & CONVENTIONAL equilibrium
     // **************************************************************************************************************///
-    ///*
+    /*
     // Execute reactive transport with different solvers
     params.use_smart_kinetics_solver = true; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
@@ -338,7 +338,7 @@ int main()
     std::cout << " - solve - search - store         : " << results.smart_kin_conv_eq_total_ideal_search_store << std::endl;
     std::cout << " - solve - search - store - prop. : " << results.smart_kin_conv_eq_total_ideal_search_store_properties << std::endl;
     //getchar();
-    //*/
+    */
 
     // **************************************************************************************************************///
     // SMART kinetics & SMART equilibrium
@@ -441,8 +441,8 @@ int main()
         std::cout << "speed up ... (with ideal search & store & properties eval.) : "
                   << results.conv_kin_conv_eq_total / results.smart_kin_smart_eq_total_ideal_search_store_properties << std::endl;
 
-        std::cout << "time RT smart.kin.& smart.eq. : " << results.time_reactive_transport_smart_kin_smart_eq << std::endl;
         std::cout << "time RT conv.kin.& conv.eq.  : " << results.time_reactive_transport_conv_kin_conv_eq << std::endl;
+        std::cout << "time RT smart.kin.& smart.eq. : " << results.time_reactive_transport_smart_kin_smart_eq << std::endl;
         std::cout << "speedup                      : " << results.time_reactive_transport_conv_kin_conv_eq
                                                             / results.time_reactive_transport_smart_kin_smart_eq << std::endl;
     }

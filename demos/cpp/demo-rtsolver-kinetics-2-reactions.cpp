@@ -259,7 +259,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     editor.addMineralPhase("Quartz");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Dolomite");
-    editor.addMineralPhase("Magnesite");
+    //editor.addMineralPhase("Magnesite");
 
     MineralReaction reaction = editor.addMineralReaction("Calcite");
     reaction.setEquation("Calcite = Ca++ + CO3--");
