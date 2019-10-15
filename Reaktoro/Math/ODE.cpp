@@ -100,9 +100,6 @@ struct ODESolver::Impl
     /// The auxiliary matrix J for the Jacobian evaluation
     Matrix J;
 
-    /// The auxiliary matrix S for the sensitivites of y
-    Matrix S;
-
     /// Construct a default ODESolver::Impl instance
     Impl()
     : cvode_mem(nullptr), cvode_y(nullptr)
@@ -136,10 +133,6 @@ struct ODESolver::Impl
         // Allocate memory for f and J
         f.resize(num_equations);
         J.resize(num_equations, num_equations);
-        S.resize(num_equations, num_equations);
-
-        // Initialize sensitivities by the identity matrix
-        S.setIdentity();
 
         // Free any dynamic memory allocated for cvode_mem context
         if(cvode_mem) CVodeFree(&cvode_mem);
@@ -253,7 +246,7 @@ struct ODESolver::Impl
         // Initialize the cvode context
         initialize(t, y);
 
-        while(t <= tfinal)
+        while(t < tfinal)
         {
             // Initialize the ODE data
             ODEData data(problem, y, f, J);
@@ -346,26 +339,30 @@ struct ODESolver::Impl
         for(int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
 
-        // Identity matrix
+
+        // Reconstruct sensitivities using implicit scheme
+        // NOTE: quite sensitive part to any changes
+        // -------------------------------------------------------------------
+
+        // Initialize identity matrix and Jacobian on the t = t^{k+1}
         Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
-        Matrix J = Matrix::Identity(data.num_equations, data.num_equations);
 
         // Set the value of the current Jacobian
         problem.jacobian(t, y, J);
 
         // Initialize system matrix A = I - dt * J^{k+1}
-        Matrix A;
-        A = I - dt * J;
+        Matrix A = I - dt * J;
 
         // Perform LU decomposition for matrix A
         LU lu(A);
 
-        // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
+        // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k(=I)
         S_ = lu.solve(S_);
     }
 
     /// Solve the ODE equations from a given start time to a final one
     /// with 2d order Taylor expantion scheme
+    // TODO: test it instead of using CVODE
     auto solve_(double& t, double dt, VectorRef y, VectorRef f_, MatrixRef J_, MatrixRef S_) -> void
     {
         // Initialize the cvode context
