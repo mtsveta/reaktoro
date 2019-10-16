@@ -28,6 +28,9 @@ namespace Reaktoro {
 /// Timing information of the operations during an kinetic calculation.
 struct SmartKineticTiming {
 
+    /// The time spent for initializing the chemical kinetic problem.
+    double initialize = 0.0;
+
     /// The time spent for solving the chemical kinetic problem.
     double solve = 0.0;
 
@@ -36,9 +39,6 @@ struct SmartKineticTiming {
 
     /// The time spent for equilibrating equilibrium species
     double equilibrate = 0.0;
-
-    /// The time spent for initializing the chemical kinetic problem during a smart learning.
-    double learn_initialization = 0.0;
 
     /// The time spent for integrating the chemical kinetic problem during a smart learning.
     double learn_integration = 0.0;

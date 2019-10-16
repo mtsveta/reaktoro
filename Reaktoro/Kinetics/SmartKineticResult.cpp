@@ -8,6 +8,8 @@ namespace Reaktoro{
 
 auto SmartKineticTiming::operator+=(const SmartKineticTiming &other) -> SmartKineticTiming&
 {
+    initialize += other.initialize;
+
     solve += other.solve;
 
     estimate += other.estimate;
