@@ -91,98 +91,31 @@ public:
     /// @param units The units of the volumetric rate (compatible with m3/s).
     auto addSolidSink(double volumerate, std::string units) -> void;
 
-    /// Initialize the chemical kinetics solver before .
+    /// Initialize the chemical kinetics solver before integration.
     /// This method should be invoked whenever the user intends to make a call to `KineticsSolver::step`.
     /// @param state The state of the chemical system
     /// @param tstart The start time of the integration.
     auto initialize(ChemicalState& state, double tstart) -> void;
 
-    /// Integrate one step of the chemical kinetics problem with a time step that does not go beyond a specified one.
+    /// Initialize the chemical kinetics solver before integration
+    /// with the provided vector of unknowns `benk` = [be, nk].
+    /// This method should be invoked whenever the user intends to make a call to `KineticsSolver::solve`.
+    /// @param state The state of the chemical system
+    /// @param tstart The start time of the integration
+    /// @param benk The initial vector of unknowns `benk` = [be, nk].
+    auto initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void;
+
+    /// Solve the chemical kinetics problem from a given initial time to a final time.
+    /// Used in reactive transport solver, which provides updated element amounts.
     /// @param state The kinetic state of the system
     /// @param t The start time of the integration (in units of seconds)
     /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
-    auto solve(ChemicalState& state, double t, double dt) -> void;
+    /// @param b The amount of elements updated from the transport
+    auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step = 0, Index icell = 0) -> void;
 
-    /// Update elements' amounts
-    /// @param b The amount of element
-    auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void;
-
-    /// Return the result of the last kinetic calculation.
+    /// Return the result of the last smart kinetic calculation.
     auto result() const -> const SmartKineticResult&;
 
-    /*
-    /// Solve the chemical kinetics problem from a given initial time to a final time.
-    /// @param state The kinetic state of the system
-    /// @param[in,out] t The current time of the integration (in units of seconds)
-    /// @param tfinal The final time of the integration (in units of seconds)
-    /// @return The updated current time after the kinetic step.
-    auto stepSmart(ChemicalState& state, double t, double tfinal) -> double;
-
-    /// Solve the chemical kinetics problem from a given initial time to a t + dt.
-    /// @param state The kinetic state of the system
-    /// @param[in,out] t The current time of the integration (in units of seconds)
-    /// @param dt The step of the integration procedure (in units of seconds)
-    /// @return The updated current time after the kinetic step.
-    auto stepCustom(ChemicalState& state, double t, double dt, VectorConstRef be) -> double;
-
-    /// Solve the chemical kinetics problem from a given initial time to a t + dt.
-    /// @param state The kinetic state of the system
-    /// @param[in,out] t The current time of the integration (in units of seconds)
-    /// @param dt The step of the integration procedure (in units of seconds)
-    /// @return The updated current time after the kinetic step.
-    auto stepKinetics(ChemicalState& state, double t, double dt, VectorConstRef be) -> double;
-
-    /// Integrate one step of the chemical kinetics problem with a time step that does not go beyond a specified one.
-    /// @param state The kinetic state of the system
-    /// @param t The start time of the integration (in units of seconds)
-    /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
-    auto solve(ChemicalState& state, double t, double dt) -> void;
-
-    /// Integrate one step of the chemical kinetics problem with a given time step.
-    /// @param state The kinetic state of the system
-    /// @param t The start time of the integration (in units of seconds)
-    /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
-    auto solveSmart(ChemicalState& state, double& t, double dt, Index step, Index cell, KineticResult& result) -> void;
-
-    /// Integrate one step of the chemical kinetics problem with a given time step.
-    /// @param state The kinetic state of the system
-    /// @param t The start time of the integration (in units of seconds)
-    /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
-    auto solveSmartPostprocess(ChemicalState& state, double& t, double dt, Index step, Index cell, KineticResult& result) -> void;
-
-    /// Integrate one step of the chemical kinetics problem with a time step that does not go beyond a specified one.
-    /// @param state The kinetic state of the system
-    /// @param t The start time of the integration (in units of seconds)
-    /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
-    auto solveKineticsEquilibrium(ChemicalState &state, double t, double dt, VectorConstRef b, Index step, Index icell, KineticResult& result) -> void;
-
-    /// Integrate one step of the chemical kinetics problem with a time step that does not go beyond a specified one.
-    /// @param state The kinetic state of the system
-    /// @param t The start time of the integration (in units of seconds)
-    /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
-    auto solveEquilibriumKinetics(ChemicalState &state, double t, double dt, VectorConstRef b, Index step, Index icell, KineticResult& result) -> void;
-
-    /// Solve the kinetic path problem.
-    /// @param state The initial state of the chemical system
-    /// @param t0 The initial time of the kinetic path
-    /// @param t1 The final time of the kinetic path
-    /// @param units The time units of `t0` and `t1` (e.g., `s`, `minute`, `day`, `year`, etc.).
-    auto solveCustom(ChemicalState& state, double t0, double t1, std::string units, VectorConstRef be, KineticResult& result) -> void;
-
-    /// Solve the kinetic path problem.
-    /// @param state The initial state of the chemical system
-    /// @param t0 The initial time of the kinetic path
-    /// @param t1 The final time of the kinetic path
-    /// @param units The time units of `t0` and `t1` (e.g., `s`, `minute`, `day`, `year`, etc.).
-    auto solveCustom(ChemicalState& state, double t0, double t1, std::string units, KineticResult& result) -> void;
-
-    /// Solve the kinetic path problem.
-    /// @param state The initial state of the chemical system
-    /// @param t0 The initial time of the kinetic path
-    /// @param t1 The final time of the kinetic path
-    /// @param units The time units of `t0` and `t1` (e.g., `s`, `minute`, `day`, `year`, etc.).
-    auto solvePath(ChemicalState& state, double t0, double t1, std::string units, KineticResult& result) -> void;
-    */
 private:
     struct Impl;
 

@@ -69,9 +69,9 @@ struct KineticPath::Impl
         solver.setOptions(options);
     }
 
-    auto setPartition(const Partition& partition) -> void
+    auto setPartition(const Partition& partition_) -> void
     {
-        solver.setPartition(partition);
+        solver.setPartition(partition_);
     }
 
     auto solve(ChemicalState& state, double t0, double t1, std::string units) -> void

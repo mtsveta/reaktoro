@@ -56,7 +56,8 @@ auto runKinetics(const Params & params) -> void{
     auto folder = makeResultsFolder(params);
 
     ChemicalEditor editor;
-    editor.addAqueousPhaseWithElementsOf("H2O CO2 CaCO3");
+    //editor.addAqueousPhaseWithElementsOf("H2O CO2 CaCO3");
+    editor.addAqueousPhaseWithElementsOf("H2O HCl CaCO3");
     editor.addMineralPhase("Calcite");
 
     MineralReaction reaction = editor.addMineralReaction("Calcite");
@@ -66,6 +67,7 @@ auto runKinetics(const Params & params) -> void{
     reaction.setSpecificSurfaceArea(10, "cm2/g");
 
     ChemicalSystem system(editor);
+    std::cout << system << std::endl;
 
     ReactionSystem reactions(editor);
 
@@ -101,6 +103,7 @@ auto runKinetics(const Params & params) -> void{
     output.add("speciesMolality(Ca++)", "Ca++  [molal]");
 
     for(unsigned i = 0; i < states_num; ++i){
+
         std::cout << "**********************************************************************************" << std::endl;
         std::cout << i + 1 << std::endl;
         std::cout << "**********************************************************************************" << std::endl;

@@ -90,11 +90,19 @@ public:
     /// @param units The units of the volumetric rate (compatible with m3/s).
     auto addSolidSink(double volumerate, std::string units) -> void;
 
-    /// Initialize the chemical kinetics solver before .
+    /// Initialize the chemical kinetics solver before integration.
     /// This method should be invoked whenever the user intends to make a call to `KineticsSolver::step`.
     /// @param state The state of the chemical system
     /// @param tstart The start time of the integration.
     auto initialize(ChemicalState& state, double tstart) -> void;
+
+    /// Initialize the chemical kinetics solver before integration
+    /// with the provided vector of unknowns `benk` = [be, nk].
+    /// This method should be invoked whenever the user intends to make a call to `KineticsSolver::solve`.
+    /// @param state The state of the chemical system
+    /// @param tstart The start time of the integration
+    /// @param benk The initial vector of unknowns `benk` = [be, nk].
+    auto initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void;
 
     /// Integrate one step of the chemical kinetics problem.
     /// @param state The kinetic state of the system
@@ -110,14 +118,12 @@ public:
     auto step(ChemicalState& state, double t, double tfinal) -> double;
 
     /// Solve the chemical kinetics problem from a given initial time to a final time.
+    /// Used in reactive transport solver, which provides updated element amounts.
     /// @param state The kinetic state of the system
     /// @param t The start time of the integration (in units of seconds)
     /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
-    auto solve(ChemicalState& state, double t, double dt) -> void;
-
-    /// Update elements' amounts
-    /// @param b The amount of element
-    auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void;
+    /// @param b The amount of elements updated from the transport
+    auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void;
 
     /// Return the result of the last kinetic calculation.
     auto result() const -> const KineticResult&;

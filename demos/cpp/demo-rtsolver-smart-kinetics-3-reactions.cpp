@@ -222,12 +222,12 @@ int main()
 
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_abstol = 1e-10;
-    params.smart_equilibrium_cutoff = -1e-10;
+    params.smart_equilibrium_abstol = 1e-8;
+    params.smart_equilibrium_cutoff = -1e-5;
 
     // Define parameters of the kinetics solvers
     params.smart_kinetics_reltol = 1e-1;
-    params.smart_kinetics_abstol = 1e-3;
+    params.smart_kinetics_abstol = 1e-5;
 
     // Output
     outputConsole(params);

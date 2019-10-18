@@ -221,7 +221,7 @@ struct KineticSolver::Impl
         if (Nk)
         {
             /*
-            * TODO: remove when debugging is finished
+            //* TODO: remove when debugging is finished
             std::cout << "ies :"; for (auto elem : ies) std::cout << elem << " "; std::cout << std::endl;
             std::cout << "iks :"; for (auto elem : iks) std::cout << elem << " "; std::cout << std::endl;
 
@@ -240,6 +240,9 @@ struct KineticSolver::Impl
             std::cout << "Ak \n" << Ak << std::endl;
 
             std::cout << "B \n" << B << std::endl;
+
+            std::cout << "Ee " << Ee << std::endl;
+            std::cout << "Nk " << Nk << std::endl;
             */
         }
     }
@@ -325,25 +328,27 @@ struct KineticSolver::Impl
         };
     }
 
-    auto initialize(ChemicalState& state, double tstart) -> void
-    {
-        // Initialise the temperature and pressure variables
-        T = state.temperature();
-        P = state.pressure();
+    auto initialize(ChemicalState& state, double tstart) -> void {
 
         // Extract the composition of the equilibrium and kinetic species
-        const auto& n = state.speciesAmounts();
+        const auto &n = state.speciesAmounts();
         nk = n(iks);
         ne = n(ies);
 
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
-
-        // Check if `be` has been set from the transport problem
-        if(be.size())   benk.head(Ee) = be; // set already existing be
-        else    benk.head(Ee) = Ae * ne;    // define be = Ae * ne
-        // Set `nk` part of `benk`
+        benk.head(Ee) = Ae * ne;
         benk.tail(Nk) = nk;
+
+        // Initialize
+        initialize(state, tstart, benk);
+
+    }
+    auto initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void
+    {
+        // Initialise the temperature and pressure variables
+        T = state.temperature();
+        P = state.pressure();
 
         // Define the ODE function
         ODEFunction ode_function = [&](double t, VectorConstRef u, VectorRef res)
@@ -411,15 +416,24 @@ struct KineticSolver::Impl
         return t;
     }
 
-    auto solve(ChemicalState& state, double t, double dt) -> void
+    auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
     {
         // Initialize result structure
         result = {};
 
         tic(0);
 
+        // Extract the composition of the kinetic species from the state
+        const auto &n = state.speciesAmounts();
+        nk = n(iks);
+
+        // Assemble the vector benk = [be nk]
+        benk.resize(Ee + Nk);
+        benk.head(Ee) = b - Ak * nk;
+        benk.tail(Nk) = nk;
+
         // Initialise the chemical kinetics solver
-        timeit(initialize(state, t), result.timing.initialize=);
+        timeit(initialize(state, t, benk), result.timing.initialize=);
 
         //std::cout << "benk before  ..." << tr(benk) << std::endl;
 
@@ -450,30 +464,35 @@ struct KineticSolver::Impl
         // Equilibrate equilibrium species
         tic(1);
 
-        if(options.use_smart_equilibrium_solver) smart_equilibrium.solve(state, T, P, be);
-        else equilibrium.solve(state, T, P, be);
+        if(options.use_smart_equilibrium_solver){
+            SmartEquilibriumResult res = {};
+            res += smart_equilibrium.solve(state, T, P, be);
+            result.smart_equilibrium += res;
+        }
+        else{
+            EquilibriumResult res = {};
+            res += equilibrium.solve(state, T, P, be);
+            result.equilibrium += res;
+        }
 
         toc(1, result.timing.equilibrate);
 
         toc(0, result.timing.solve);
 
     }
-
+    /*
     auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
     {
         // Fetch the amounts of spacies from the chemical state
         const auto& n = state.speciesAmounts();
         nk = n(iks);
-        ne = n(ies);
 
         // Update amounts of elements
         be = b - Ak * nk;
-    }
+    }*/
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
     {
-        // std::cout << "f(t) = f(" << t << ")" << std::endl;
-
         // Extract the `be` and `nk` entries of the vector [be, nk]
         be = u.head(Ee);
         nk = u.tail(Nk);
@@ -568,8 +587,6 @@ struct KineticSolver::Impl
             // Add the contribution of the source rates
             res += B * q.val;
         }
-
-        //std::cout << "end of func u: " << tr(u) << std::endl;
 
         return 0;
     }
@@ -671,6 +688,11 @@ auto KineticSolver::initialize(ChemicalState& state, double tstart) -> void
     pimpl->initialize(state, tstart);
 }
 
+auto KineticSolver::initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void
+{
+    pimpl->initialize(state, tstart, benk);
+}
+
 auto KineticSolver::step(ChemicalState& state, double t) -> double
 {
     return pimpl->step(state, t);
@@ -681,15 +703,17 @@ auto KineticSolver::step(ChemicalState& state, double t, double dt) -> double
     return pimpl->step(state, t, dt);
 }
 
-auto KineticSolver::solve(ChemicalState& state, double t, double dt) -> void
+auto KineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
 {
-    pimpl->solve(state, t, dt);
+    pimpl->solve(state, t, dt, b);
 }
 
+/*
 auto KineticSolver::setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
 {
     pimpl->setElementsAmountsPerCell(state, b);
 }
+*/
 
 auto KineticSolver::result() const -> const KineticResult&
 {

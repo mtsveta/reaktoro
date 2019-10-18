@@ -417,21 +417,28 @@ struct SmartKineticSolver::Impl
         };
     }
 
-    auto initialize(ChemicalState& state, double tstart) -> void
+
+    auto initialize(ChemicalState& state, double tstart) -> void {
+
+        // Extract the composition of the equilibrium and kinetic species
+        const auto &n = state.speciesAmounts();
+        nk = n(iks);
+        ne = n(ies);
+
+        // Assemble the vector benk = [be nk]
+        benk.resize(Ee + Nk);
+        benk.head(Ee) = Ae * ne;
+        benk.tail(Nk) = nk;
+
+        // Initialize
+        initialize(state, tstart, benk);
+
+    }
+    auto initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void
     {
         // Initialise the temperature and pressure variables
         T = state.temperature();
         P = state.pressure();
-
-        // Extract the composition of the equilibrium and kinetic species
-        const auto& n = state.speciesAmounts();
-        ne = n(ies);
-        nk = n(iks);
-
-        // Assemble the vector benk = [be nk]
-        benk.resize(Ee + Nk);
-        benk.head(Ee) = be;
-        benk.tail(Nk) = nk;
 
         // Define the ODE function
         ODEFunction ode_function = [&](double t, VectorConstRef u, VectorRef res)
@@ -465,18 +472,7 @@ struct SmartKineticSolver::Impl
 
     }
 
-    auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
-    {
-        // Fetch the amounts of spacies from the chemical state
-        const auto& n = state.speciesAmounts();
-        nk = n(iks);
-        ne = n(ies);
-
-        // Update amounts of elements
-        be = b - Ak * nk;
-    }
-
-    auto learn(ChemicalState& state, double t, double dt) -> void
+    auto learn(ChemicalState& state, double t, double dt, Index step, Index icell) -> void
     {
         SmartKineticResult res = {};
 
@@ -512,15 +508,19 @@ struct SmartKineticSolver::Impl
 
         // Evaluate chemical properties, reaction rate, and sensitivities
         /*
-        timeit(properties = equilibrium.properties() , result.timing.learn_chemical_properties +=);
+        //timeit(properties = state.properties() , result.timing.learn_chemical_properties +=);
+        timeit(properties = state.properties() , result.timing.learn_chemical_properties +=);
         timeit(r = reactions.rates(properties), result.timing.learn_reaction_rates+=);
         timeit(sensitivity = equilibrium.sensitivity(), result.timing.learn_sensitivity +=);
         */
+        //std::cout << "properties.lnActivities().val : \n" << tr(properties.lnActivities().val) << std::endl;
+        //std::cout << "r.val : \n" << r.val << std::endl;
+        //std::cout << "sensitivity.dndb : \n" << sensitivity.dndb << std::endl;
         // Save the kinetic state to the tree of learned states
         timeit(tree.emplace_back(TreeNode{kin_state, state, properties, sensitivity, r}), result.timing.learn_storage+=);
     }
 
-    auto estimate(ChemicalState& state, double& t, Vector benk0) -> void
+    auto estimate(ChemicalState& state, double& t, Vector benk0, Index step, Index icell) -> void
     {
         // Skip estimation if no previous full computation has been done
         if(tree.empty())
@@ -539,7 +539,7 @@ struct SmartKineticSolver::Impl
             const auto& benk0_a = a.state.u0;
             const auto& benk0_b = b.state.u0;
 
-            return (benk0_a - benk).squaredNorm() < (benk0_b - benk).squaredNorm();  // TODO: We need to extend this later with T and P contributions too
+            return (benk0_a - benk0).squaredNorm() < (benk0_b - benk0).squaredNorm();  // TODO: We need to extend this later with T and P contributions too
         };
 
         //---------------------------------------------------------------------------------------
@@ -581,6 +581,13 @@ struct SmartKineticSolver::Impl
         benk_new.noalias() = benk_ref + dndn0_ref * (benk0 - benk0_ref);
 
         toc(1, result.timing.estimate_mat_vec_mul);
+
+        /*
+        if(step>=120){
+            std::cout << "benk before : " << tr(benk) << std::endl;
+            std::cout << "benk after  : " << tr(benk_new) << std::endl;
+        }
+        */
 
         //----------------------------------------------
         // Step 3: Checking the acceptance criterion
@@ -631,7 +638,7 @@ struct SmartKineticSolver::Impl
         // Check the variations of equilibrium species
         // -------------------------------------------------------------------------------------------------------------
         bool equilibrium_variation_check = true;
-        bool equilibrium_neg_amount_check = ne.minCoeff() > equilibrium_cutoff;
+        bool equilibrium_neg_amount_check = ne.minCoeff() > -1e-5;
 
         // Loop via equilibrium species and consider only big enough fractions
         for(int i = 0; i < xe_ref.size(); ++i){
@@ -648,13 +655,6 @@ struct SmartKineticSolver::Impl
                 result.estimate.failed_with_chemical_potential = lnae_ref[i] + delta_lnae[i]; // TODO: change to the chemical potential
                 break;
             }
-            /*
-            if(ne[i] < equilibrium_cutoff){
-                equilibrium_neg_amount_check = false;
-                //std::cout << "neg amount in i: " << ies[i] << std::endl;
-                break;
-            }
-            */
         }
 
         /// -------------------------------------------------------------------------------------------------------------
@@ -685,20 +685,28 @@ struct SmartKineticSolver::Impl
 
         if (!equilibrium_variation_check || !equilibrium_neg_amount_check || !kinetics_r_variation_check)
         //if (!equilibrium_variation_check || !kinetics_r_variation_check)
+        {
+            /*
+            if(step>=120) {
+                std::cout << "lnae_var_check     : " << equilibrium_variation_check;
+                std::cout << ", eq_amount_check  : " << equilibrium_neg_amount_check;
+                std::cout << ", r_var_check    : " << kinetics_r_variation_check << std::endl;
+                getchar();
+            }
+            */
             return;
+        }
 
         // Mark estimated result as accepted
         result.estimate.accepted = true;
 
         // Mirrowing
-        benk_new = abs(benk_new);
-        /*
+        //benk_new = abs(benk_new);
         // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
         ///*
         for(unsigned int i = 0; i < benk_new.size(); ++i)
-            if(benk_new[i] > equilibrium_cutoff && benk_new[i] < 0)
-                benk_new[i] = options.equilibrium.epsilon;
-        */
+            if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
+        //*/
 
         // Update the solution of kinetic problem by new estimated value
         benk = benk_new;
@@ -706,26 +714,45 @@ struct SmartKineticSolver::Impl
         toc(2, result.timing.estimate_acceptance);
 
         // Increase the count of successfully used (for estimation) element
-        it->usage_count++;
+        //it->usage_count++;
 
     }
 
-    auto solve(ChemicalState& state, double t, double dt) -> void
+    auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void
     {
-        // Initialise the chemical kinetics solver
-        initialize(state, t);
-
-        tic(0);
 
         // Reset the result of the last smart equilibrium calculation
         result = {};
 
+        tic(0);
+
+        // ----------------------------------------------------------------------------------
+        // Initialize kinetic problem
+        // ----------------------------------------------------------------------------------
+
+        // Extract the composition of the kinetic species from the state
+        const auto &n = state.speciesAmounts();
+        nk = n(iks);
+
+        // Assemble the vector benk = [be nk]
+        benk.resize(Ee + Nk);
+        be = b - Ak * nk;
+        benk.head(Ee) = be;
+        benk.tail(Nk) = nk;
+
+        // Initialise the chemical kinetics solver
+        timeit(initialize(state, t, benk), result.timing.initialize=);
+
+        // ----------------------------------------------------------------------------------
+        // Smartly solve kinetic species
+        // ----------------------------------------------------------------------------------
+
         // Perform a smart estimate for the chemical state
-        timeit(estimate(state, t, benk), result.timing.estimate =);
+        timeit(estimate(state, t, benk, step, icell), result.timing.estimate =);
 
         // Perform a learning step if the smart prediction is not satisfactory
         if (!result.estimate.accepted)
-            timeit(learn(state, t, dt), result.timing.learn =);
+            timeit(learn(state, t, dt, step, icell), result.timing.learn =);
 
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
@@ -734,17 +761,17 @@ struct SmartKineticSolver::Impl
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
 
+        // ----------------------------------------------------------------------------------
         // Equilibrate equilibrium species
+        // ----------------------------------------------------------------------------------
         tic(1);
 
-        if(options.use_smart_equilibrium_solver)
-        {
+        if(options.use_smart_equilibrium_solver){
             SmartEquilibriumResult res = {};
             res += smart_equilibrium.solve(state, T, P, be);
             result.smart_equilibrium += res;
         }
-        else
-        {
+        else{
             EquilibriumResult res = {};
             res += equilibrium.solve(state, T, P, be);
             result.equilibrium += res;
@@ -961,18 +988,19 @@ auto SmartKineticSolver::initialize(ChemicalState& state, double tstart) -> void
     pimpl->initialize(state, tstart);
 }
 
+auto SmartKineticSolver::initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void
+{
+    pimpl->initialize(state, tstart, benk);
+}
+
 auto SmartKineticSolver::result() const -> const SmartKineticResult&
 {
     return pimpl->result;
 }
 
-auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt) -> void
+auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void
 {
-    pimpl->solve(state, t, dt);
-}
-auto SmartKineticSolver::setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
-{
-    pimpl->setElementsAmountsPerCell(state, b);
+    pimpl->solve(state, t, dt, b, step, icell);
 }
 
 } // namespace Reaktoro

@@ -339,19 +339,21 @@ struct ODESolver::Impl
         for(int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
 
-
         // Reconstruct sensitivities using implicit scheme
         // NOTE: quite sensitive part to any changes
         // -------------------------------------------------------------------
 
         // Initialize identity matrix and Jacobian on the t = t^{k+1}
         Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
+        Matrix Jk1 = Matrix::Identity(data.num_equations, data.num_equations);
+        Vector fk1 = Vector::Zero(data.num_equations);
 
         // Set the value of the current Jacobian
-        problem.jacobian(t, y, J);
+        problem.jacobian(t, y, Jk1);
+        problem.function(t, y, fk1);
 
         // Initialize system matrix A = I - dt * J^{k+1}
-        Matrix A = I - dt * J;
+        Matrix A = I - dt * Jk1;
 
         // Perform LU decomposition for matrix A
         LU lu(A);
