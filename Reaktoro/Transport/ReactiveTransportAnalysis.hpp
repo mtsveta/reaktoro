@@ -117,17 +117,29 @@ struct ReactiveTransportAnalysis
         /// The time spent (in s) in each time step for smart chemical kinetic calculations.
         std::vector<double> smart_kinetics;
 
+        /// The time spent (in s) in each time step for smart chemical kinetics calculations without the computing costs of nearest neighbor search operations.
+        std::vector<double> smart_kinetics_with_ideal_search;
+
         /// The time spent (in s) in each time step for learning in smart chemical kinetic calculations.
         std::vector<double> smart_kinetics_learn;
 
         /// The time spent (in s) in each time step for chemical properties evaluation as part of learning in smart chemical kinetic calculations.
-        std::vector<double> smart_kinetics_learn_chemical_properties;
+        std::vector<double> smart_kinetics_chemical_properties;
+
+        /// The time spent (in s) in each time step for chemical properties evaluation as part of learning in smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics_equilibration;
 
         /// The time spent (in s) in each time step for estimating in smart chemical kinetic calculations.
         std::vector<double> smart_kinetics_estimate;
 
         /// The time spent (in s) in each time step for searching as part of estimating in smart chemical kinetic calculations.
-        std::vector<double> smart_kinetics_estimate_search;
+        std::vector<double> smart_kinetics_nearest_neighbor_search;
+
+        /// The time spent (in s) in each time step for acceptance verification as part of estimating in smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics_acceptance;
+
+        /// The time spent (in s) in each time step for matrix-vector multiplication as part of estimating in smart chemical kinetic calculations.
+        std::vector<double> smart_kinetics_mat_vec_mul;
 
         /// The time spent (in s) in each time step for chemical equilibrium calculations.
         std::vector<double> equilibrium;

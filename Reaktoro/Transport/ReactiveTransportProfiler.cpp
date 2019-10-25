@@ -116,8 +116,7 @@ struct ReactiveTransportProfiler::Impl
 
         info.smart_equilibrium_estimate.resize(num_time_steps);
         info.smart_equilibrium_nearest_neighbor_search.resize(num_time_steps);
-        info.smart_equilibrium_accept.resize(num_time_steps);
-
+        info.smart_equilibrium_acceptance.resize(num_time_steps);
         info.smart_equilibrium_gibbs_energy_minimization.resize(num_time_steps);
         info.smart_equilibrium_storage.resize(num_time_steps);
 
@@ -126,12 +125,15 @@ struct ReactiveTransportProfiler::Impl
         info.kinetics_properties.resize(num_time_steps);
         info.kinetics_with_ideal_properties.resize(num_time_steps);
 
-
         info.smart_kinetics.resize(num_time_steps);
+        info.smart_kinetics_with_ideal_search.resize(num_time_steps);
         info.smart_kinetics_learn.resize(num_time_steps);
-        info.smart_kinetics_learn_chemical_properties.resize(num_time_steps);
+        info.smart_kinetics_chemical_properties.resize(num_time_steps);
+        info.smart_kinetics_equilibration.resize(num_time_steps);
         info.smart_kinetics_estimate.resize(num_time_steps);
-        info.smart_kinetics_estimate_search.resize(num_time_steps);
+        info.smart_kinetics_nearest_neighbor_search.resize(num_time_steps);
+        info.smart_kinetics_acceptance.resize(num_time_steps);
+        info.smart_kinetics_mat_vec_mul.resize(num_time_steps);
 
         for(Index i = 0; i < num_time_steps; ++i)
         {
@@ -142,21 +144,23 @@ struct ReactiveTransportProfiler::Impl
             info.smart_equilibrium_with_ideal_search[i] = info.smart_equilibrium[i] - timing_smart_equilibrium_at_step[i].estimate_search;
             info.smart_equilibrium_estimate[i] = timing_smart_equilibrium_at_step[i].estimate;
             info.smart_equilibrium_nearest_neighbor_search[i] = timing_smart_equilibrium_at_step[i].estimate_search;
-            info.smart_equilibrium_accept[i] = timing_smart_equilibrium_at_step[i].estimate_acceptance;
+            info.smart_equilibrium_acceptance[i] = timing_smart_equilibrium_at_step[i].estimate_acceptance;
             info.smart_equilibrium_gibbs_energy_minimization[i] = timing_smart_equilibrium_at_step[i].learn_gibbs_energy_minimization;
             info.smart_equilibrium_storage[i] = timing_smart_equilibrium_at_step[i].learn_storage;
 
             info.kinetics[i] = timing_kinetics_at_step[i].solve;
             info.kinetics_equilibration[i] = timing_kinetics_at_step[i].integrate_equilibration;
             info.kinetics_properties[i] = timing_kinetics_at_step[i].integrate_chemical_properties;
-            info.kinetics_with_ideal_properties[i] = timing_kinetics_at_step[i].solve - timing_kinetics_at_step[i].integrate_chemical_properties;
 
             info.smart_kinetics[i] = timing_smart_kinetics_at_step[i].solve;
+            info.smart_kinetics_with_ideal_search[i] = info.smart_kinetics[i] - timing_smart_kinetics_at_step[i].estimate_search;
             info.smart_kinetics_learn[i] = timing_smart_kinetics_at_step[i].learn;
-            info.smart_kinetics_learn_chemical_properties[i] = timing_smart_kinetics_at_step[i].learn_chemical_properties;
+            info.smart_kinetics_chemical_properties[i] = timing_smart_kinetics_at_step[i].learn_chemical_properties;
+            info.smart_kinetics_equilibration[i] = timing_smart_kinetics_at_step[i].learn_equilibration;
             info.smart_kinetics_estimate[i] = timing_smart_kinetics_at_step[i].estimate;
-            info.smart_kinetics_estimate_search[i] = timing_smart_kinetics_at_step[i].estimate_search;
-
+            info.smart_kinetics_nearest_neighbor_search[i] = timing_smart_kinetics_at_step[i].estimate_search;
+            info.smart_kinetics_acceptance[i] = timing_smart_kinetics_at_step[i].estimate_acceptance;
+            info.smart_kinetics_mat_vec_mul[i] = timing_smart_kinetics_at_step[i].estimate_mat_vec_mul;
         }
 
         return info;
