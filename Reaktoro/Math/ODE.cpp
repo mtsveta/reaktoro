@@ -142,7 +142,7 @@ struct ODESolver::Impl
 
         // Initialize a new vector y
         cvode_y = N_VNew_Serial(num_equations);
-        for(int i = 0; i < num_equations; ++i)
+        for(unsigned int i = 0; i < num_equations; ++i)
             VecEntry(cvode_y, i) = y[i];
 
         // Initialize a new cvode context
@@ -163,10 +163,10 @@ struct ODESolver::Impl
         N_Vector abstols = N_VNew_Serial(num_equations);
 
         if(options.abstols.size() == num_equations)
-            for(int i = 0; i < num_equations; ++i)
+            for(unsigned int i = 0; i < num_equations; ++i)
                 VecEntry(abstols, i) = options.abstols[i];
         else
-            for(int i = 0; i < num_equations; ++i)
+            for(unsigned int i = 0; i < num_equations; ++i)
                 VecEntry(abstols, i) = options.abstol;
 
         // Set the parameters for the calculation
@@ -209,7 +209,7 @@ struct ODESolver::Impl
         CheckIntegration(CVode(cvode_mem, tfinal, cvode_y, &t, CV_ONE_STEP));
 
         // Transfer the result from cvode_y to y
-        for(int i = 0; i < data.num_equations; ++i)
+        for(unsigned int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(cvode_y, i);
     }
 
@@ -236,12 +236,12 @@ struct ODESolver::Impl
         }
 
         // Transfer the result from cvode_y to y
-        for(int i = 0; i < data.num_equations; ++i)
+        for(unsigned int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
     }
 
     /// Integrate the ODE performing a single step not going over a given time.
-    auto integrate(double& t, VectorRef y, double tfinal, MatrixRef S_) -> void
+    auto integrate(double& t, VectorRef y, double tfinal, MatrixRef Sk1) -> void
     {
         // Initialize the cvode context
         initialize(t, y);
@@ -269,7 +269,7 @@ struct ODESolver::Impl
                 t = tfinal;
             }
             // Transfer the result from cvode_y to y
-            for(int i = 0; i < data.num_equations; ++i)
+            for(unsigned int i = 0; i < data.num_equations; ++i)
                 y[i] = VecEntry(this->cvode_y, i);
 
             // Define dt
@@ -289,7 +289,7 @@ struct ODESolver::Impl
             LU lu(A);
 
             // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
-            S_ = lu.solve(S_);
+            Sk1 = lu.solve(Sk1);
         }
     }
 
@@ -313,13 +313,13 @@ struct ODESolver::Impl
         CheckIntegration(CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL));
 
         // Transfer the result from cvode_y to y
-        for(int i = 0; i < data.num_equations; ++i)
+        for(unsigned int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
 
     }
 
     /// Solve the ODE equations from a given start time to a final one.
-    auto solve(double& t, double dt, VectorRef y, MatrixRef S_) -> void
+    auto solve(double& t, double dt, VectorRef y, MatrixRef Sk1) -> void
     {
         // Initialize the cvode context
         initialize(t, y);
@@ -336,36 +336,32 @@ struct ODESolver::Impl
         CheckIntegration(CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL));
 
         // Transfer the result from cvode_y to y
-        for(int i = 0; i < data.num_equations; ++i)
+        for(unsigned int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
 
         // Reconstruct sensitivities using implicit scheme
-        // NOTE: quite sensitive part to any changes
         // -------------------------------------------------------------------
 
         // Initialize identity matrix and Jacobian on the t = t^{k+1}
         Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
-        Matrix Jk1 = Matrix::Identity(data.num_equations, data.num_equations);
-        Vector fk1 = Vector::Zero(data.num_equations);
 
         // Set the value of the current Jacobian
-        problem.jacobian(t, y, Jk1);
-        problem.function(t, y, fk1);
+        problem.jacobian(t, y, J);
 
         // Initialize system matrix A = I - dt * J^{k+1}
-        Matrix A = I - dt * Jk1;
+        Matrix A = I - dt * J;
 
         // Perform LU decomposition for matrix A
         LU lu(A);
 
         // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k(=I)
-        S_ = lu.solve(S_);
+        Sk1 = lu.solve(I);
     }
 
     /// Solve the ODE equations from a given start time to a final one
     /// with 2d order Taylor expantion scheme
     // TODO: test it instead of using CVODE
-    auto solve_(double& t, double dt, VectorRef y, VectorRef f_, MatrixRef J_, MatrixRef S_) -> void
+    auto solve_(double& t, double dt, VectorRef y, MatrixRef Sk1) -> void
     {
         // Initialize the cvode context
         initialize(t, y);
@@ -375,23 +371,29 @@ struct ODESolver::Impl
 
         // Identity matrix
         Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
-
+        Matrix Jk = Matrix::Identity(data.num_equations, data.num_equations);
+        Matrix Jk1 = Matrix::Identity(data.num_equations, data.num_equations);
+        Vector fk = Vector::Zero(data.num_equations);
         // Set the value of the current jacobian
-        problem.jacobian(t, y, J_);
-        problem.function(t, y, f_);
+        problem.jacobian(t, y, Jk);
+        problem.function(t, y, fk);
 
         // Explicit 2nd orer Taylor scheme
-        y += dt * f_ + 1/2 * dt * dt * J_;
+        y += dt * fk + 1 / 2 * dt * dt * Jk;
+
+        t += dt;
+
+        problem.jacobian(t, y, Jk1);
 
         // Initialize system matrix A = I - dt * J^{k+1}
         Matrix A;
-        A = I - dt * J_;
+        A = I - dt * Jk1;
 
         // Perform LU decomposition for matrix A
         LU lu(A);
 
         // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
-        S_ = lu.solve(S_);
+        Sk1 = lu.solve(I);
     }
 };
 
@@ -426,12 +428,12 @@ int CVODEFunction(realtype t, N_Vector y, N_Vector f, void* user_data)
 {
     ODEData& data = *static_cast<ODEData*>(user_data);
 
-    for(int i = 0; i < data.num_equations; ++i)
+    for(unsigned int i = 0; i < data.num_equations; ++i)
         data.y[i] = VecEntry(y, i);
 
     int result = data.problem.function(t, data.y, data.f);
 
-    for(int i = 0; i < data.num_equations; ++i)
+    for(unsigned int i = 0; i < data.num_equations; ++i)
         VecEntry(f, i) = data.f[i];
 
     return result;
@@ -442,13 +444,13 @@ int CVODEJacobian(long int N, realtype t, N_Vector y, N_Vector fy, DlsMat J, voi
     // TODO: N and fy never used. Do we need them here?
     ODEData& data = *static_cast<ODEData*>(user_data);
 
-    for(int i = 0; i < data.num_equations; ++i)
+    for(unsigned int i = 0; i < data.num_equations; ++i)
         data.y[i] = VecEntry(y, i);
 
     int result = data.problem.jacobian(t, data.y, data.J);
 
-    for(int i = 0; i < data.num_equations; ++i)
-        for(int j = 0; j < data.num_equations; ++j)
+    for(unsigned int i = 0; i < data.num_equations; ++i)
+        for(unsigned int j = 0; j < data.num_equations; ++j)
             MatEntry(J, i, j) = data.J(i, j);
 
     return result;
