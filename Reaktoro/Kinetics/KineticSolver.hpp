@@ -128,6 +128,9 @@ public:
     /// Return the result of the last kinetic calculation.
     auto result() const -> const KineticResult&;
 
+    /// Return properties of the chemical state provided by the KineticSolver
+    auto properties() const -> const ChemicalProperties&;
+
 private:
     struct Impl;
 

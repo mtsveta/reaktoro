@@ -440,18 +440,6 @@ struct KineticSolver::Impl
         // Integrate the chemical kinetics ODE from `t` to `t + dt`
         timeit(ode.solve(t, dt, benk), result.timing.integrate=);
 
-        /*
-        double t1 = t + dt;
-        while(t <= t1)
-        {
-            // Integration time step
-            t = step(state, t, t1);            // Time-step is selected by the CVODE solver
-        }
-        */
-
-        //std::cout << "benk after ..." << tr(benk) << std::endl;
-        //getchar();
-
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
         nk = benk.tail(Nk);
@@ -480,16 +468,6 @@ struct KineticSolver::Impl
         toc(0, result.timing.solve);
 
     }
-    /*
-    auto setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
-    {
-        // Fetch the amounts of spacies from the chemical state
-        const auto& n = state.speciesAmounts();
-        nk = n(iks);
-
-        // Update amounts of elements
-        be = b - Ak * nk;
-    }*/
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
     {
@@ -507,7 +485,7 @@ struct KineticSolver::Impl
 
         // Solve the equilibrium problem using the elemental molar abundance `be`
         //if(options.use_smart_equilibrium_solver) // using smart equilibrium solver
-        if(false) // using smart equilibrium solver
+        if(false) // block using smart equilibrium solver (for now)
         {
             SmartEquilibriumResult res = {};
 
@@ -630,6 +608,7 @@ struct KineticSolver::Impl
 
         return 0;
     }
+
 };
 
 KineticSolver::KineticSolver()
@@ -708,12 +687,10 @@ auto KineticSolver::solve(ChemicalState& state, double t, double dt, VectorConst
     pimpl->solve(state, t, dt, b);
 }
 
-/*
-auto KineticSolver::setElementsAmountsPerCell(const ChemicalState& state, VectorConstRef b) -> void
+auto KineticSolver::properties() const -> const ChemicalProperties&
 {
-    pimpl->setElementsAmountsPerCell(state, b);
+    return pimpl->properties;
 }
-*/
 
 auto KineticSolver::result() const -> const KineticResult&
 {
