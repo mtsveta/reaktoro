@@ -81,6 +81,9 @@ public:
     /// Recover the sensitivity derivative `dxdp`, `dydp`, `dzdp`.
     auto recover(const Matrix& dgdp, const Matrix& dbdp, Matrix& dxdp, Matrix& dydp, Matrix& dzdp) -> void;
 
+    /// Recover the sensitivity derivative `dxdp`, `dydp`, `dzdp`.
+    auto recover(const Vector& dgdp, const Vector& dbdp, Vector& dxdp, Vector& dydp, Vector& dzdp) -> void;
+
 private:
     struct Impl;
 

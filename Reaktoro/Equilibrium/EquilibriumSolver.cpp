@@ -654,6 +654,17 @@ auto EquilibriumSolver::solve(ChemicalState& state, double T, double P, const do
     return pimpl->solve(state, T, P, be);
 }
 
+auto EquilibriumSolver::solve(ChemicalState& state) -> EquilibriumResult
+{
+    return pimpl->solve_with_all_element_amounts(state, state.temperature(), state.pressure(), state.elementAmounts());
+}
+
+auto EquilibriumSolver::solve(ChemicalState& state, const EquilibriumProblem& problem) -> EquilibriumResult
+{
+    setPartition(problem.partition());
+    return pimpl->solve_with_all_element_amounts(state, problem.temperature(), problem.pressure(), problem.elementAmounts());
+}
+
 auto EquilibriumSolver::properties() const -> const ChemicalProperties&
 {
     return pimpl->properties;
