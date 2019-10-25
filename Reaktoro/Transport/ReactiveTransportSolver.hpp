@@ -16,7 +16,6 @@
 #pragma once
 
 // C++ includes
-#include <iostream>
 #include <memory>
 
 // Reaktoro includes
@@ -46,7 +45,7 @@ public:
     /// Construct a ReactiveTransportSolver instance.
     explicit ReactiveTransportSolver(const ChemicalSystem& system);
 
-    /// Construct a ReactiveTransportSolver instance when .
+    /// Construct a ReactiveTransportSolver instance when system, reactions, and partition are provided.
     ReactiveTransportSolver(const ChemicalSystem& system, const ReactionSystem& reactions, const Partition& partition);
 
     /// Construct a copy of a ReactiveTransportSolver instance.
@@ -55,7 +54,7 @@ public:
     /// Destroy this ReactiveTransportSolver instance.
     virtual ~ReactiveTransportSolver();
 
-    /// Assign a copy of an ReactiveTransportSolver instance
+    /// Assign a copy of an ReactiveTransportSolver instance.
     auto operator=(ReactiveTransportSolver other) -> ReactiveTransportSolver&;
 
     /// Set the options for the reactive transport calculations.

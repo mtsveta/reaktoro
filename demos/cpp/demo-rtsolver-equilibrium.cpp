@@ -51,6 +51,7 @@ struct Params
     bool use_smart_equilibrium_solver;
     double smart_equilibrium_reltol;
     double smart_equilibrium_abstol;
+    double smart_equilibrium_cutoff;
 
     double tol;
 
@@ -67,6 +68,9 @@ struct RTEquilibriumResults
     /// Total CPU time (in s) required by smart equilibrium scheme
     /// excluding the costs for the search and storage of the closest reference states.
     double smart_total_ideal_search_store = 0.0;
+
+    /// Smart equilibrium acceptance rate
+    double smart_eq_acceptance_rate = 0.0;
 
     /// Total CPU time (in s) required by conventional equilibrium scheme.
     double conventional_total = 0.0;
@@ -131,9 +135,9 @@ int main()
     params.P = 100;                      // the pressure (in units of bar)
 
     // Define parameters of the equilibrium solvers
-    params.smart_equlibrium_reltol = 1e-1;
-    params.smart_equlibrium_abstol = 1e-8;
-    params.tol = 6e-1;
+    params.smart_equilibrium_reltol = 1e-1;
+    params.smart_equilibrium_abstol = 1e-8;
+    params.smart_equilibrium_cutoff = -1e-5;
     params.track_statistics = true;
 
     // Output
@@ -143,8 +147,8 @@ int main()
     RTEquilibriumResults results;
 
     // Execute reactive transport with different solvers
-    params.use_smart_eqilibirum_solver = true; runReactiveTransport(params, results);
-    params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
+    params.use_smart_equilibrium_solver = true; runReactiveTransport(params, results);
+    params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;
     results.smart_total = results.smart_equilibrium_timing.solve;
@@ -185,6 +189,7 @@ auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -
     SmartEquilibriumOptions smart_equilibrium_options;
     smart_equilibrium_options.reltol = params.smart_equlibrium_reltol;
     smart_equilibrium_options.abstol = params.smart_equlibrium_abstol;
+    smart_equilibrium_options.cutoff = params.smart_equilibrium_cutoff;
     smart_equilibrium_options.tol = params.tol;
 
     // Step **: Construct the chemical system with its phases and species (using ChemicalEditor)
@@ -259,6 +264,7 @@ auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -
     rtsolver.initialize();
 
     // Step **: Define the quantities that should be output for every cell, every time step
+    ///*
     ChemicalOutput output(rtsolver.output());
     output.add("pH");
     output.add("speciesMolality(H+)");
@@ -271,6 +277,7 @@ auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -
     output.add("speciesMolality(Calcite)");
     output.add("speciesMolality(Dolomite)");
     output.filename(folder + "/" + "test.txt");
+    //*/
 
     // Step **: Create RTProfiler to track the timing and results of reactive transport
     ReactiveTransportProfiler profiler;
@@ -285,7 +292,7 @@ auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -
     while (step < params.nsteps)
     {
         // Print some progress
-        //std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.step(field);
@@ -374,5 +381,6 @@ auto outputConsole(const Params& params) -> void {
     std::cout << "eqabstol  : " << params.smart_equlibrium_abstol << std::endl;
     std::cout << "eqreltol  : " << params.smart_equlibrium_reltol << std::endl;
     std::cout << "tol       : " << params.tol << std::endl;
+    std::cout << "eqcutoff  : " << params.smart_equilibrium_cutoff << std::endl;
 
 }

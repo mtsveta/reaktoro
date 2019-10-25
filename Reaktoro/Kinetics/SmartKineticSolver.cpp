@@ -124,9 +124,6 @@ struct SmartKineticSolver::Impl
     /// The combined vector of elemental molar abundance and composition of kinetic species [be nk]
     Vector benk;
 
-    /// The chemical properties of the system
-    ChemicalProperties properties;
-
     /// The vector with the values of the reaction rates
     ChemicalVector r;
 

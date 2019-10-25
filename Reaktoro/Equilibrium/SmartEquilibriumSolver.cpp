@@ -454,6 +454,7 @@ struct SmartEquilibriumSolver::Impl
         // Check if smart estimation failed with respect to variation of chemical potentials or amounts
         if(is_error_acceptable == false)
             return;
+        }
 
         // Set the estimate accepted status to true
         result.estimate.accepted = true;
@@ -506,10 +507,6 @@ struct SmartEquilibriumSolver::Impl
         toc(0, result.timing.solve);
 
         return result;
-    }
-    auto properties() const -> const ChemicalProperties&
-    {
-        solver.properties();
     }
 
     /// Set the partition of the chemical system.
