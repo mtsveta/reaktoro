@@ -31,6 +31,9 @@ void exportKineticSolver(py::module& m)
     auto step1 = static_cast<double(KineticSolver::*)(ChemicalState&, double)>(&KineticSolver::step);
     auto step2 = static_cast<double(KineticSolver::*)(ChemicalState&, double, double)>(&KineticSolver::step);
 
+    auto initialize1 = static_cast<void(KineticSolver::*)(ChemicalState&, double)>(&KineticSolver::initialize);
+    auto initialize2 = static_cast<void(KineticSolver::*)(ChemicalState&, double, VectorConstRef)>(&KineticSolver::initialize);
+
     py::class_<KineticSolver>(m, "KineticSolver")
         .def(py::init<const ReactionSystem&>())
         .def("setOptions", &KineticSolver::setOptions)
@@ -39,7 +42,8 @@ void exportKineticSolver(py::module& m)
         .def("addPhaseSink", &KineticSolver::addPhaseSink)
         .def("addFluidSink", &KineticSolver::addFluidSink)
         .def("addSolidSink", &KineticSolver::addSolidSink)
-        .def("initialize", &KineticSolver::initialize)
+        .def("initialize", initialize1)
+        .def("initialize", initialize2)
         .def("step", step1)
         .def("step", step2)
         .def("solve", &KineticSolver::solve)
