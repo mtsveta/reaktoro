@@ -65,12 +65,21 @@ auto ChemicalField::elementAmounts(VectorRef values) -> void
         values.segment(offset, num_elements) = m_states[i].elementAmounts();
 }
 
-auto ChemicalField::output(std::string filename, StringList quantities) -> void
+auto ChemicalField::output(std::string filename, const StringList& quantities) -> void
 {
     ChemicalOutput out(m_system);
     out.filename(filename);
-    for(auto quantity : quantities)
+    for(const auto& quantity : quantities)
         out.add(quantity);
+}
+
+auto ChemicalField::properties() -> std::vector<ChemicalProperties>&
+{
+    return m_properties;
+}
+auto ChemicalField::states() -> std::vector<ChemicalState>&
+{
+    return m_states;
 }
 
 } // namespace Reaktoro

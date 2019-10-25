@@ -63,7 +63,11 @@ public:
 
     auto elementAmounts(VectorRef values) -> void;
 
-    auto output(std::string filename, StringList quantities) -> void;
+    auto output(std::string filename, const StringList& quantities) -> void;
+
+    auto properties() -> std::vector<ChemicalProperties>&;
+
+    auto states() -> std::vector<ChemicalState>&;
 
 private:
     /// The number of degrees of freedom in the chemical field.
@@ -82,7 +86,7 @@ private:
     /// The chemical states in the chemical field
     std::vector<ChemicalState> m_states;
 
-    /// The chemical states in the chemical field
+    /// The chemical properties in the chemical field
     std::vector<ChemicalProperties> m_properties;
 };
 
