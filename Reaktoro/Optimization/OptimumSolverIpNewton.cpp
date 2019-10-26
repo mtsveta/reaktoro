@@ -557,11 +557,6 @@ auto OptimumSolverIpNewton::sensitivities(MatrixConstRef dgdp, MatrixConstRef db
     return pimpl->sensitivities(dgdp, dbdp, dxdp, dydp, dzdp);
 }
 
-auto OptimumSolverIpNewton::sensitivities(VectorConstRef dgdp, VectorConstRef dbdp, Vector& dxdp, Vector& dydp, Vector& dzdp) -> void
-{
-    return pimpl->sensitivities(dgdp, dbdp, dxdp, dydp, dzdp);
-}
-
 auto OptimumSolverIpNewton::clone() const -> OptimumSolverBase*
 {
     return new OptimumSolverIpNewton(*this);

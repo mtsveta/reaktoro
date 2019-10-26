@@ -20,11 +20,13 @@
 // Reaktoro includes
 #include <Reaktoro/Common/ChemicalVector.hpp>
 #include <Reaktoro/Common/Constants.hpp>
+#include <Reaktoro/Common/ConvertUtils.hpp>
 #include <Reaktoro/Common/Exception.hpp>
 #include <Reaktoro/Common/Profiling.hpp>
 #include <Reaktoro/Core/ChemicalProperties.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
 #include <Reaktoro/Core/ChemicalSystem.hpp>
+#include <Reaktoro/Core/Connectivity.hpp>
 #include <Reaktoro/Core/Partition.hpp>
 #include <Reaktoro/Core/ThermoProperties.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumOptions.hpp>
@@ -34,7 +36,9 @@
 #include <Reaktoro/Math/MathUtils.hpp>
 #include <Reaktoro/Optimization/OptimumOptions.hpp>
 #include <Reaktoro/Optimization/OptimumProblem.hpp>
+#include <Reaktoro/Optimization/OptimumResult.hpp>
 #include <Reaktoro/Optimization/OptimumSolver.hpp>
+#include <Reaktoro/Optimization/OptimumSolverRefiner.hpp>
 #include <Reaktoro/Optimization/OptimumState.hpp>
 
 namespace Reaktoro {
@@ -574,10 +578,6 @@ struct EquilibriumSolver::Impl
         solver.sensitivities(dgdT, dbdT, dndT, dydT, dzdT);
         solver.sensitivities(dgdP, dbdP, dndP, dydP, dzdP);
         solver.sensitivities(dgdb, dbdb, dndb, dydb, dzdb);
-
-        drdT = ue.ddT + ue.ddn * dndT - tr(Ae)*dydT - dzdT;
-        drdP = ue.ddP + ue.ddn * dndP - tr(Ae)*dydP - dzdP;
-        drdb = ue.ddn * dndb - tr(Ae)*dydb - dzdb;
 
         drdT = ue.ddT + ue.ddn * dndT - tr(Ae)*dydT - dzdT;
         drdP = ue.ddP + ue.ddn * dndP - tr(Ae)*dydP - dzdP;
