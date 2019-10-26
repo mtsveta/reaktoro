@@ -89,6 +89,7 @@ void to_json(json& j, const ReactiveTransportAnalysis& obj) {
     j["computing_costs_per_time_step"]["smart_equilibrium_accept"] = obj.computing_costs_per_time_step.smart_equilibrium_accept;
     j["computing_costs_per_time_step"]["smart_equilibrium_nearest_neighbor_search"] = obj.computing_costs_per_time_step.smart_equilibrium_nearest_neighbor_search;
     j["computing_costs_per_time_step"]["smart_equilibrium_acceptance"] = obj.computing_costs_per_time_step.smart_equilibrium_acceptance;
+    j["computing_costs_per_time_step"]["smart_equilibrium_mat_vec_mul"] = obj.computing_costs_per_time_step.smart_equilibrium_mat_vec_mul;
     j["computing_costs_per_time_step"]["smart_equilibrium_gibbs_energy_minimization"] = obj.computing_costs_per_time_step.smart_equilibrium_gibbs_energy_minimization;
     j["computing_costs_per_time_step"]["smart_equilibrium_storage"] = obj.computing_costs_per_time_step.smart_equilibrium_storage;
 }

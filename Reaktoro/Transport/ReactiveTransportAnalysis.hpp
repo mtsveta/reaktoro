@@ -156,8 +156,11 @@ struct ReactiveTransportAnalysis
         /// The time spent (in s) in each time step for nearest neighbor search operations during smart chemical equilibrium calculations.
         std::vector<double> smart_equilibrium_nearest_neighbor_search;
 
-        /// The time spent (in s) in each time step for smart chemical equilibrium estimation calculations.
-        std::vector<double> smart_equilibrium_accept;
+        /// The time spent (in s) in each time step for matrix-vector multiplication as part of estimating in smart chemical equilibrium calculations.
+        std::vector<double> smart_equilibrium_mat_vec_mul;
+
+        // The time spent (in s) in each time step for acceptance operations during smart chemical equilibrium calculations.
+        std::vector<double> smart_equilibrium_acceptance;
 
         /// The time spent (in s) in each time step for Gibbs energy minimization calculations during smart equilibrium learning operations.
         std::vector<double> smart_equilibrium_gibbs_energy_minimization;

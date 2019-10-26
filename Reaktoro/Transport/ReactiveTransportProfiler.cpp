@@ -117,6 +117,7 @@ struct ReactiveTransportProfiler::Impl
         info.smart_equilibrium_estimate.resize(num_time_steps);
         info.smart_equilibrium_nearest_neighbor_search.resize(num_time_steps);
         info.smart_equilibrium_acceptance.resize(num_time_steps);
+        info.smart_equilibrium_mat_vec_mul.resize(num_time_steps);
         info.smart_equilibrium_gibbs_energy_minimization.resize(num_time_steps);
         info.smart_equilibrium_storage.resize(num_time_steps);
 
@@ -144,6 +145,7 @@ struct ReactiveTransportProfiler::Impl
             info.smart_equilibrium_with_ideal_search[i] = info.smart_equilibrium[i] - timing_smart_equilibrium_at_step[i].estimate_search;
             info.smart_equilibrium_estimate[i] = timing_smart_equilibrium_at_step[i].estimate;
             info.smart_equilibrium_nearest_neighbor_search[i] = timing_smart_equilibrium_at_step[i].estimate_search;
+            info.smart_equilibrium_mat_vec_mul[i] = timing_smart_equilibrium_at_step[i].estimate_mat_vec_mul;
             info.smart_equilibrium_acceptance[i] = timing_smart_equilibrium_at_step[i].estimate_acceptance;
             info.smart_equilibrium_gibbs_energy_minimization[i] = timing_smart_equilibrium_at_step[i].learn_gibbs_energy_minimization;
             info.smart_equilibrium_storage[i] = timing_smart_equilibrium_at_step[i].learn_storage;
