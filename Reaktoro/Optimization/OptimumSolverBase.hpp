@@ -63,7 +63,7 @@ public:
     /// @param[out] dxdp The derivatives `dx/dp`
     /// @param[out] dydp The derivatives `dy/dp`
     /// @param[out] dzdp The derivatives `dz/dp`
-    virtual auto sensitivities(VectorConstRef dgdp, VectorConstRef dbdp, Vector& dxdp, Vector& dydp, Vector& dzdp) -> void {}
+    virtual auto sensitivities(MatrixConstRef dgdp, MatrixConstRef dbdp, Vector& dxdp, Vector& dydp, Vector& dzdp) -> void {}
 
     /// Return a clone of this instance.
     virtual auto clone() const -> OptimumSolverBase* = 0;

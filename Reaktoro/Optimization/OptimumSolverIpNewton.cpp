@@ -505,6 +505,16 @@ struct OptimumSolverIpNewton::Impl
         rhs.ry.noalias() =  dbdp;
         rhs.rz.fill(0.0);
 
+        // // The regularization parameters delta and gamma
+        // const auto gamma = 1.0e-20;
+        // const auto delta = 1.0e-20;
+
+        // // The KKT matrix
+        // KktMatrix lhs(f.hessian, A, x, z, gamma, delta);
+
+        // // Update the decomposition of the KKT matrix with update Hessian matrix
+        // kkt.decompose(lhs);
+
         // Solve the KKT equations to get the derivatives
         kkt.solve(rhs, sol);
 
