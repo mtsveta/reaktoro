@@ -579,6 +579,10 @@ struct EquilibriumSolver::Impl
         drdP = ue.ddP + ue.ddn * dndP - tr(Ae)*dydP - dzdP;
         drdb = ue.ddn * dndb - tr(Ae)*dydb - dzdb;
 
+        drdT = ue.ddT + ue.ddn * dndT - tr(Ae)*dydT - dzdT;
+        drdP = ue.ddP + ue.ddn * dndP - tr(Ae)*dydP - dzdP;
+        drdb = ue.ddn * dndb - tr(Ae)*dydb - dzdb;
+
         return sensitivities;
     }
 };
@@ -652,17 +656,6 @@ auto EquilibriumSolver::solve(ChemicalState& state, double T, double P, VectorCo
 auto EquilibriumSolver::solve(ChemicalState& state, double T, double P, const double* be) -> EquilibriumResult
 {
     return pimpl->solve(state, T, P, be);
-}
-
-auto EquilibriumSolver::solve(ChemicalState& state) -> EquilibriumResult
-{
-    return pimpl->solve_with_all_element_amounts(state, state.temperature(), state.pressure(), state.elementAmounts());
-}
-
-auto EquilibriumSolver::solve(ChemicalState& state, const EquilibriumProblem& problem) -> EquilibriumResult
-{
-    setPartition(problem.partition());
-    return pimpl->solve_with_all_element_amounts(state, problem.temperature(), problem.pressure(), problem.elementAmounts());
 }
 
 auto EquilibriumSolver::properties() const -> const ChemicalProperties&
