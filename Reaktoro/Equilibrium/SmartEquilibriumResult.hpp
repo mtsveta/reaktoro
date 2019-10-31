@@ -69,6 +69,9 @@ struct SmartEquilibriumResultDuringEstimate
     /// The indication whether the smart equilibrium estimate was accepted.
     bool accepted = false;
 
+    /// The index of the reference element used for estimation.
+    Index reference_state_index;
+
     /// The name of the species that caused the smart approximation to fail.
     std::string failed_with_species;
 

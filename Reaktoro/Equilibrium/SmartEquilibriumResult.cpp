@@ -37,6 +37,7 @@ auto SmartEquilibriumTiming::operator+=(const SmartEquilibriumTiming& other) -> 
 auto SmartEquilibriumResultDuringEstimate::operator+=(const SmartEquilibriumResultDuringEstimate& other) -> SmartEquilibriumResultDuringEstimate&
 {
     accepted = other.accepted;
+    reference_state_index = other.reference_state_index;
     failed_with_species = other.failed_with_species;
     failed_with_amount = other.failed_with_amount;
     failed_with_chemical_potential = other.failed_with_chemical_potential;

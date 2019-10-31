@@ -508,17 +508,6 @@ struct SmartEquilibriumSolver::Impl
 
         return result;
     }
-
-    /// Set the partition of the chemical system.
-    auto getSolver() -> EquilibriumSolver&
-    {
-        return solver;
-    }
-    auto sensitivity() -> const EquilibriumSensitivity&
-    {
-        solver.sensitivity();
-    }
-
 };
 
 SmartEquilibriumSolver::SmartEquilibriumSolver()
@@ -568,7 +557,7 @@ auto SmartEquilibriumSolver::solve(ChemicalState& state, const EquilibriumProble
 
 auto SmartEquilibriumSolver::sensitivity() -> const EquilibriumSensitivity&
 {
-    return pimpl->getSolver().sensitivity();
+    return pimpl->solver.sensitivity();
 }
 
 auto SmartEquilibriumSolver::properties() const -> const ChemicalProperties&

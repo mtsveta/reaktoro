@@ -18,7 +18,6 @@
 // C++ includes
 #include <memory>
 #include <string>
-//#include <vector>
 
 // Reaktoro includes
 #include <Reaktoro/Math/Matrix.hpp>

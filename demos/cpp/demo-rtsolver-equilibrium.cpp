@@ -136,9 +136,11 @@ int main()
 
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_abstol = 1e-8;
+    params.smart_equilibrium_abstol = 1e-3;
     params.smart_equilibrium_cutoff = -1e-5;
     params.track_statistics = true;
+
+    params.plot_results = true;
 
     // Output
     outputConsole(params);
@@ -184,6 +186,7 @@ auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -
 
     // Step **: Define chemical equilibrium solver options
     EquilibriumOptions equilibrium_options;
+    equilibrium_options.hessian = GibbsHessian::Exact;
 
     // Step **: Define smart chemical equilibrium solver options
     SmartEquilibriumOptions smart_equilibrium_options;
@@ -191,6 +194,7 @@ auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -
     smart_equilibrium_options.abstol = params.smart_equlibrium_abstol;
     smart_equilibrium_options.cutoff = params.smart_equilibrium_cutoff;
     smart_equilibrium_options.tol = params.tol;
+    smart_equilibrium_options.learning.hessian = GibbsHessian::Exact;
 
     // Step **: Construct the chemical system with its phases and species (using ChemicalEditor)
     ChemicalEditor editor;
@@ -264,20 +268,20 @@ auto runReactiveTransport(const Params& params, RTEquilibriumResults& results) -
     rtsolver.initialize();
 
     // Step **: Define the quantities that should be output for every cell, every time step
-    ///*
-    ChemicalOutput output(rtsolver.output());
-    output.add("pH");
-    output.add("speciesMolality(H+)");
-    output.add("speciesMolality(Ca++)");
-    output.add("speciesMolality(Mg++)");
-    output.add("speciesMolality(HCO3-)");
-    output.add("speciesMolality(CO2(aq))");
-    output.add("phaseVolume(Calcite)");
-    output.add("phaseVolume(Dolomite)");
-    output.add("speciesMolality(Calcite)");
-    output.add("speciesMolality(Dolomite)");
-    output.filename(folder + "/" + "test.txt");
-    //*/
+    if( params.plot_results){
+        ChemicalOutput output(rtsolver.output());
+        output.add("pH");
+        output.add("speciesMolality(H+)");
+        output.add("speciesMolality(Ca++)");
+        output.add("speciesMolality(Mg++)");
+        output.add("speciesMolality(HCO3-)");
+        output.add("speciesMolality(CO2(aq))");
+        output.add("phaseVolume(Calcite)");
+        output.add("phaseVolume(Dolomite)");
+        output.add("speciesMolality(Calcite)");
+        output.add("speciesMolality(Dolomite)");
+        output.filename(folder + "/" + "test.txt");
+    }
 
     // Step **: Create RTProfiler to track the timing and results of reactive transport
     ReactiveTransportProfiler profiler;
