@@ -17,7 +17,6 @@
 
 // C++ includes
 #include <memory>
-#include <deque>
 
 // Reaktoro includes
 #include <Reaktoro/Math/Matrix.hpp>
@@ -36,7 +35,6 @@ class Partition;
 // Forward declarations (structs)
 struct SmartEquilibriumOptions;
 struct SmartEquilibriumResult;
-struct SmartEquilibriumNode;
 
 /// A class used to perform equilibrium calculations using machine learning scheme.
 class SmartEquilibriumSolver
