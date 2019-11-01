@@ -578,6 +578,15 @@ namespace Reaktoro {
             // Comparison function based on the Euclidean distance
             auto distancefn = [&](const TreeNode& a, const TreeNode& b)
             {
+                Vector be_a = a.be/sum(a.be);
+                Vector be_b = b.be/sum(b.be);
+                Vector be_x = be/sum(be);
+
+                return (be_a - be_x).squaredNorm() < (be_b - be_x).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
+            };
+            // Comparison function based on the Euclidean distance
+            auto distancefn = [&](const TreeNode& a, const TreeNode& b)
+            {
                 const auto& be_a = a.be;
                 const auto& be_b = b.be;
                 return (be_a - be).squaredNorm() < (be_b - be).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
