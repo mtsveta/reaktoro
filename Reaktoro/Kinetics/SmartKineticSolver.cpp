@@ -634,7 +634,7 @@ struct SmartKineticSolver::Impl
         // Check the variations of equilibrium species
         // -------------------------------------------------------------------------------------------------------------
         bool equilibrium_variation_check = true;
-        bool equilibrium_neg_amount_check = ne.minCoeff() > -1e-5; //kinetics_cutoff;
+        bool equilibrium_neg_amount_check = ne.minCoeff() > kinetics_cutoff;
 
         // Loop via equilibrium species and consider only big enough fractions
         for(int i = 0; i < xe_ref.size(); ++i){
@@ -698,8 +698,8 @@ struct SmartKineticSolver::Impl
 
         }
 
-        if(!equilibrium_variation_check || !equilibrium_neg_amount_check || !kinetics_r_variation_check)
-        //if(!equilibrium_variation_check || !kinetics_r_variation_check)
+        //if(!equilibrium_variation_check || !equilibrium_neg_amount_check || !kinetics_r_variation_check)
+        if(!equilibrium_variation_check || !kinetics_r_variation_check)
         {
             /*
             if(step>=1000) {

@@ -280,6 +280,7 @@ struct ODESolver::Impl
 
             // Set the value of the current jacobian
             problem.jacobian(t, y, J);
+            if(t = tfinal) problem.function(t, y, f);
 
             // Initialize system matrix A = I - dt * J^{k+1}
             Matrix A;
@@ -344,16 +345,13 @@ struct ODESolver::Impl
 
         // Initialize identity matrix and Jacobian on the t = t^{k+1}
         Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
-        Matrix Jk1 = Matrix::Identity(data.num_equations, data.num_equations);
-        Vector fk1 = Vector::Zero(data.num_equations);
 
-        // Set the value of the current Jacobian
-        // TODO: is the order important?
-        problem.jacobian(t, y, Jk1); // provides evaluation of sensitivities at t = t_{k+1}
-        problem.function(t, y, fk1); // provides evaluation of properties and rates at t = t_{k+1}
+        // Evalute current value of Jacobian and RHS
+        problem.jacobian(t, y, J); // provides evaluation of sensitivities at t = t_{k+1}
+        problem.function(t, y, f); // provides evaluation of properties and rates at t = t_{k+1}
 
         // Initialize system matrix A = I - dt * J^{k+1}
-        Matrix A = I - dt * Jk1;
+        Matrix A = I - dt * J;
 
         // Perform LU decomposition for matrix A
         LU lu(A);

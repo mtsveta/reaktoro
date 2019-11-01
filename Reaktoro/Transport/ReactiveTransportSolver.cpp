@@ -365,12 +365,6 @@ struct ReactiveTransportSolver::Impl
                 // Solve with a smart kinetic solver
                 smart_kinetic_solver.solve(states[icell], t_start, dt, b.row(icell));
 
-                /*
-                std::cout << "icell        : " << icell << std::endl;
-                std::cout << "b.row(icell) : " << b.row(icell) << std::endl;
-                std::cout << "n : " << tr(states[icell].speciesAmounts()) << std::endl << std::endl;
-                getchar();
-                */
                 // Update chemical properties of the field
                 //properties[icell] = smart_kinetic_solver.properties();
                 /*

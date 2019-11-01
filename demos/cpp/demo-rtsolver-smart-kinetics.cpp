@@ -214,7 +214,7 @@ int main()
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 10000; // the number of steps in the reactive transport simulation
+    params.nsteps = 100; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -247,7 +247,7 @@ int main()
     /// **************************************************************************************************************///
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     /// **************************************************************************************************************///
-    ///*
+    /*
     params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conv_kin_conv_eq_total = results.kinetic_timing.solve;
@@ -263,7 +263,7 @@ int main()
     std::cout << "     - equilibration            : " << results.kinetic_timing.integrate_equilibration << " (" << results.kinetic_timing.integrate_equilibration / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "   - equilibrate           : " << results.kinetic_timing.equilibrate << " (" << results.kinetic_timing.equilibrate / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
-    //*/
+    */
 
 
     /*
@@ -714,11 +714,10 @@ auto makeResultsFolder(const Params& params) -> std::string
                            (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                            (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
     std::string folder =
                 (params.use_smart_kinetics_solver || params.use_smart_equilibrium_solver) ?
-                "../rt-exact-hessian-withcutoff" + smart_test_tag :
-                "../rt-exact-hessian-withcutoff" + test_tag;
+                "../plotting-results/rt-exact-hessian-withoutcutoff" + smart_test_tag :
+                "../plotting-results/rt-exact-hessian-withoutcutoff" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "*********************************************************************" << std::endl;
