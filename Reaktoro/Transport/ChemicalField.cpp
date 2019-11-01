@@ -114,6 +114,20 @@ auto ChemicalField::operator=(ChemicalField other) -> ChemicalField&
     return *this;
 }
 
+auto ChemicalField::begin() const -> ConstIterator { return  pimpl->m_states.cbegin(); }
+
+auto ChemicalField::begin() -> Iterator { return  pimpl->m_states.begin(); }
+
+auto ChemicalField::end() const -> ConstIterator { return  pimpl->m_states.cend(); }
+
+auto ChemicalField::end() -> Iterator { return pimpl->m_states.end(); }
+
+auto ChemicalField::operator[](Index index) const -> const ChemicalState& { return  pimpl->m_states[index]; }
+
+auto ChemicalField::operator[](Index index) -> ChemicalState& {
+    return pimpl->m_states[index];
+}
+
 auto ChemicalField::size() const -> Index
 {
     return pimpl->m_size;

@@ -35,6 +35,9 @@ namespace Reaktoro {
 class ChemicalField
 {
 public:
+    using Iterator = std::vector<ChemicalState>::iterator;
+    using ConstIterator = std::vector<ChemicalState>::const_iterator;
+
     /// Construct a ChemicalField instance when the number of the states(cells) and system is provided.
     ChemicalField(Index size, const ChemicalSystem& system);
 
@@ -52,6 +55,14 @@ public:
 
     /// Return the number of states in chamical field
     auto size() const -> Index;
+
+    // TODO: do we keep this structure of not?
+    auto begin() const -> ConstIterator;
+    auto begin() -> Iterator;
+    auto end() const -> ConstIterator;
+    auto end() -> Iterator;
+    auto operator[](Index index) const -> const ChemicalState&;
+    auto operator[](Index index) -> ChemicalState& ;
 
     /// Set all the states of the field by the one provided
     auto set(const ChemicalState& state) -> void;
