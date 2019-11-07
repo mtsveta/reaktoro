@@ -23,9 +23,10 @@
 #include <Reaktoro/Common/TimeUtils.hpp>
 #include <Reaktoro/Math/MathUtils.hpp>
 #include <Reaktoro/Optimization/KktSolver.hpp>
-#include <Reaktoro/Optimization/OptimumProblem.hpp>
 #include <Reaktoro/Optimization/OptimumOptions.hpp>
+#include <Reaktoro/Optimization/OptimumProblem.hpp>
 #include <Reaktoro/Optimization/OptimumResult.hpp>
+#include <Reaktoro/Optimization/OptimumSensitivity.hpp>
 #include <Reaktoro/Optimization/OptimumState.hpp>
 #include <Reaktoro/Optimization/Utils.hpp>
 
@@ -48,14 +49,34 @@ struct OptimumSolverIpNewton::Impl
     /// The outputter instance
     Outputter outputter;
 
+    /// The last optimization problem
+    OptimumProblem problem;
+
+    /// The last computed optimum state
+    OptimumState state;
+
+    /// The last optimization options
+    OptimumOptions options;
+
+    /// The sensitivity derivatives of the computed optimum state
+    OptimumSensitivity sensitivity;
+
+    // The last result of the calculation
+    OptimumResult result;
+
     /// Solve the optimization problem.
-    auto solve(const OptimumProblem& problem, OptimumState& state, const OptimumOptions& options) -> OptimumResult
+    auto solve(const OptimumProblem& problem_, OptimumState& state_, const OptimumOptions& options_) -> OptimumResult
     {
         // Start timing the calculation
         Time begin = time();
 
-        // The result of the calculation
-        OptimumResult result;
+        // Update internal copies of problem, state, and options
+        problem = problem_;
+        state = state_;
+        options = options_;
+
+        // The result of the calculation (start clean)
+        result = {};
 
         // Finish the calculation if the problem has no variable
         if(problem.n == 0)
@@ -413,6 +434,9 @@ struct OptimumSolverIpNewton::Impl
         // Output a final header
         outputter.outputHeader();
 
+        // Set input optimum state to the just computed optimum state
+        state_ = state;
+
         // Finish timing the calculation
         result.time = elapsed(begin);
 
@@ -420,18 +444,57 @@ struct OptimumSolverIpNewton::Impl
     }
 
     /// Calculate the sensitivity of the optimal solution with respect to parameters.
-    auto dxdp(VectorConstRef dgdp, VectorConstRef dbdp) -> Matrix
+    auto sensitivities(MatrixConstRef dgdp, MatrixConstRef dbdp, Matrix& dxdp, Matrix& dydp, Matrix& dzdp) -> void
     {
-        // Initialize the right-hand side of the KKT equations
-        rhs.rx.noalias() = -dgdp;
-        rhs.ry.noalias() =  dbdp;
-        rhs.rz.fill(0.0);
+        // The number of variables, equality constraints, and parameters
+        const auto nx = problem.A.cols();
+        const auto nb = problem.A.rows();
+        const auto np = dgdp.cols();
 
-        // Solve the KKT equations to get the derivatives
-        kkt.solve(rhs, sol);
+        // Resize input/output matrices
+        dxdp.resize(nx, np);
+        dydp.resize(nb, np);
+        dzdp.resize(nx, np);
 
-        // Return the calculated sensitivity vector
-        return sol.dx;
+        // Auxiliary state references
+        auto& x = state.x;
+        auto& y = state.y;
+        auto& z = state.z;
+        auto& f = state.f;
+
+        // Auxiliary problem references
+        const auto& A = problem.A;
+
+        // The regularization parameters delta and gamma
+        auto gamma = options.regularization.gamma;
+        auto delta = options.regularization.delta;
+
+        // Set gamma and delta to mu in case they are zero
+        gamma = gamma ? gamma : options.ipnewton.mu;
+        delta = delta ? delta : options.ipnewton.mu;
+
+        // The KKT matrix
+        KktMatrix lhs(f.hessian, A, x, z, gamma, delta);
+
+        // Calculate sensitivity derivatives for each parameter
+        for(auto i = 0; i < np; ++i)
+        {
+            // Initialize the right-hand side of the KKT equations
+            rhs.rx.noalias() = -dgdp.col(i);
+            rhs.ry.noalias() =  dbdp.col(i);
+            rhs.rz.fill(0.0);
+
+            // Update the decomposition of the KKT matrix with update Hessian matrix
+            kkt.decompose(lhs);
+
+            // Solve the KKT equations to get the derivatives
+            kkt.solve(rhs, sol);
+
+            // Return the calculated sensitivity vector
+            dxdp.col(i) = sol.dx;
+            dydp.col(i) = sol.dy;
+            dzdp.col(i) = sol.dz;
+        }
     }
 };
 
@@ -462,9 +525,9 @@ auto OptimumSolverIpNewton::solve(const OptimumProblem& problem, OptimumState& s
     return pimpl->solve(problem, state, options);
 }
 
-auto OptimumSolverIpNewton::dxdp(VectorConstRef dgdp, VectorConstRef dbdp) -> Vector
+auto OptimumSolverIpNewton::sensitivities(MatrixConstRef dgdp, MatrixConstRef dbdp, Matrix& dxdp, Matrix& dydp, Matrix& dzdp) -> void
 {
-    return pimpl->dxdp(dgdp, dbdp);
+    return pimpl->sensitivities(dgdp, dbdp, dxdp, dydp, dzdp);
 }
 
 auto OptimumSolverIpNewton::clone() const -> OptimumSolverBase*

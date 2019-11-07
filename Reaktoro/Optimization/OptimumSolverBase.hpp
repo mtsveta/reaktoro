@@ -49,10 +49,13 @@ public:
     /// @param options The options for the optimisation calculation
     virtual auto solve(const OptimumProblem& problem, OptimumState& state, const OptimumOptions& options) -> OptimumResult = 0;
 
-    /// Return the sensitivity `dx/dp` of the solution `x` with respect to a vector of parameters `p`.
+    /// Return the sensitivities `dx/dp`, `dy/dp`, `dz/dp` of the solution `(x,y,z)` with respect to a vector of parameters `p`.
     /// @param dgdp The derivatives `dg/dp` of the objective gradient `grad(f)` with respect to the parameters `p`
     /// @param dbdp The derivatives `db/dp` of the vector `b` with respect to the parameters `p`
-    virtual auto dxdp(VectorConstRef dgdp, VectorConstRef dbdp) -> Vector = 0;
+    /// @param[out] dxdp The derivatives `dx/dp`
+    /// @param[out] dydp The derivatives `dy/dp`
+    /// @param[out] dzdp The derivatives `dz/dp`
+    virtual auto sensitivities(MatrixConstRef dgdp, MatrixConstRef dbdp, Matrix& dxdp, Matrix& dydp, Matrix& dzdp) -> void {}
 
     /// Return a clone of this instance.
     virtual auto clone() const -> OptimumSolverBase* = 0;
