@@ -18,28 +18,24 @@
 #pragma once
 
 // Reaktoro includes
-#include <Reaktoro/Equilibrium/EquilibriumOptions.hpp>
+#include <Reaktoro/Math/Matrix.hpp>
 
 namespace Reaktoro {
 
-/// The options for the smart equilibrium calculations.
-/// @see SmartEquilibriumSolver
-struct SmartEquilibriumOptions
+/// A type where the sensitivity derivatives of the computed optimum state is stored.
+struct OptimumSensitivity
 {
-    /// The equilibrium options to be used during learning operations.
-    EquilibriumOptions learning;
+    /// The sensitivity derivatives of the primal solution *x* with respect to parameters *p*.
+    Matrix dxdp;
 
-    /// The cutoff value for species mole fractions. Species with mole fractions below this value are ignored during the acceptance test.
-    double mole_fraction_cutoff = 1.0e-6;
+    /// The sensitivity derivatives of the dual solution *y* with respect to parameters *p*.
+    Matrix dydp;
 
-    /// The weighted residual tolerance used in the acceptance test.
-    double tol = 1.0e-1;
+    /// The sensitivity derivatives of the dual solution *z* with respect to parameters *p*.
+    Matrix dzdp;
 
-    /// The relative tolerance used in the acceptance test.
-    double reltol = 0.1;
-
-    /// The absolute tolerance used in the acceptance test.
-    double abstol = 1e-8;
+    /// The sensitivity derivatives of the dual solution *w* with respect to parameters *p*.
+    Matrix dwdp;
 };
 
 } // namespace Reaktoro

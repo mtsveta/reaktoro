@@ -81,16 +81,16 @@ struct EquilibriumSolver::Impl
     /// The molar amounts of the elements in the equilibrium partition
     Vector be;
 
-    /// The standard chemical potentials of the species
+    /// The standard chemical potentials of the species normalized by RT
     ThermoVector u0;
 
-    /// The chemical potentials of the species
+    /// The chemical potentials of the species normalized by RT
     ChemicalVector u;
 
-    /// The chemical potentials of the equilibrium species
+    /// The chemical potentials of the equilibrium species normalized by RT
     ChemicalVector ue;
 
-    /// The chemical potentials of the inert species
+    /// The chemical potentials of the inert species normalized by RT
     Vector ui;
 
     /// The mole fractions of the equilibrium species
@@ -453,10 +453,22 @@ struct EquilibriumSolver::Impl
         return zero || !options.warmstart;
     }
 
-    /// Solve the equilibrium problem, passing all elements that has on chemical system
-    auto solve_with_all_element_amounts(ChemicalState& state, double T, double P, VectorConstRef b) -> EquilibriumResult
+    /// Solve the equilibrium problem with given initial state
+    auto solve(ChemicalState& state) -> EquilibriumResult
     {
-        Vector be = b(iee);
+        const auto T = state.temperature();
+        const auto P = state.pressure();
+        be = state.elementAmountsInSpecies(ies)(iee);
+        return solve(state, T, P, be);
+    }
+
+    /// Solve the equilibrium problem with given problem definition
+    auto solve(ChemicalState& state, const EquilibriumProblem& problem) -> EquilibriumResult
+    {
+        setPartition(problem.partition());
+        const auto T = problem.temperature();
+        const auto P = problem.pressure();
+        be = problem.elementAmounts()(iee);
         return solve(state, T, P, be);
     }
 
@@ -531,60 +543,47 @@ struct EquilibriumSolver::Impl
     /// Return the sensitivity of the equilibrium state.
     auto sensitivity() -> const EquilibriumSensitivity&
     {
-        zerosEe = zeros(Ee);
-        zerosNe = zeros(Ne);
-        unitjEe = zeros(Ee);
+        auto& dndT = sensitivities.dndT;
+        auto& dydT = sensitivities.dydT;
+        auto& dzdT = sensitivities.dzdT;
+        auto& drdT = sensitivities.drdT;
+        auto& dndP = sensitivities.dndP;
+        auto& dydP = sensitivities.dydP;
+        auto& dzdP = sensitivities.dzdP;
+        auto& drdP = sensitivities.drdP;
+        auto& dndb = sensitivities.dndb;
+        auto& dydb = sensitivities.dydb;
+        auto& dzdb = sensitivities.dzdb;
+        auto& drdb = sensitivities.drdb;
 
-        sensitivities.dndT = zeros(Ne);
-        sensitivities.dndP = zeros(Ne);
-        sensitivities.dndb = zeros(Ne, Ee);
+        dndT = zeros(Ne);
+        dndP = zeros(Ne);
+        dndb = zeros(Ne, Ee);
 
-        sensitivities.dndT = solver.dxdp(ue.ddT, zerosEe);
-        sensitivities.dndP = solver.dxdp(ue.ddP, zerosEe);
-        for(Index j = 0; j < Ee; ++j)
-        {
-            unitjEe = unit(Ee, j);
-            sensitivities.dndb.col(j) = solver.dxdp(zerosNe, unitjEe);
-        }
+        dydT = zeros(Ee);
+        dydP = zeros(Ee);
+        dydb = zeros(Ee, Ee);
+
+        dzdT = zeros(Ne);
+        dzdP = zeros(Ne);
+        dzdb = zeros(Ne, Ee);
+
+        const auto& dgdT = ue.ddT;
+        const auto& dgdP = ue.ddP;
+        const auto& dgdb = zeros(Ne, Ee);
+        const auto& dbdT = zeros(Ee);
+        const auto& dbdP = zeros(Ee);
+        const auto& dbdb = identity(Ee, Ee);
+
+        solver.sensitivities(dgdT, dbdT, dndT, dydT, dzdT);
+        solver.sensitivities(dgdP, dbdP, dndP, dydP, dzdP);
+        solver.sensitivities(dgdb, dbdb, dndb, dydb, dzdb);
+
+        drdT = ue.ddT + ue.ddn * dndT - tr(Ae)*dydT - dzdT;
+        drdP = ue.ddP + ue.ddn * dndP - tr(Ae)*dydP - dzdP;
+        drdb = ue.ddn * dndb - tr(Ae)*dydb - dzdb;
 
         return sensitivities;
-    }
-
-    /// Compute the sensitivity of the species amounts with respect to temperature.
-    auto dndT() -> VectorConstRef
-    {
-        const auto& ieq_species = partition.indicesEquilibriumSpecies();
-        zerosEe = zeros(Ee);
-        sensitivities.dndT = zeros(N);
-        sensitivities.dndT(ieq_species) = solver.dxdp(ue.ddT, zerosEe);
-        return sensitivities.dndT;
-    }
-
-    /// Compute the sensitivity of the species amounts with respect to pressure.
-    auto dndP() -> VectorConstRef
-    {
-        const auto& ieq_species = partition.indicesEquilibriumSpecies();
-        zerosEe = zeros(Ee);
-        sensitivities.dndP = zeros(N);
-        sensitivities.dndP(ieq_species) = solver.dxdp(ue.ddP, zerosEe);
-        return sensitivities.dndP;
-    }
-
-    /// Compute the sensitivity of the species amounts with respect to element amounts.
-    auto dndb() -> VectorConstRef
-    {
-        const auto& ieq_species = partition.indicesEquilibriumSpecies();
-        const auto& ieq_elements = partition.indicesEquilibriumElements();
-        zerosEe = zeros(Ee);
-        zerosNe = zeros(Ne);
-        unitjEe = zeros(Ee);
-        sensitivities.dndb = zeros(Ne, Ee);
-        for(Index j : ieq_elements)
-        {
-            unitjEe = unit(Ee, j);
-            sensitivities.dndb.col(j)(ieq_species) = solver.dxdp(zerosNe, unitjEe);
-        }
-        return sensitivities.dndb;
     }
 };
 
@@ -639,6 +638,16 @@ auto EquilibriumSolver::approximate(ChemicalState& state) -> EquilibriumResult
     return pimpl->approximate_with_all_element_amounts(state, state.temperature(), state.pressure(), state.elementAmounts());
 }
 
+auto EquilibriumSolver::solve(ChemicalState& state) -> EquilibriumResult
+{
+    return pimpl->solve(state);
+}
+
+auto EquilibriumSolver::solve(ChemicalState& state, const EquilibriumProblem& problem) -> EquilibriumResult
+{
+    return pimpl->solve(state, problem);
+}
+
 auto EquilibriumSolver::solve(ChemicalState& state, double T, double P, VectorConstRef be) -> EquilibriumResult
 {
     return pimpl->solve(state, T, P, be);
@@ -649,17 +658,6 @@ auto EquilibriumSolver::solve(ChemicalState& state, double T, double P, const do
     return pimpl->solve(state, T, P, be);
 }
 
-auto EquilibriumSolver::solve(ChemicalState& state) -> EquilibriumResult
-{
-    return pimpl->solve_with_all_element_amounts(state, state.temperature(), state.pressure(), state.elementAmounts());
-}
-
-auto EquilibriumSolver::solve(ChemicalState& state, const EquilibriumProblem& problem) -> EquilibriumResult
-{
-    setPartition(problem.partition());
-    return pimpl->solve_with_all_element_amounts(state, problem.temperature(), problem.pressure(), problem.elementAmounts());
-}
-
 auto EquilibriumSolver::properties() const -> const ChemicalProperties&
 {
     return pimpl->properties;
@@ -668,21 +666,6 @@ auto EquilibriumSolver::properties() const -> const ChemicalProperties&
 auto EquilibriumSolver::sensitivity() -> const EquilibriumSensitivity&
 {
     return pimpl->sensitivity();
-}
-
-auto EquilibriumSolver::dndT() -> VectorConstRef
-{
-    return pimpl->dndT();
-}
-
-auto EquilibriumSolver::dndP() -> VectorConstRef
-{
-    return pimpl->dndP();
-}
-
-auto EquilibriumSolver::dndb() -> VectorConstRef
-{
-    return pimpl->dndb();
 }
 
 auto EquilibriumSolver::result() const -> const EquilibriumResult&
