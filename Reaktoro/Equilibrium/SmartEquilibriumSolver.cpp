@@ -150,7 +150,7 @@ struct SmartEquilibriumSolver::Impl
 
         // Store the computed solution into the knowledge tree
         timeit( tree.push_back({be, state, properties, solver.sensitivity()}),
-            result.timing.learning_storage= );
+            result.timing.learn_storage= );
     }
 
     /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
