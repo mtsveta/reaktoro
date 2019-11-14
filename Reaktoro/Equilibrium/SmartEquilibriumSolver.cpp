@@ -383,6 +383,7 @@ struct SmartEquilibriumSolver::Impl
 
         if(is_error_acceptable == false)
         {
+            /*
             std::cout << std::scientific;
             // std::cout << "-----------------------------" << std::endl;
             // std::cout << "*** Failed Smart Estimate ***" << std::endl;
@@ -400,6 +401,7 @@ struct SmartEquilibriumSolver::Impl
             // std::cout << std::left << std::setw(25) << "r[i] * x[i]";
             // std::cout << std::left << std::setw(25) << "(r[i] * n[i])/nsum";
             std::cout << std::endl;
+
             for(auto i = 0; i < r.size(); ++i)
             {
                 if(r[i] == 0.0) continue;
@@ -417,6 +419,7 @@ struct SmartEquilibriumSolver::Impl
                 if(i == ispecies) std::cout << "***************" << std::endl;
             }
             std::cout << "=============================" << std::endl;
+            */
         }
 
         toc(1, result.timing.estimate_mat_vec_mul);
