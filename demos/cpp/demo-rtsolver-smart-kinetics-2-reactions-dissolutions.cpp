@@ -210,7 +210,7 @@ int main()
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 3000; // the number of steps in the reactive transport simulation
+    params.nsteps = 10000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -222,7 +222,7 @@ int main()
 
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_abstol = 1e-8;
+    params.smart_equilibrium_abstol = 1e-13;
     params.smart_equilibrium_cutoff = -1e-5;
 
     // Define parameters of the kinetics solvers
@@ -238,7 +238,7 @@ int main()
     /// **************************************************************************************************************///
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     /// **************************************************************************************************************///
-    ///*
+    /*
     params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conv_kin_conv_eq_total = results.kinetic_timing.solve;
@@ -254,7 +254,7 @@ int main()
     std::cout << "     - equilibration            : " << results.kinetic_timing.integrate_equilibration << " (" << results.kinetic_timing.integrate_equilibration / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "   - equilibrate           : " << results.kinetic_timing.equilibrate << " (" << results.kinetic_timing.equilibrate / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
-    //*/
+    */
 
 
     /*
@@ -302,7 +302,7 @@ int main()
     // **************************************************************************************************************///
     // SMART kinetics & CONVENTIONAL equilibrium
     // **************************************************************************************************************///
-    ///*
+    /*
     // Execute reactive transport with different solvers
     params.use_smart_kinetics_solver = true; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
@@ -338,7 +338,7 @@ int main()
     std::cout << " - solve - search - store         : " << results.smart_kin_conv_eq_total_ideal_search_store << std::endl;
     std::cout << " - solve - search - store - prop. : " << results.smart_kin_conv_eq_total_ideal_search_store_properties << std::endl;
     //getchar();
-    //*/
+    */
 
     // **************************************************************************************************************///
     // SMART kinetics & SMART equilibrium
@@ -487,13 +487,12 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     editor.addMineralPhase("Dolomite");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Quartz");
-    editor.addMineralPhase("Magnesite");
     editor.addMineralPhase("Halite");
 
     MineralReaction reaction = editor.addMineralReaction("Calcite");
     reaction.setEquation("Calcite = Ca++ + CO3--");
-    reaction.addMechanism("logk = -5.81 mol/(m2*s); Ea = 23.5 kJ/mol");
-    reaction.addMechanism("logk = -0.30 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0");
+    reaction.addMechanism("logk = -5.81 mol/(m2*s); Ea = 23.5 kJ/mol"); // neutral
+    reaction.addMechanism("logk = -0.30 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0"); // acidic
     reaction.setSpecificSurfaceArea(5000, "cm2/g");
 
     editor.addMineralReaction("Dolomite")
@@ -703,8 +702,8 @@ auto makeResultsFolder(const Params& params) -> std::string
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
     std::string folder =
             (params.use_smart_kinetics_solver || params.use_smart_equilibrium_solver) ?
-            "../rt-sa-5000-2-reacts-diss" + smart_test_tag :
-            "../rt-sa-5000-2-reacts-diss" + test_tag;
+            "../plotting-results/rt-sa-5000-2-reacts-diss" + smart_test_tag :
+            "../plotting-results/rt-sa-5000-2-reacts-diss" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "*********************************************************************" << std::endl;
