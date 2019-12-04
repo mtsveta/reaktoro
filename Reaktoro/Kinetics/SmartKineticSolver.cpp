@@ -817,29 +817,19 @@ struct SmartKineticSolver::Impl
         getchar();
         */
         // If tree is of a certain size, do the cleanup
-        if (tree.size() == 100){
+        //*
+        if (tree.size() == 400){
             auto it = tree.begin();
             auto counter = 0;
-            for (auto node : tree) {
-                if (!node.usage_count) {
+            for (auto it = tree.begin(); it!=tree.end();) {
+                if (!it->usage_count) {
                     it = tree.erase(it); // return the iterator pointing on the elemnt after the removed one
                 }
                 else
                     it++; // increase the iterator
             }
         }
-        // Print the tree
-        if (tree.size() == 99 or tree.size() == 100 or tree.size() == 101 or t / dt = 49) {
-            std::cout << "\nTree with reference elements for smart kinetics of the size " << tree.size() << std::endl;
-            unsigned int i = 0;
-            for (auto node : tree) {
-                std::cout << "node " << i << " used " << node.usage_count
-                          << std::endl;
-                i += 1;
-            }
-            getchar();
-        }
-
+        //*/
     }
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
@@ -984,11 +974,24 @@ struct SmartKineticSolver::Impl
 
         return 0;
     }
-    /*
-    auto showTree(const Index& step) -> void{
+
+    auto printTree(const Index& step) -> void{
         //if(options.learning.use_smart_equilibrium_solver) smart_equilibrium->showTree(step);
+        // Print the tree
+        if (step == 99) {
+            std::cout << "\nTree with reference elements for smart kinetics of the size " << tree.size() << std::endl;
+            unsigned int i = 0;
+            unsigned int count_nonzero = 0;
+            for (auto node : tree) {
+                std::cout << "node " << i << " used " << node.usage_count << std::endl;
+                i += 1;
+                if (node.usage_count) count_nonzero++;
+            }
+            std::cout << "Number of non-zero entries is " << count_nonzero << " out of " << tree.size() << std::endl;
+            //getchar();
+        }
     }
-    */
+
 };
 
 SmartKineticSolver::SmartKineticSolver()
@@ -1065,6 +1068,10 @@ auto SmartKineticSolver::properties() const -> const ChemicalProperties&
 auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
 {
     pimpl->solve(state, t, dt, b);
+}
+
+auto SmartKineticSolver::printTree(const Index& step) -> void{
+    pimpl->printTree(step);
 }
 
 } // namespace Reaktoro

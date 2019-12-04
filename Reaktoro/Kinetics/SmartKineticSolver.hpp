@@ -119,6 +119,9 @@ public:
     // Return properties of the chemical state provided by the KineticSolver
     auto properties() const -> const ChemicalProperties&;
 
+    // Output tree with reference element to the console
+    auto printTree(const Index& step) -> void;
+
 private:
     struct Impl;
 
