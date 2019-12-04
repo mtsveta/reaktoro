@@ -816,15 +816,30 @@ struct SmartKineticSolver::Impl
         std::cout << "smart kinetics accepted   ? " << result.estimate.accepted << ", index of ref elem in kinetics " << result.estimate.reference_state_index << std::endl; // << " out of " << tree.size() <<
         getchar();
         */
-        /*
-        std::cout << "\nTree kinetics: " << std::endl;
-        unsigned int i = 0;
-        for(auto node : tree){
-             std::cout << "node " << i << " used " <<  node.usage_count <<  std::endl;
-             i += 1;
+        // If tree is of a certain size, do the cleanup
+        if (tree.size() == 100){
+            auto it = tree.begin();
+            auto counter = 0;
+            for (auto node : tree) {
+                if (!node.usage_count) {
+                    it = tree.erase(it); // return the iterator pointing on the elemnt after the removed one
+                }
+                else
+                    it++; // increase the iterator
+            }
         }
-        getchar();
-        */
+        // Print the tree
+        if (tree.size() == 99 or tree.size() == 100 or tree.size() == 101 or t / dt = 49) {
+            std::cout << "\nTree with reference elements for smart kinetics of the size " << tree.size() << std::endl;
+            unsigned int i = 0;
+            for (auto node : tree) {
+                std::cout << "node " << i << " used " << node.usage_count
+                          << std::endl;
+                i += 1;
+            }
+            getchar();
+        }
+
     }
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
