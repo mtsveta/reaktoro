@@ -698,8 +698,8 @@ struct SmartKineticSolver::Impl
 
         }
 
-        //if(!equilibrium_variation_check || !equilibrium_neg_amount_check || !kinetics_r_variation_check)
-        if(!equilibrium_variation_check || !kinetics_r_variation_check)
+        if(!equilibrium_variation_check || !equilibrium_neg_amount_check || !kinetics_r_variation_check)
+        //if(!equilibrium_variation_check || !kinetics_r_variation_check)
         {
             /*
             if(step>=1000) {
@@ -732,8 +732,8 @@ struct SmartKineticSolver::Impl
         result.estimate.reference_state_index = std::distance(tree.begin(), it);
 
         // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
-        for(unsigned int i = 0; i < benk_new.size(); ++i)
-            if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
+        //for(unsigned int i = 0; i < benk_new.size(); ++i) if(benk_new[i] >= kinetics_cutoff && benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
+        for(unsigned int i = 0; i < benk_new.size(); ++i) if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
 
         // Update the solution of kinetic problem by new estimated value
         benk = benk_new;

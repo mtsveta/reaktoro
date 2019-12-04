@@ -222,7 +222,7 @@ int main()
 
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_abstol = 1e-13;
+    params.smart_equilibrium_abstol = 1e-6;
     params.smart_equilibrium_cutoff = -1e-5;
 
     // Define parameters of the kinetics solvers
@@ -302,7 +302,7 @@ int main()
     // **************************************************************************************************************///
     // SMART kinetics & CONVENTIONAL equilibrium
     // **************************************************************************************************************///
-    /*
+    ///*
     // Execute reactive transport with different solvers
     params.use_smart_kinetics_solver = true; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
@@ -331,14 +331,14 @@ int main()
     std::cout << "   - equilibrate           : " << results.smart_kinetic_timing.equilibrate << " (" << results.smart_kinetic_timing.equilibrate / results.smart_kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
-    std::cout << " acceptance rate      : " << results.smart_kin_conv_eq_acceptance_rate << std::endl;
+    std::cout << " acceptance rate      : " << results.smart_kin_conv_eq_acceptance_rate << " / " << (1 - results.smart_kin_conv_eq_acceptance_rate) * params.ncells *params.nsteps << " smartly estimated kinetics states out of " << params.ncells *params.nsteps  << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
     std::cout << " - solve - search                 : " << results.smart_kin_conv_eq_total_ideal_search << std::endl;
     std::cout << " - solve - search - store         : " << results.smart_kin_conv_eq_total_ideal_search_store << std::endl;
     std::cout << " - solve - search - store - prop. : " << results.smart_kin_conv_eq_total_ideal_search_store_properties << std::endl;
     //getchar();
-    */
+    //*/
 
     // **************************************************************************************************************///
     // SMART kinetics & SMART equilibrium
@@ -380,8 +380,10 @@ int main()
     std::cout << "     - estimation            : " << results.smart_equilibrium_timing.estimate << " (" << results.smart_equilibrium_timing.estimate / results.smart_kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "       - search                   : " << results.smart_equilibrium_timing.estimate_search << " (" << results.smart_equilibrium_timing.estimate_search / results.smart_kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
-    std::cout << " smart equilibrium acceptance rate   : " << results.smart_kin_smart_eq_equilibrium_acceptance_rate << std::endl;
-    std::cout << " smart kinetics acceptance rate      : " << results.smart_kin_smart_eq_acceptance_rate << std::endl;
+    std::cout << " smart kinetics acceptance rate      : " << results.smart_kin_smart_eq_acceptance_rate << " / "
+              << (1 - results.smart_kin_smart_eq_acceptance_rate) * params.ncells *params.nsteps << " smartly estimated kinetics states out of " << params.ncells *params.nsteps  << std::endl;
+    std::cout << " smart equilibrium acceptance rate   : " << results.smart_kin_smart_eq_equilibrium_acceptance_rate << " / "
+              << (1 - results.smart_kin_smart_eq_equilibrium_acceptance_rate) * params.ncells *params.nsteps << " smartly estimated equilibrium states out of " << params.ncells *params.nsteps  << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
     std::cout << " - solve - search                 : " << results.smart_kin_smart_eq_total_ideal_search << std::endl;
     std::cout << " - solve - search - store         : " << results.smart_kin_smart_eq_total_ideal_search_store << std::endl;
@@ -546,9 +548,9 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 
     // Step **: Scale the volumes of the phases in the initial condition
     state_ic.scalePhaseVolume("Aqueous", 0.1, "m3");    // 10% if the 1.0m3
-    state_ic.scalePhaseVolume("Quartz", 0.81, "m3");   // 0.81 = 0.90 * 0.9 (0.9 is 90% of 1.0m3, 0.98 is 98% quartz of the rock)
-    state_ic.scalePhaseVolume("Calcite", 0.054, "m3");  // 0.054 = 0.06 * 0.9 (0.9 is 90% of 1.0m3, 0.02 is 2% calcite of the rock)
-    state_ic.scalePhaseVolume("Dolomite", 0.036, "m3");  // 0.036 = 0.04 * 0.9 (0.9 is 90% of 1.0m3, 0.02 is 2% calcite of the rock)
+    state_ic.scalePhaseVolume("Quartz", 0.81, "m3");   // 0.81 = 0.90 * 0.9 (0.9 of rock is due to 10% porosity, 0.90 is 90% quartz of the rock)
+    state_ic.scalePhaseVolume("Calcite", 0.054, "m3");  // 0.054 = 0.06 * 0.9 (0.9 of rock due to 10% porosity, 0.06 is 6% calcite of the rock)
+    state_ic.scalePhaseVolume("Dolomite", 0.036, "m3");  // 0.036 = 0.04 * 0.9 (0.9 of rock due to 10% porosity, 0.04 is 4% calcite of the rock)
 
     // Step **: Create the mesh for the column
     Mesh mesh(params.ncells, params.xl, params.xr);
@@ -702,8 +704,8 @@ auto makeResultsFolder(const Params& params) -> std::string
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
     std::string folder =
             (params.use_smart_kinetics_solver || params.use_smart_equilibrium_solver) ?
-            "../plotting-results/rt-sa-5000-2-reacts-diss" + smart_test_tag :
-            "../plotting-results/rt-sa-5000-2-reacts-diss" + test_tag;
+            "../plotting-results/rt-sa-5000-2-reacts-diss-withcutoff" + smart_test_tag :
+            "../plotting-results/rt-sa-5000-2-reacts-diss-withcutoff" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "*********************************************************************" << std::endl;
