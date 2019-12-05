@@ -134,7 +134,7 @@ int main()
     // Define parameters of the equilibrium solvers
     params.smart_equlibrium_reltol = 1e-1;
     params.smart_equlibrium_abstol = 1e-8;
-    params.tol = 1e-1;
+    params.tol = 6e-1;
     params.track_statistics = true;
 
     // Output
@@ -164,7 +164,7 @@ int main()
               << results.conventional_total / results.smart_total_ideal_search_store << std::endl << std::endl;
     std::cout << " smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " / "
               << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells *params.nsteps
-              << " smartly estimated equilibrium states out of " << params.ncells * params.nsteps  << std::endl;
+              << " fully evaluated GEMS out of " << params.ncells * params.nsteps  << std::endl;
 
     std::cout << "time_reactive_transport_conventional: " << results.time_reactive_transport_conventional << std::endl;
     std::cout << "time_reactive_transport_smart       : " << results.time_reactive_transport_smart << std::endl;
@@ -342,11 +342,18 @@ auto makeResultsFolder(const Params& params) -> std::string
     tol_stream << std::scientific << std::setprecision(1) << params.tol;
 
     std::string test_tag = "-dt-" + dt_stream.str() +
+                                 "-ncells-" + std::to_string(params.ncells) +
+                                 "-nsteps-" + std::to_string(params.nsteps) + "-reference";
+
+    std::string smart_test_tag = "-dt-" + dt_stream.str() +
                            "-ncells-" + std::to_string(params.ncells) +
                            "-nsteps-" + std::to_string(params.nsteps) +
-                           "-tol-" + tol_stream.str() +
-                           (params.use_smart_eqilibirum_solver == true ? "-smart" : "-reference");      // name of the folder with results
-    std::string folder = "results-pitzer" + test_tag;
+                           "-tol-" + tol_stream.str() + "-smart";      // name of the folder with results
+    std::string folder = "results-pitzer-geometric-nnsearch";
+    folder = (params.use_smart_eqilibirum_solver) ?
+              folder + smart_test_tag :
+              folder + test_tag;
+    //std::string folder = "results-pitzer-" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder.c_str());
 
     std::cout << "\nsolver                         : " << (params.use_smart_eqilibirum_solver == true ? "smart" : "conventional") << std::endl;

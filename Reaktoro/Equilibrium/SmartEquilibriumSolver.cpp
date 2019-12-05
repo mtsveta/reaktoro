@@ -175,6 +175,7 @@ struct SmartEquilibriumSolver::Impl
         tic(0);
 
         // Comparison function based on the Euclidean distance
+        /*
         auto distancefn = [&](const TreeNode& a, const TreeNode& b)
         {
             Vector be_a = a.be/sum(a.be);
@@ -183,16 +184,17 @@ struct SmartEquilibriumSolver::Impl
 
             return (be_a - be_x).squaredNorm() < (be_b - be_x).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
         };
-
-        // // Comparison function based on the Euclidean distance
-        // auto distancefn = [&](const TreeNode& a, const TreeNode& b)
-        // {
-        //     const auto& be_a = a.be;
-        //     const auto& be_b = b.be;
-        //     return (be_a - be).squaredNorm() < (be_b - be).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
-        // };
+        */
 
         // Comparison function based on the Euclidean distance
+        auto distancefn = [&](const TreeNode& a, const TreeNode& b)
+        {
+             const auto& be_a = a.be;
+             const auto& be_b = b.be;
+             return (be_a - be).squaredNorm() < (be_b - be).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
+        };
+
+        // Comparison function based on the residual comparison
         // auto distancefn = [&](const TreeNode& a, const TreeNode& b)
         // {
         //     const auto RT = universalGasConstant*a.state.temperature();
@@ -304,6 +306,12 @@ struct SmartEquilibriumSolver::Impl
         z.noalias() = z0;
         // y.noalias() = y0 + dy * RT; // TODO: Investigate further if derivatives of y and z wrt (T,P,b) can be made more accurately
         // z.noalias() = z0 + dz * RT; // TODO: Investigate further if derivatives of y and z wrt (T,P,b) can be made more accurately
+
+        // Negative cutoff control
+        bool neg_amount_check = n.minCoeff() > -1e-5;
+        // If cutoff test didn't pass, estimation has failded
+        if(neg_amount_check == false)
+            return;
 
         // Correct negative mole numbers
         for(auto i = 0; i < n.size(); ++i)
@@ -429,6 +437,7 @@ struct SmartEquilibriumSolver::Impl
         //----------------------------------------------
         tic(2);
 
+        // Update three propterties of the chemical state (for better initial guess of the GEM problem)
         state.setSpeciesAmounts(n);
         state.setElementDualPotentials(y);
         state.setSpeciesDualPotentials(z);
