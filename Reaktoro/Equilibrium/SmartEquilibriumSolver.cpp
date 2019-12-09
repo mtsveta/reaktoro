@@ -150,7 +150,7 @@ struct SmartEquilibriumSolver::Impl
 
         // Store the computed solution into the knowledge tree
         timeit( tree.push_back({be, state, properties, solver.sensitivity()}),
-            result.timing.learning_storage= );
+            result.timing.learn_storage= );
     }
 
     /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
@@ -175,6 +175,7 @@ struct SmartEquilibriumSolver::Impl
         tic(0);
 
         // Comparison function based on the Euclidean distance
+        /*
         auto distancefn = [&](const TreeNode& a, const TreeNode& b)
         {
             Vector be_a = a.be/sum(a.be);
@@ -183,16 +184,17 @@ struct SmartEquilibriumSolver::Impl
 
             return (be_a - be_x).squaredNorm() < (be_b - be_x).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
         };
-
-        // // Comparison function based on the Euclidean distance
-        // auto distancefn = [&](const TreeNode& a, const TreeNode& b)
-        // {
-        //     const auto& be_a = a.be;
-        //     const auto& be_b = b.be;
-        //     return (be_a - be).squaredNorm() < (be_b - be).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
-        // };
+        */
 
         // Comparison function based on the Euclidean distance
+        auto distancefn = [&](const TreeNode& a, const TreeNode& b)
+        {
+             const auto& be_a = a.be;
+             const auto& be_b = b.be;
+             return (be_a - be).squaredNorm() < (be_b - be).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
+        };
+
+        // Comparison function based on the residual comparison
         // auto distancefn = [&](const TreeNode& a, const TreeNode& b)
         // {
         //     const auto RT = universalGasConstant*a.state.temperature();
@@ -305,6 +307,12 @@ struct SmartEquilibriumSolver::Impl
         // y.noalias() = y0 + dy * RT; // TODO: Investigate further if derivatives of y and z wrt (T,P,b) can be made more accurately
         // z.noalias() = z0 + dz * RT; // TODO: Investigate further if derivatives of y and z wrt (T,P,b) can be made more accurately
 
+        // Negative cutoff control
+        bool neg_amount_check = n.minCoeff() > -1e-5;
+        // If cutoff test didn't pass, estimation has failded
+        if(neg_amount_check == false)
+            return;
+
         // Correct negative mole numbers
         for(auto i = 0; i < n.size(); ++i)
             if(n[i] <= 0.0)
@@ -383,6 +391,7 @@ struct SmartEquilibriumSolver::Impl
 
         if(is_error_acceptable == false)
         {
+            /*
             std::cout << std::scientific;
             // std::cout << "-----------------------------" << std::endl;
             // std::cout << "*** Failed Smart Estimate ***" << std::endl;
@@ -400,6 +409,7 @@ struct SmartEquilibriumSolver::Impl
             // std::cout << std::left << std::setw(25) << "r[i] * x[i]";
             // std::cout << std::left << std::setw(25) << "(r[i] * n[i])/nsum";
             std::cout << std::endl;
+
             for(auto i = 0; i < r.size(); ++i)
             {
                 if(r[i] == 0.0) continue;
@@ -417,6 +427,7 @@ struct SmartEquilibriumSolver::Impl
                 if(i == ispecies) std::cout << "***************" << std::endl;
             }
             std::cout << "=============================" << std::endl;
+            */
         }
 
         toc(1, result.timing.estimate_mat_vec_mul);
@@ -426,6 +437,7 @@ struct SmartEquilibriumSolver::Impl
         //----------------------------------------------
         tic(2);
 
+        // Update three propterties of the chemical state (for better initial guess of the GEM problem)
         state.setSpeciesAmounts(n);
         state.setElementDualPotentials(y);
         state.setSpeciesDualPotentials(z);
