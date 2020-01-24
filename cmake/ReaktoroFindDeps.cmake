@@ -12,3 +12,10 @@ if(REAKTORO_BUILD_PYTHON)
     endif()
 
 endif()
+
+find_package(ThermoFun REQUIRED)
+if(NOT ThermoFun_FOUND)
+    message(WARNING "Could not find ThermoFun - the Python module `reaktoro` will not be built.")
+else()
+    message(STATUS "Found ThermoFun v${ThermoFun_VERSION}")
+endif()
