@@ -59,12 +59,6 @@ if(NOT CMAKE_BUILD_TYPE)
     set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS Debug Release MinSizeRel RelWithDebInfo)
 endif()
 
-# Set libraries to be compiled with position independent code mode (i.e., fPIC option in GNU compilers)
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 # Set the list of compiler flags for MSVC compiler
 if(${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC)
     add_compile_options(
@@ -97,6 +91,8 @@ add_subdirectory(Reaktoro)
 # Build the Python extension module PyReaktoro and the Python packages reaktoro
 if(REAKTORO_BUILD_PYTHON)
     add_subdirectory(python)
+else()
+    add_subdirectory(python EXCLUDE_FROM_ALL)
 endif()
 
 # Build the Python package ireaktoro, the Reaktoro interpreter
@@ -127,6 +123,11 @@ endif()
 
 # Build the utilities
 add_subdirectory(utilities EXCLUDE_FROM_ALL)
+
+# Add target "python" for manual building of python wrappers, as `make python`, if REAKTORO_BUILD_PYTHON is OFF
+add_custom_target(python
+    COMMAND ${CMAKE_MAKE_PROGRAM}
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/python")
 
 # Add target "interpreter" for manual building of interpreter, as `make interpreter`, if REAKTORO_BUILD_INTERPRETER is OFF
 add_custom_target(interpreter

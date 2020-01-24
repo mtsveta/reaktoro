@@ -274,6 +274,13 @@ by filling a new issue here:
 .. centered::
     `Reaktoro's GitHub Issues`_
 
+You'll need a GitHub account - but this is easy to sort out if you don't have
+one yet!
+
+
+.. _ChemicalEditor: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalEditor.html
+.. _ChemicalPlot: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalPlot.html
+.. _ChemicalQuantity: https://www.reaktoro.org/cpp/classReaktoro_1_1ChemicalQuantity.html
 .. _ChemicalState: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalState.html
 .. _ChemicalSystem: https://reaktoro.org/cpp/classReaktoro_1_1ChemicalSystem.html
 .. _EquilibriumProblem: https://reaktoro.org/cpp/classReaktoro_1_1EquilibriumProblem.html
