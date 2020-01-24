@@ -1,6 +1,9 @@
 # Find Boost library
 find_package(Boost REQUIRED)
 
+# Fidn json library
+find_package(nlohmann_json 3.6.1 REQUIRED)
+
 # Find ThermoFun library and define a pre-processor macro REAKTORO_USING_THERMOFUN if so
 find_package(ThermoFun REQUIRED)
 
