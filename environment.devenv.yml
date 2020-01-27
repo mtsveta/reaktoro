@@ -20,12 +20,7 @@ dependencies:
   # Python dependendies
   - numpy
   - pandas
-  - pip
-  - pip:
-    - sphinx==1.8.5
-    - sphinx-autobuild
-    - sphinx_rtd_theme
-    - sphinxcontrib-images
+  - nlohmann_json
   - pytest
   - pytest-cpp
   - pytest-datadir
@@ -44,6 +39,13 @@ dependencies:
   - ccache                         # [unix]
   - clcache                        # [win]
   - invoke
+  - pip
+  - pip:
+    - sphinx==1.8.5
+    - sphinx-autobuild
+    - sphinx_rtd_theme
+    - sphinxcontrib-images
+
 
 environment:
 
