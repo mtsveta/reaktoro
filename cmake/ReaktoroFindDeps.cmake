@@ -6,6 +6,7 @@ find_package(nlohmann_json 3.6.1 REQUIRED)
 
 # Find ThermoFun library and define a pre-processor macro REAKTORO_USING_THERMOFUN if so
 find_package(ThermoFun REQUIRED)
+message(STATUS "Found ThermoFun v${ThermoFun_VERSION}: ${ThermoFun_INCLUDE_DIRS}")
 
 if(ThermoFun_FOUND)
     add_compile_definitions(REAKTORO_USING_THERMOFUN)
