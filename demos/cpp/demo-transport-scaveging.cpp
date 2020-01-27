@@ -141,7 +141,7 @@ int main()
      output.add("phaseAmount(Pyrrhotite)");
      output.add("phaseAmount(Siderite)");
  
-     rt.initialize(field);
+     rt.initialize();
  
      auto t = 0.0;
      auto step = 0.0;
