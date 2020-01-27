@@ -134,7 +134,7 @@ int main()
     // Define parameters of the equilibrium solvers
     params.smart_equlibrium_reltol = 1e-1;
     params.smart_equlibrium_abstol = 1e-8;
-    params.tol = 6e-1;
+    params.tol = 8e-1;
     params.track_statistics = true;
 
     // Output

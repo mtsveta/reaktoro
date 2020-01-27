@@ -37,8 +37,8 @@ def load_data():
     minerals = [] # code 'O'
     for item in zip(species, species_codes):
         if item[1] == 'S' or item[1] == 'T' or item[1] == 'W': aqueous_species.append(item[0])
-        if item[1] == 'G' or item[1] == 'M' or item[1] == 'I': gaseous_species.append(item[0])
-        if item[1] == 'O': minerals.append(item[0])
+        if item[1] == 'G': gaseous_species.append(item[0])
+        if item[1] == 'M' or item[1] == 'I' or item[1] == 'J' or item[1] == 'O': minerals.append(item[0])
 
     return aqueous_species, gaseous_species, minerals
 
@@ -55,18 +55,27 @@ print(databases)
 aqueous_species, gaseous_species, minerals = load_data()
 print("Aqueous species: \n ", aqueous_species)
 print("Gaseous species: \n ", gaseous_species)
-print("Minerals species: \n ",minerals)
+print("Minerals species: \n ", minerals)
 
-editor = ChemicalEditor(databases[3])
-editor.setTemperatures(T, "kelvin")
-editor.setPressures(P, "pascal")
-editor.addAqueousPhase(aqueous_species)
+print(database_files[1])
+editor = ChemicalEditor(databases[1])
+editor.setTemperatures([T], "kelvin")
+editor.setPressures([P], "pascal")
+
+
+#editor.addAqueousPhase(aqueous_species)
+# 'AlHSiO3+2', 'Fe2(OH)2+4', 'Fe3(OH)4+5', `FeHSiO3+2`, 'MgSiO3@', 'S-2',
+editor.addAqueousPhase(['Al(SO4)+', 'Al(SO4)2-', 'Al+3', 'AlO+', 'AlO2-', 'AlO2H@', 'AlOH+2', 'AlSiO5-3', 'Ca(CO3)@', 'Ca(HCO3)+', 'Ca(SO4)@', 'Ca+2', 'CaOH+', 'Ca(HSiO3)+', 'CaSiO3@', 'Fe(CO3)@', 'Fe(HCO3)+', 'Fe(HSO4)+', 'Fe(SO4)@', 'Fe+2', 'FeCl+', 'FeOH+', 'Fe(HSO4)+2', 'Fe(SO4)+', 'Fe(SO4)2-', 'Fe+3', 'FeCl+2', 'FeCl2+', 'FeCl3@', 'FeO+', 'FeO2-', 'FeO2H@', 'FeOH+2', 'K(SO4)-', 'K+', 'KOH@', 'Mg(CO3)@', 'Mg(HCO3)+', 'Mg+2', 'MgOH+', 'MgSO4@', 'Mg(HSiO3)+', 'Na(CO3)-', 'Na(HCO3)@', 'Na(SO4)-', 'Na+', 'NaOH@', 'HSiO3-', 'Si4O10-4', 'SiO2@', 'SiO3-2', 'CO2@', 'CO3-2', 'HCO3-', 'CH4@', 'ClO4-', 'Cl-', 'H2@', 'N2@', 'O2@', 'S2O3-2', 'HSO3-', 'SO3-2', 'HSO4-', 'SO4-2', 'H2S@', 'HS-', 'OH-', 'H+', 'H2O@'])
+#editor.addGaseousPhase(gaseous_species)
+for mineral in minerals:
+    editor.addMineralPhase(mineral)
 
 # System with
 # 14 elements,
 # 160 speceis,
 # 68 phases.
 
+'''
 editor.addAqueousPhase([
     "Al(OH)2+", "Al(OH)3@", "Al(OH)4-", "Al+3", "AlH3SiO4+2", "AlOH+2",
     "Ca+2", "CaCO3@", "CaCl+", "CaCl2@", "CaHCO3+", "CaHSiO3+", "CaOH+", "CaSiO3@", "K+", "KAlO2@",
@@ -111,6 +120,7 @@ problem.setPressure(P, "Pascal")
 state = equilibrate(problem)
 
 state.output("result.txt")
+'''
 
 '''
 # Step 7.3: Define the initial condition of the reactive transport modeling problem
