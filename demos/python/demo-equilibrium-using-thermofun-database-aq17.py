@@ -48,6 +48,9 @@ problem.add("KAlSi3O8",        	20,	    "g")
 problem.setTemperature(500.0, "celsius")
 problem.setPressure(3000.0, "bar")
 
-state = equilibrate(problem)
+options = EquilibriumOptions()
+options.optimum.output.active = True
+
+state = equilibrate(problem, options)
 
 state.output("result.txt")
