@@ -3,9 +3,12 @@ import thermofun.PyThermoFun as thermofun
 
 database = thermofun.Database("databases/thermofun/aq17-thermofun.json")
 
+T = 500.0   # in celsius
+P = 3000.0  # in bar
+
 editor = ChemicalEditor(database)
-editor.setTemperatures([500.0], "celsius")
-editor.setPressures([3000.0], "bar")
+editor.setTemperatures([T], "celsius")
+editor.setPressures([P], "bar")
 
 editor.addAqueousPhase([
     "Al(OH)2+", "Al(OH)3@", "Al(OH)4-", "Al+3", "AlH3SiO4+2", "AlOH+2",
@@ -45,17 +48,16 @@ problem.add("NaAlSi3O8",        37,	    "g")
 problem.add("KAl3Si3O10(OH)2",  13,	    "g")
 problem.add("SiO2",          	30,	    "g")
 problem.add("KAlSi3O8",        	20,	    "g")
-problem.setTemperature(500.0, "celsius")
-problem.setPressure(3000.0, "bar")
-
+problem.setTemperature(T, "celsius")
+problem.setPressure(P, "bar")
 '''
 options = EquilibriumOptions()
 options.optimum.output.active = True
 
 state = ChemicalState(system)
 state.setSpeciesAmount("H2O@", 10, "mol")
-state.setTemperature(500.0, "celsius")
-state.setPressure(3000.0, "bar")
+state.setTemperature(T, "celsius")
+state.setPressure(P, "bar")
 equilibrate(state, problem, options)
 
 print("Species name : n (in mol)")
@@ -66,7 +68,7 @@ for species in system.species():
     print(f"{name:>13} = {amount}")
 state.output("result-with-initial-state.txt")
 '''
-#'''
+
 state = equilibrate(problem)
 print("Species name : n (in mol)")
 for species in system.species():
@@ -75,4 +77,3 @@ for species in system.species():
     # Output according to the threshold
     print(f"{name:>13} = {amount}")
 state.output("result.txt")
-#'''
