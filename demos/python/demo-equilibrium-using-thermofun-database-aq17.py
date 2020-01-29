@@ -48,9 +48,31 @@ problem.add("KAlSi3O8",        	20,	    "g")
 problem.setTemperature(500.0, "celsius")
 problem.setPressure(3000.0, "bar")
 
+'''
 options = EquilibriumOptions()
 options.optimum.output.active = True
 
-state = equilibrate(problem, options)
+state = ChemicalState(system)
+state.setSpeciesAmount("H2O@", 10, "mol")
+state.setTemperature(500.0, "celsius")
+state.setPressure(3000.0, "bar")
+equilibrate(state, problem, options)
 
+print("Species name : n (in mol)")
+for species in system.species():
+    name = species.name()
+    amount = state.speciesAmount(name)
+    # Output according to the threshold
+    print(f"{name:>13} = {amount}")
+state.output("result-with-initial-state.txt")
+'''
+#'''
+state = equilibrate(problem)
+print("Species name : n (in mol)")
+for species in system.species():
+    name = species.name()
+    amount = state.speciesAmount(name)
+    # Output according to the threshold
+    print(f"{name:>13} = {amount}")
 state.output("result.txt")
+#'''
