@@ -4,8 +4,11 @@ import thermofun.PyThermoFun as thermofun
 import numpy as np
 import sys
 
-T = 293.15
-P = 100000.0
+T = 293.15 # in kevin
+P = 100000.0 # pascal
+
+T_celsius = 19.85 # in celsius
+P_bar = 1 # in bar
 
 def load_data():
 
@@ -120,17 +123,30 @@ solver = EquilibriumSolver(system)
 # -------------------------------------------------------------------------------------------------------------------- #
 # Cement
 # -------------------------------------------------------------------------------------------------------------------- #
-
+# Our list of elements: List with 14 elements:
+# Al C Ca Cl
+# Fe H K Mg
+# N Na O S
+# Si Z
+'''
 # Full total bulk composition (vector b), moles [nIC] (will be partially re-written from DBR files)
 b_cement = np.array([0.00216091995294773, 0.00131648456336122, 0.0265187935777118, 3.45606512042692e-08,
                      0.00106005014319273, 0.158129994752999, 0.000679052483286759, 0.000733976294881496,
                      0.00044118313690989, 2.63859873267357e-08, 0.353701411160683, 0.00102638869260499,
                      0.118139969440399, 0])
-# With swapped values:
+'''
+# With swapped values 0.00044118313690989 for Na and 0 for N
 b_cement = np.array([0.00216091995294773, 0.00131648456336122, 0.0265187935777118, 3.45606512042692e-08,
                      0.00106005014319273, 0.158129994752999, 0.000679052483286759, 0.000733976294881496,
-                     2.63859873267357e-08, 0.00044118313690989, 0.353701411160683, 0.00102638869260499,
+                     0, 0.00044118313690989, 0.353701411160683, 0.00102638869260499,
                      0.118139969440399, 0])
+# Create element dictionary:
+b_cement_dict = {}
+i = 0
+for elements, amount in zip(system.elements(), b_cement):
+    #b_cement_dict.append({species.name(), amount})
+    b_cement_dict[elements.name()] = amount
+    print(f"{elements.name():>2} : {amount}")
 
 # Create chemical state for the cement
 state_cement = ChemicalState(system)
@@ -142,7 +158,9 @@ for species in system.species():
     name = species.name()
     amount = state_cement.speciesAmount(name)
     # Output according to the threshold
-    if amount >= 1e-10: print(f"{name:>13} = {amount}")
+    #if amount >= 1e-10:
+    print(f"{name:>13} = {amount}")
+    #print(f"{amount}")
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # Sea water (SW)
@@ -158,9 +176,26 @@ b_sw = np.array([1e-12, 8.39047799118904e-07, 4.60274559011631e-06, 0.0002447048
                  1e-12, 0.0480862507085869, 4.5682055764741e-06, 2.37779781110928e-05,
                  5.4730517594269e-08, 0.000209584727160819, 0.239750374257753, 1.26338032622899e-05,
                  0.107827168643251, 0])
+
 state_sw = ChemicalState(system)
 solver.solve(state_sw, T, P, b_sw)
 state_sw.output("state_sw.txt")
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# NaCl-brine (Sodium-chloride brine)
+# -------------------------------------------------------------------------------------------------------------------- #
+
+b_nacl = np.array([1.43733259290492e-12, 1.21929100962448e-11, 1.43733259290492e-12, 0.000238186684843354,
+                   1.43733259290492e-12, 0.0480657296087116, 1.43733259290492e-12, 1.43733259290492e-12,
+                   0.000238186684843354, 5.34889415162815e-08, 0.239687078800178, 1.43733259290492e-12,
+                   0.107827100001437, 0])
+b_nacl = np.array([1.43733259290492e-12, 1.21929100962448e-11, 1.43733259290492e-12, 0.000238186684843354,
+                   1.43733259290492e-12, 0.0480657296087116, 1.43733259290492e-12, 1.43733259290492e-12,
+                   5.34889415162815e-08, 0.000238186684843354, 0.239687078800178, 1.43733259290492e-12,
+                   0.107827100001437, 0])
+state_nacl = ChemicalState(system)
+solver.solve(state_nacl, T, P, b_nacl)
+state_sw.output("state_nacl.txt")
 
 '''
 print("Species in seawater : n (in mol)")
