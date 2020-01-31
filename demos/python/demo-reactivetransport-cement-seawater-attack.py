@@ -217,6 +217,8 @@ input()
 
 # Step 9: Scale the volumes of the phases in the initial condition
 state_cement.scalePhaseVolume('Aqueous', 0.1, 'm3') # corresponds to the initial porosity of 10%.
+state_cement.scaleVolume(1.0, 'm3')
+#state_cement.scaleMin
 #state_cement.scalePhaseVolume('Quartz', 0.882, 'm3')
 #state_cement.scalePhaseVolume('Calcite', 0.018, 'm3')
 

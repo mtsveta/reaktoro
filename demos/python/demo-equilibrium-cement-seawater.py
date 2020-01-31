@@ -4,23 +4,6 @@ import thermofun.PyThermoFun as thermofun
 import numpy as np
 import sys
 
-'''
-The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C12A7.
-/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
-70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C3A.
-/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
-70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C3S.
-/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
-70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C4AF.
-/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
-70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance CA.
-/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
-70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance CA2.
-/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
-70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance Na2SO4.
-/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
-'''
-
 T = 293.15 # in kevin
 P = 100000.0 # pascal
 
@@ -80,30 +63,48 @@ print("\nMinerals species: ", minerals)
 editor = ChemicalEditor(database)
 editor.setTemperatures([T], "kelvin")
 editor.setPressures([P], "pascal")
-editor.addAqueousPhase(aqueous_species)
+editor.addAqueousPhase(aqueous_species).setChemicalModelHKF()
+'''
+params = DebyeHuckelParams()
+params.setPHREEQC()
+editor.addAqueousPhase(aqueous_species).setChemicalModelDebyeHuckel(params)
+'''
+'''
+params = DebyeHuckelParams()
+params.bneutral(0.122657)
+params.aion(3.67)
+params.bion(0.122657)
+editor.addAqueousPhase(aqueous_species).setChemicalModelDebyeHuckel(params)
+'''
+'''
+params = DebyeHuckelParams()
+params.aion(3.67)
+params.bion(0.122657)
+params.bneutral(0.122657)
+aqueous_phase.setChemicalModelDebyeHuckel(params)
+'''
 editor.addGaseousPhase(gaseous_species)
 
-'''
 # Add mineral species
 phase_indices = np.array([2, 2, 6, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
+#'''
 # Add solid solutions and pure minerals
 index_minerals = 0
 for i in range(0, len(phase_indices)):
     #print(minerals[index_minerals:index_minerals+phase_indices[i]])
     editor.addMineralPhase(minerals[index_minerals:index_minerals+phase_indices[i]])
     index_minerals = index_minerals + phase_indices[i]
-'''
 #'''
+'''
 # Adding only pure minerals
 index_minerals = 0
 for i in range(0, len(phase_indices)):
-
     if phase_indices[i] == 1:
         print(minerals[index_minerals:index_minerals+phase_indices[i]])
         editor.addMineralPhase(minerals[index_minerals:index_minerals+phase_indices[i]])
     index_minerals = index_minerals + phase_indices[i]
-#'''
+'''
 # Create chemical system
 system = ChemicalSystem(editor)
 # Print system charachteristics
@@ -118,6 +119,13 @@ print(f"List with {(system.numElements())} elements:", end=" ")
 for element in system.elements(): print(element.name(), end=" ")
 print("")
 
+"""
+engine = thermofun.ThermoEngine(database)
+for species in system.species():
+    print(f"{species.name():>15} : {engine.thermoPropertiesSubstance((T), P, species.name()).gibbs_energy.val:>10}")
+
+input()
+"""
 '''
 # Print formula matrix
 matrix = system.formulaMatrix()
@@ -167,41 +175,94 @@ for elements, amount in zip(system.elements(), b_cement):
     b_cement_dict[elements.name()] = amount
     print(f"{elements.name():>2} : {amount}")
 
-# Create chemical state for the cement
-state_cement = ChemicalState(system)
-solver.solve(state_cement, T, P, b_cement)
-state_cement.output("state_cement.txt")
+#'''
+problem_sw = EquilibriumInverseProblem(system)
+problem_sw.setTemperature(T, "kelvin")
+problem_sw.setPressure(P, "pascal")
+problem_sw.setElementInitialAmounts(b_cement)
+problem_sw.fixSpeciesAmount("Qtz", 0.107827, "mol")
+#problem_sw.fixSpeciesAmount("C3AFS0.84H4.32", 0.0, "mol")
 
+state_cement = equilibrate(problem_sw)
+#'''
+#"""
+# Create chemical state for the cement
+#state_cement = ChemicalState(system)
+#solver.solve(state_cement, T, P, b_cement)
+state_cement.output("state_cement.txt")
+#print(state_cement)
+#"""
 print("Species in cement : n (in mol)")
 for species in system.species():
     name = species.name()
     amount = state_cement.speciesAmount(name)
     # Output according to the threshold
     print(f"{name:>30} = {amount}")
+
+'''
+engine = thermofun.ThermoEngine(database)
+for species in aqueous_species:
+    print(f"{species:>15} : {engine.thermoPropertiesSubstance((T), P, species).gibbs_energy.val:>10}")
+'''
+"""
+b_aqueous_phase = state_cement.elementAmountInPhase (std::string element, std::string phase)
+for elements in system.elements():
+    name = elements.name()
+    amount = state_cement.elementAmountInPhase(name, "aqu)
+    # Output according to the threshold
+    print(f"{name:>5} = {amount}")
+"""
+
 # -------------------------------------------------------------------------------------------------------------------- #
 # Sea water (SW)
 # -------------------------------------------------------------------------------------------------------------------- #
 
 # bIC: Bulk composition of reactive subsystem (main GEM input), moles of ICs [nICb]
+"""
 b_sw = np.array([1e-12, 8.39047799118904e-07, 4.60274559011631e-06, 0.00024470481263518,
                  1e-12, 0.0480862507085869, 4.5682055764741e-06, 2.37779781110928e-05,
                  0.000209584727160819, 5.4730517594269e-08, 0.239750374257753, 1.26338032622899e-05,
                  0.107827168643251, 0])
+"""
+# Our list of elements: List with 14 elements:
+# Al C Ca Cl
+# Fe H K Mg
+# N Na O S
+# Si Z
 # Replace by the array with swapped 8th and 9th elements
 b_sw = np.array([1e-12, 8.39047799118904e-07, 4.60274559011631e-06, 0.00024470481263518,
-                 1e-12, 0.0480862507085869, 4.5682055764741e-06, 2.37779781110928e-05,
-                 5.4730517594269e-08, 0.000209584727160819, 0.239750374257753, 1.26338032622899e-05,
+                 1e-12, 0.0480862507085869 + 2, 4.5682055764741e-06, 2.37779781110928e-05,
+                 5.4730517594269e-08, 0.000209584727160819, 0.239750374257753 + 1, 1.26338032622899e-05,
                  0.107827168643251, 0])
-
+'''
+# NOT WORKING!
 state_sw = ChemicalState(system)
 solver.solve(state_sw, T, P, b_sw)
+state_sw.output("state_sw_equilibrium_solver.txt")
+
 print("Species in seawater : n (in mol)")
 for species in system.species():
     name = species.name()
     amount = state_sw.speciesAmount(name)
     # Output according to the threshold
     print(f"{name:>30} = {amount}")
+'''
+problem_sw = EquilibriumInverseProblem(system)
+problem_sw.setTemperature(T, "kelvin")
+problem_sw.setPressure(P, "pascal")
+problem_sw.setElementInitialAmounts(b_sw)
+problem_sw.fixSpeciesAmount("Qtz", 0.107827, "mol")
+'''
+problem_sw.fixSpeciesAmount("M075SH", 0.0, "mol")
+problem_sw.fixSpeciesAmount("M15SH", 0.0, "mol")
+problem_sw.fixSpeciesAmount("Arg", 0.0, "mol")
+problem_sw.fixSpeciesAmount("Cal", 0.0, "mol")
+problem_sw.fixSpeciesAmount("natrolite", 0.0, "mol")
+'''
+state_sw = equilibrate(problem_sw)
+state_sw.output("state_sw_equilibrate.txt")
 
+'''
 # -------------------------------------------------------------------------------------------------------------------- #
 # NaCl-brine (Sodium-chloride brine)
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -222,7 +283,7 @@ for species in system.species():
     amount = state_sw.speciesAmount(name)
     # Output according to the threshold
     print(f"{name:>30} = {amount}")
-
+'''
 '''
 n_sw = np.array([2.46100221484366e-21, 7.49133660286559e-22, 5.75242310773387e-21, 6.90681743697294e-17, 9.90800739368853e-13, 9.12927398011268e-15, 8.56314982070215e-19, 4.72498975561693e-20, 5.94922644003287e-21, 8.54248693442392e-09, 1.28390023290633e-08, 3.45691884021378e-07, 4.23557433459937e-06, 2.05232883296596e-11, 7.63063575495622e-11, 1.0525861918408e-12, 4.39471302392405e-25, 3.63567913737693e-25, 4.80923510908748e-32, 9.91586748163519e-25, 1.39895482718739e-23, 1.90008627164411e-24, 1.53430533643884e-25, 2.37937181783215e-30, 3.39737043871988e-23, 2.2047927969019e-24, 5.7209131449752e-23, 1.19305043639265e-28, 3.75830040054004e-34, 6.33502555926846e-23, 2.9355392326128e-23, 8.30349031726048e-25, 6.72188840987796e-14, 1.85696519699273e-13, 7.47079270448143e-13, 5.20123301714824e-18, 1.2431602548248e-19, 9.06591037658476e-08, 4.47754516670466e-06, 1.3060035882638e-12,
                  2.61236812901651e-08, 5.98734301787103e-08, 2.16483206816277e-05, 2.55807225290953e-09, 2.04024260738186e-06, 8.03111666803934e-10, 5.65266946690013e-11, 4.20224888575075e-08, 7.27152956534961e-08, 2.95494185377378e-06, 0.000206514926295945, 1.21226589402462e-10, 2.82491060715618e-09, 2.28299242396247e-19, 6.4881254166339e-08, 8.93964212306933e-14, 4.14429201643602e-09, 2.30155215456548e-08, 5.89771600313447e-07, 0, 2.89784766978446e-27, 0.00024470481263518, 0, 2.73652587971345e-08, 1.13662409601231e-07, 0, 0, 0, 6.60908355733222e-13, 7.20226715243868e-06, 0, 0, 0, 8.34730158698885e-10, 2.67834682848817e-12, 0.0240427541324881, 0, 0, 0, 0,
