@@ -4,6 +4,23 @@ import thermofun.PyThermoFun as thermofun
 import numpy as np
 import sys
 
+'''
+The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C12A7.
+/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
+70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C3A.
+/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
+70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C3S.
+/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
+70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance C4AF.
+/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
+70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance CA.
+/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
+70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance CA2.
+/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
+70The given temperature: 293.15 is not inside the specified interval/s for the Cp calculation.The temperature is not inside the specified interval for the substance Na2SO4.
+/home/conda/feedstock_root/build_artifacts/thermofun_1576161870387/work/ThermoFun/Substances/EmpiricalCpIntegration.cpp
+'''
+
 T = 293.15 # in kevin
 P = 100000.0 # pascal
 
@@ -56,9 +73,9 @@ database = thermofun.Database(database_path)
 
 # Load species from the date files
 aqueous_species, gaseous_species, minerals = load_data()
-print("Aqueous species: \n ", aqueous_species)
-print("Gaseous species: \n ", gaseous_species)
-print("Minerals species: \n ", minerals)
+print("Aqueous species: ", aqueous_species)
+print("\nGaseous species: ", gaseous_species)
+print("\nMinerals species: ", minerals)
 
 editor = ChemicalEditor(database)
 editor.setTemperatures([T], "kelvin")
@@ -66,6 +83,7 @@ editor.setPressures([P], "pascal")
 editor.addAqueousPhase(aqueous_species)
 editor.addGaseousPhase(gaseous_species)
 
+'''
 # Add mineral species
 phase_indices = np.array([2, 2, 6, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
@@ -76,6 +94,7 @@ for i in range(0, len(phase_indices)):
     editor.addMineralPhase(minerals[index_minerals:index_minerals+phase_indices[i]])
     index_minerals = index_minerals + phase_indices[i]
 '''
+#'''
 # Adding only pure minerals
 index_minerals = 0
 for i in range(0, len(phase_indices)):
@@ -84,7 +103,7 @@ for i in range(0, len(phase_indices)):
         print(minerals[index_minerals:index_minerals+phase_indices[i]])
         editor.addMineralPhase(minerals[index_minerals:index_minerals+phase_indices[i]])
     index_minerals = index_minerals + phase_indices[i]
-'''
+#'''
 # Create chemical system
 system = ChemicalSystem(editor)
 # Print system charachteristics
@@ -158,10 +177,7 @@ for species in system.species():
     name = species.name()
     amount = state_cement.speciesAmount(name)
     # Output according to the threshold
-    #if amount >= 1e-10:
-    print(f"{name:>13} = {amount}")
-    #print(f"{amount}")
-
+    print(f"{name:>30} = {amount}")
 # -------------------------------------------------------------------------------------------------------------------- #
 # Sea water (SW)
 # -------------------------------------------------------------------------------------------------------------------- #
@@ -179,7 +195,12 @@ b_sw = np.array([1e-12, 8.39047799118904e-07, 4.60274559011631e-06, 0.0002447048
 
 state_sw = ChemicalState(system)
 solver.solve(state_sw, T, P, b_sw)
-state_sw.output("state_sw.txt")
+print("Species in seawater : n (in mol)")
+for species in system.species():
+    name = species.name()
+    amount = state_sw.speciesAmount(name)
+    # Output according to the threshold
+    print(f"{name:>30} = {amount}")
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # NaCl-brine (Sodium-chloride brine)
@@ -195,16 +216,13 @@ b_nacl = np.array([1.43733259290492e-12, 1.21929100962448e-11, 1.43733259290492e
                    0.107827100001437, 0])
 state_nacl = ChemicalState(system)
 solver.solve(state_nacl, T, P, b_nacl)
-state_sw.output("state_nacl.txt")
-
-'''
-print("Species in seawater : n (in mol)")
+print("Species in NaCl-brine : n (in mol)")
 for species in system.species():
     name = species.name()
     amount = state_sw.speciesAmount(name)
     # Output according to the threshold
-    print(f"{name:>13} = {amount}")
-'''
+    print(f"{name:>30} = {amount}")
+
 '''
 n_sw = np.array([2.46100221484366e-21, 7.49133660286559e-22, 5.75242310773387e-21, 6.90681743697294e-17, 9.90800739368853e-13, 9.12927398011268e-15, 8.56314982070215e-19, 4.72498975561693e-20, 5.94922644003287e-21, 8.54248693442392e-09, 1.28390023290633e-08, 3.45691884021378e-07, 4.23557433459937e-06, 2.05232883296596e-11, 7.63063575495622e-11, 1.0525861918408e-12, 4.39471302392405e-25, 3.63567913737693e-25, 4.80923510908748e-32, 9.91586748163519e-25, 1.39895482718739e-23, 1.90008627164411e-24, 1.53430533643884e-25, 2.37937181783215e-30, 3.39737043871988e-23, 2.2047927969019e-24, 5.7209131449752e-23, 1.19305043639265e-28, 3.75830040054004e-34, 6.33502555926846e-23, 2.9355392326128e-23, 8.30349031726048e-25, 6.72188840987796e-14, 1.85696519699273e-13, 7.47079270448143e-13, 5.20123301714824e-18, 1.2431602548248e-19, 9.06591037658476e-08, 4.47754516670466e-06, 1.3060035882638e-12,
                  2.61236812901651e-08, 5.98734301787103e-08, 2.16483206816277e-05, 2.55807225290953e-09, 2.04024260738186e-06, 8.03111666803934e-10, 5.65266946690013e-11, 4.20224888575075e-08, 7.27152956534961e-08, 2.95494185377378e-06, 0.000206514926295945, 1.21226589402462e-10, 2.82491060715618e-09, 2.28299242396247e-19, 6.4881254166339e-08, 8.93964212306933e-14, 4.14429201643602e-09, 2.30155215456548e-08, 5.89771600313447e-07, 0, 2.89784766978446e-27, 0.00024470481263518, 0, 2.73652587971345e-08, 1.13662409601231e-07, 0, 0, 0, 6.60908355733222e-13, 7.20226715243868e-06, 0, 0, 0, 8.34730158698885e-10, 2.67834682848817e-12, 0.0240427541324881, 0, 0, 0, 0,

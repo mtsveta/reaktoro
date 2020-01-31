@@ -68,17 +68,14 @@ output_quantities = """
     speciesMolality(Calcite)
     speciesMolality(Dolomite)
     speciesMolality(Quartz)
+    
     speciesMolality(hydrotalcite)
     speciesMolality(Portlandite)
-    C4AH11
+    speciesMolality(C4AH11)
     CSHQ-JenD
     CSHQ-JenH
     CSHQ-TobD
-    CSHQ-TobH
-    
-    
-    
-    
+    CSHQ-TobH  
 """.split()
 
 #------------------------------------------------------------------------------#
