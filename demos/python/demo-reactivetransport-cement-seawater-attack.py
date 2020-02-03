@@ -17,10 +17,13 @@
 
 # Step 1: Import the reaktoro Python package (and other packages)
 from reaktoro import *
-from numpy import *
+import numpy as np
 import os
 from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
+import thermofun.PyThermoFun as thermofun
+from demos.python.plotting import plot_figures_ph, plot_animation_ph
+from natsort import natsorted
 
 #------------------------------------------------------------------------------#
 # Problems parameters
@@ -39,6 +42,7 @@ xl = 0.0          # the x-coordinate of the left boundary
 xr = 1.0          # the x-coordinate of the right boundary
 ncells = 50      # the number of cells in the discretization
 nsteps = 600      # the number of steps in the reactive transport simulation
+#nsteps = 3000      # the number of steps in the reactive transport simulation
 D  = 2.3e-9       # the diffusion coefficient (in units of m2/s)
 v  = 1.0/day           # the fluid pore velocity (in units of m/s)
 dt = 10*minute    # the time step (30 minutes in units of s)
@@ -52,32 +56,87 @@ P = 100000.0      # in pascal
 dx = (xr - xl)/ncells
 alpha = v*dt/dx
 ndigits = len(str(nsteps))
+xcells = np.linspace(xl, xr, ncells)  # the x-coordinates of the plots
 folder = 'results'
 
 CFL = dt * v  / dx
 print("CFL = ", CFL)
 
+# Options for the figure plotting
+plot_at_selected_steps = [1, 10, 60, 120, 240, 480, 600]  # the time steps at which the results are plotted
+
 # Step 4: The list of quantities to be output for each mesh cell, each time step
 output_quantities = """
     pH
+    Eh
+    ionicStrength
+    elementAmount(C)
+    elementAmount(Cl)
+    elementAmount(Ca)
+    elementAmount(Fe)
+    elementAmount(K)
+    elementAmount(Mg)    
+    elementAmount(Na) 
+    elementAmount(S) 
+    elementAmount(Si) 
+    elementAmount(Al)    
+    elementAmount(Fe)     
     speciesMolality(H+)
-    speciesMolality(Ca++)
-    speciesMolality(Mg++)
+    speciesMolality(Cl-)
+    speciesMolality(Ca+2)
+    speciesMolality(Mg+2)
+    speciesMolality(Na+)
     speciesMolality(HCO3-)
-    speciesMolality(CO2(aq))
-    speciesMolality(Calcite)
-    speciesMolality(Dolomite)
-    speciesMolality(Quartz)
-    
+    speciesMolality(CO2@)
+    speciesMolality(Cal)
     speciesMolality(hydrotalcite)
     speciesMolality(Portlandite)
     speciesMolality(C4AH11)
-    CSHQ-JenD
-    CSHQ-JenH
-    CSHQ-TobD
-    CSHQ-TobH  
+    speciesMolality(CSHQ-JenD)
+    speciesMolality(CSHQ-JenH)
+    speciesMolality(CSHQ-TobD)
+    speciesMolality(CSHQ-TobH)
+    speciesMolality(C3AFS0.84H4.32)
+    speciesMolality(Brc)
+    speciesMolality(ettringite03_ss)
+    speciesMolality(ettringite13)
+    speciesMolality(ettringite9)
 """.split()
 
+indx_pH = 0
+indx_Eh = 1
+indx_IS = 2
+indx_C = 3
+indx_Cl = 4
+indx_Ca = 5
+indx_Fe = 6
+indx_K = 7
+indx_Mg = 8
+indx_Na = 9
+indx_S = 10
+indx_Si = 11
+indx_Al = 12
+indx_Fe = 13
+indx_Hcation = 14
+indx_Cl = 15
+indx_Cacation = 16
+indx_Mgcation = 17
+indx_Nacation = 18
+indx_HCO3anoion = 19
+indx_CO2aq = 20
+indx_Cal = 21
+indx_hydrotalcite = 22
+indx_Portlandite = 23
+indx_C4AH11 = 24
+indx_CSHQJenD = 25
+indx_CSHQJenH = 26
+indx_CSHQTobD = 27
+indx_CSHQTobH = 28
+indx_C3AFS = 29
+indx_Brc = 30
+indx_ettringite03_ss = 31
+indx_ettringite13 = 32
+indx_ettringite9 = 33
 #------------------------------------------------------------------------------#
 # Auxiliary functions
 #------------------------------------------------------------------------------#
@@ -93,20 +152,7 @@ def titlestr(t):
 def make_results_folders():
     os.system('mkdir -p results')
     os.system('mkdir -p figures/ph')
-    os.system('mkdir -p figures/aqueous-species')
-    os.system('mkdir -p figures/calcite-dolomite')
     os.system('mkdir -p videos')
-
-# Step 8: Plot all result files and generate a video
-def plot():
-    # Plot all result files
-    files = sorted(os.listdir('results'))
-    Parallel(n_jobs=16)(delayed(plotfile)(file) for file in files)
-    # Create videos for the figures
-    ffmpegstr = 'ffmpeg -y -r 30 -i figures/{0}/%0' + str(ndigits) + 'd.png -codec:v mpeg4 -flags:v +qscale -global_quality:v 0 videos/{0}.mp4'
-    os.system(ffmpegstr.format('calcite-dolomite'))
-    os.system(ffmpegstr.format('aqueous-species'))
-    os.system(ffmpegstr.format('ph'))
 
 def plotfile(file):
 
@@ -115,12 +161,12 @@ def plotfile(file):
     print('Plotting figure', step, '...')
 
     t = step * dt
-    filearray = loadtxt('results/' + file, skiprows=1)
+    filearray = np.loadtxt('results/' + file, skiprows=1)
     data = filearray.T
 
     ndigits = len(str(nsteps))
 
-    x = linspace(xl, xr, ncells)
+    x = np.linspace(xl, xr, ncells)
 
     plt.figure()
     plt.xlim(left=-0.02, right=0.52)
@@ -163,62 +209,121 @@ def plotfile(file):
 
     plt.close('all')
 
+def load_data():
+
+    data_folder = 'demos/python/data-files/'
+    file_with_species = 'species.txt'
+    file_with_species_codes = 'species-codes.txt'
+
+    def get_data_from_file(filepath):
+        items = []
+        with open(filepath,'r') as file:
+            for line in file:
+                for word in line.split():
+                    items.append(word.replace("'", "")) #items.append(re.sub(r'[^\w]', '', word))
+        return items
+
+    species = get_data_from_file(data_folder + file_with_species)
+    species_codes = get_data_from_file(data_folder + file_with_species_codes)
+
+    # Fetch all the aqueous species
+    aqueous_species = [] # codes 'S', 'T', 'W'
+    gaseous_species = [] # codes 'G'
+    minerals = [] # code 'O', 'M', 'I', J
+    for item in zip(species, species_codes):
+        # 'S' = solute, 'T' = ?, 'W' = water
+        if item[1] == 'S' or item[1] == 'T' or item[1] == 'W': aqueous_species.append(item[0])
+        # 'G' = gaseous
+        if item[1] == 'G': gaseous_species.append(item[0])
+        # 'G' = gaseous, 'I' = ?, 'J' = ?, 'O' = ?,
+        if item[1] == 'M' or item[1] == 'I' or item[1] == 'J' or item[1] == 'O': minerals.append(item[0])
+
+    return aqueous_species, gaseous_species, minerals
 #------------------------------------------------------------------------------#
 # Reactive transport simulations
 #------------------------------------------------------------------------------#
 
-# Step 4: Construct the chemical system with its phases and species
+# Load the database
 database_path = 'databases/thermofun/cemdata18-thermofun.json'
-db = Database('database_path')
+database = thermofun.Database(database_path)
 
+# Load species from the date files
+aqueous_species, gaseous_species, minerals = load_data()
+print("Aqueous species: ", aqueous_species)
+print("\nGaseous species: ", gaseous_species)
+print("\nMinerals species: ", minerals)
+
+# Create chemical species
 editor = ChemicalEditor(database)
 editor.setTemperatures([T], "kelvin")
 editor.setPressures([P], "pascal")
-editor.addAqueousPhase(aqueous_species)
+editor.addAqueousPhase(aqueous_species).setChemicalModelHKF()
 editor.addGaseousPhase(gaseous_species)
 
 # Add mineral species
-phase_indices = np.array([2, 2, 6, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1])
-# Add solid solutions and pure minerals
+phase_indices = np.array([2, 2, 6, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                          1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                          1, 1, 1, 1])
+# Add solid solutions (using provided above indices) and pure minerals
 index_minerals = 0
 for i in range(0, len(phase_indices)):
     #print(minerals[index_minerals:index_minerals+phase_indices[i]])
     editor.addMineralPhase(minerals[index_minerals:index_minerals+phase_indices[i]])
     index_minerals = index_minerals + phase_indices[i]
 
-
-# Step 5: Create the ChemicalSystem object using the configured editor
+# Create chemical system and print its characteristics
 system = ChemicalSystem(editor)
-# Create EquilibriumSolver for the chemical system
-solver = EquilibriumSolver(system)
+num_elements = system.numElements()
+num_species = system.numSpecies()
+print(f"System with with {num_elements} elements, {num_species} species, {system.numPhases()} phases")
 
-# Step 6: Define the initial condition of the reactive transport modeling problem
-# With swapped values 0.00044118313690989 for Na and 0 for N
+# Must coincide with GEMs: 'Al' 'C' 'Ca' 'Cl' 'Fe' 'H' 'K' 'Mg' 'Na' 'Nit' 'O' 'S' 'Si' 'Zz'
+# Our list with 14 elements: Al C Ca Cl Fe H K Mg N Na O S Si Z
+# Have to swap b value for 8th and 9th elements!
+print(f"List with {(system.numElements())} elements:", end=" ")
+for element in system.elements(): print(element.name(), end=" ")
+print("")
+
+
+# -------------------------------------------------------------------------------------------------------------------- #
+# Cement / Initial boundary condition
+# -------------------------------------------------------------------------------------------------------------------- #
+# Bulk composition of reactive subsystem, moles of ICs
 b_cement = np.array([0.00216091995294773, 0.00131648456336122, 0.0265187935777118, 3.45606512042692e-08,
                      0.00106005014319273, 0.158129994752999, 0.000679052483286759, 0.000733976294881496,
                      0, 0.00044118313690989, 0.353701411160683, 0.00102638869260499,
                      0.118139969440399, 0])
-state_cement = ChemicalState(system)
-solver.solve(state_cement, T, P, b_cement)
+# Define cement problem
+problem_cement = EquilibriumInverseProblem(system)
+problem_cement.setTemperature(T, "kelvin")
+problem_cement.setPressure(P, "pascal")
+problem_cement.setElementInitialAmounts(b_cement)
+problem_cement.fixSpeciesAmount("Qtz", 0.107827, "mol")
+
+state_cement = equilibrate(problem_cement)
 state_cement.output("state_cement.txt")
 
-# Step 7: Define the boundary condition of the reactive transport modeling problem
-# Replace by the array with swapped 8th and 9th elements
+# -------------------------------------------------------------------------------------------------------------------- #
+# Sea water (SW) / Left boundary condition
+# -------------------------------------------------------------------------------------------------------------------- #
+# Bulk composition of reactive subsystem, moles of BCs
 b_sw = np.array([1e-12, 8.39047799118904e-07, 4.60274559011631e-06, 0.00024470481263518,
-                 1e-12, 0.0480862507085869, 4.5682055764741e-06, 2.37779781110928e-05,
-                 5.4730517594269e-08, 0.000209584727160819, 0.239750374257753, 1.26338032622899e-05,
+                 1e-12, 0.0480862507085869 + 2, 4.5682055764741e-06, 2.37779781110928e-05,
+                 5.4730517594269e-08, 0.000209584727160819, 0.239750374257753 + 1, 1.26338032622899e-05,
                  0.107827168643251, 0])
-state_sw = ChemicalState(system)
-solver.solve(state_sw, T, P, b_sw)
-state_sw.output("state_sw.txt")
 
-input()
+problem_sw = EquilibriumInverseProblem(system)
+problem_sw.setTemperature(T, "kelvin")
+problem_sw.setPressure(P, "pascal")
+problem_sw.setElementInitialAmounts(b_sw)
+problem_sw.fixSpeciesAmount("Qtz", 0.107827, "mol")
+
+state_sw = equilibrate(problem_sw)
+state_sw.output("state_sw.txt")
 
 # Step 9: Scale the volumes of the phases in the initial condition
 state_cement.scalePhaseVolume('Aqueous', 0.1, 'm3') # corresponds to the initial porosity of 10%.
 state_cement.scaleVolume(1.0, 'm3')
-#state_cement.scaleMin
 #state_cement.scalePhaseVolume('Quartz', 0.882, 'm3')
 #state_cement.scalePhaseVolume('Calcite', 0.018, 'm3')
 
@@ -236,28 +341,22 @@ rt = ReactiveTransportSolver(system)
 rt.setMesh(mesh)
 rt.setVelocity(v)
 rt.setDiffusionCoeff(D)
-rt.setBoundaryState(state_bc)
+rt.setBoundaryState(state_sw)
 rt.setTimeStep(dt)
 rt.initialize()
 
 # Step 14: Set the output of the reactive transport simulation
 output = rt.output()
-output.add("pH")
-output.add("speciesMolality(H+)")
-output.add("speciesMolality(Ca++)")
-output.add("speciesMolality(Mg++)")
-output.add("speciesMolality(HCO3-)")
-output.add("speciesMolality(CO2(aq))")
-output.add("phaseVolume(Calcite)")
-output.add("phaseVolume(Dolomite)")
-output.filename('results/rtsolver.txt')  # Set the name of the output files
+for item in output_quantities:
+    output.add(item)
+output.filename('results/state.txt')  # Set the name of the output files
 
 make_results_folders()
 
 # Step 15: Perform given number of reactive tranport steps
 t = 0.0  # current time variable
 step = 0  # current number of steps
-
+"""
 while step <= nsteps:  # step until the number of steps are achieved
     # Print the progress of the simulation
     print("Progress: {}/{} steps, {} min".format(step, nsteps, t/minute))
@@ -268,6 +367,27 @@ while step <= nsteps:  # step until the number of steps are achieved
     # Increment time step and number of time steps
     t += dt
     step += 1
+"""
+print("Collecting files...")
+# Collect files with results corresponding to smart or reference (classical) solver
+files = [file for file in natsorted( os.listdir(folder) )]
 
+params = {"plot_at_selected_steps": plot_at_selected_steps,
+          "dt":  dt,
+          "folder": folder,
+          "files": files,
+          "indx_ph": indx_pH,
+          "xcells": xcells}
 
-plot()
+plot_figures_ph(params)
+
+# Animation options
+params["animation_starts_at_frame"] = 0 # the first frame index to be considered
+#params["animation_ends_at_frame"] = 600 # the last frame index to be considered
+#params["animation_num_frames_to_jump"] = 1 # the number of frames to jump between current and next
+params["animation_ends_at_frame"] = 10 * 30 # the last frame index to be considered
+params["animation_num_frames_to_jump"] = 1 # the number of frames to jump between current and next
+params["animation_fps"] = 30  # the number of frames per second
+params["animation_interval_wait"] = 200  # the time (in milliseconds) to wait between each frame
+
+plot_animation_ph(params)
