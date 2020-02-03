@@ -51,6 +51,22 @@ editor = ChemicalEditor(database)
 editor.setTemperatures([T], "kelvin")
 editor.setPressures([P], "pascal")
 editor.addAqueousPhase(aqueous_species).setChemicalModelHKF()
+#editor.addAqueousPhase(aqueous_species). setChemicalModelDebyeHuckel()
+"""
+********************************************************************************************************************************************
+*** Error: Could not calculate the equilibrium state of the system.
+*** Reason: Convergence could not be established with given equilibrium conditions, initial guess, and/or numerical parameters.
+*** Location:  This error was encountered in Reaktoro/Equilibrium/EquilibriumUtils.cpp:81.
+********************************************************************************************************************************************
+"""
+editor.addAqueousPhase(aqueous_species).setChemicalModelPitzerHMW()
+"""
+****************************************************************************************************
+*** Error: Cannot interpolate the Pitzer function J1(x) with the provided x = 25235.3.
+*** Reason: The value of x must be within the interval [0, 10000].
+*** Location:  This error was encountered in Reaktoro/Thermodynamics/Models/AqueousChemicalModelPitzerHMW.cpp:694.
+****************************************************************************************************
+"""
 editor.addGaseousPhase(gaseous_species)
 
 # Add mineral species
