@@ -6,6 +6,8 @@ minute = 60
 hour = 60 * minute
 day = 24 * hour
 
+# https://github.com/sciplot/gnuplot-palettes/blob/master/doc/overview.png
+
 def line(color):
     return {'linestyle': '-', 'color': color, 'zorder': 1, 'linewidth': 2}
 
@@ -38,6 +40,64 @@ def plot_figures_ph(params):
         plt.legend(loc='lower right')
         plt.savefig('figures/ph/pH-{}.pdf'.format(i))
         plt.tight_layout()
+        plt.close()
+
+def plot_figures_elements(params):
+
+    plot_at_selected_steps = params["plot_at_selected_steps"]
+    dt = params["dt"]
+    folder = params["folder"]
+    files = params["files"]
+    xcells = params["xcells"]
+
+    indices = [params["indx_C"], params["indx_Cl"], params["indx_Ca"], params["indx_Fe"], params["indx_K"],
+               params["indx_Mg"], params["indx_Na"], params["indx_S"], params["indx_Si"], params["indx_Al"]]
+    labels = ['C', 'Cl', 'Ca', 'Fe', 'K', 'Mg', 'Na', 'S', 'Si', 'Al']
+
+    indx_C = params["indx_C"]
+    indx_Cl = params["indx_Cl"]
+    indx_Ca = params["indx_Ca"]
+    indx_Fe = params["indx_Fe"]
+    indx_K = params["indx_K"]
+    indx_Mg = params["indx_Mg"]
+    indx_Na = params["indx_Na"]
+    indx_S = params["indx_S"]
+    indx_Si = params["indx_Si"]
+    indx_Al = params["indx_Al"]
+    indx_Fe = params["indx_S"]
+
+    colors = ['grey', 'tan', 'gold', 'yellowgreen', 'palevioletred',
+              'steelblue', 'salmon', 'ligthseagreen', 'firebrick', 'olivedrab']
+    xcells = params["xcells"]
+
+    for i in plot_at_selected_steps:
+        print("On pH figure at time step: {}".format(i))
+        t = i * dt
+        filearray = np.loadtxt(folder + '/' + files[i-1], skiprows=1)
+        data = filearray.T
+        """
+        data_C = data[indx_C]
+        data_Cl = data[indx_Cl]
+        data_Ca = data[indx_Ca]
+        data_Fe = data[indx_Fe]
+        data_K = data[indx_K]
+        data_Mg = data[indx_Mg]
+        data_Na = data[indx_Na]
+        data_S = data[indx_S]
+        data_Si = data[indx_Si]
+        data_Al = data[indx_Al]
+        data_Fe = data[indx_Fe]
+        """
+        plt.axes(xlim=(-0.01, 1.001), ylim=(8.5, 10.0))
+        plt.xlabel('Distance [m]')
+        plt.ylabel('Elements amounts [molal]')
+        plt.title(titlestr(t))
+        for j in range(0, len(indices)):
+            plt.plot(xcells, data[indices[j]], label=labels[j], **line(colors[j]))
+        plt.legend(loc='lower right')
+        plt.savefig('figures/ph/pH-{}.pdf'.format(i))
+        plt.tight_layout()
+        plt.show()
         plt.close()
 
 def plot_animation_ph(params):

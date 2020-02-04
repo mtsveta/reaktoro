@@ -22,7 +22,7 @@ import os
 from joblib import Parallel, delayed
 import matplotlib.pyplot as plt
 import thermofun.PyThermoFun as thermofun
-from demos.python.plotting import plot_figures_ph, plot_animation_ph
+from demos.python.plotting.plotting import *
 from natsort import natsorted
 
 #------------------------------------------------------------------------------#
@@ -80,7 +80,6 @@ output_quantities = """
     elementAmount(S) 
     elementAmount(Si) 
     elementAmount(Al)    
-    elementAmount(Fe)     
     speciesMolality(H+)
     speciesMolality(Cl-)
     speciesMolality(Ca+2)
@@ -116,27 +115,26 @@ indx_Na = 9
 indx_S = 10
 indx_Si = 11
 indx_Al = 12
-indx_Fe = 13
-indx_Hcation = 14
-indx_Cl = 15
-indx_Cacation = 16
-indx_Mgcation = 17
-indx_Nacation = 18
-indx_HCO3anoion = 19
-indx_CO2aq = 20
-indx_Cal = 21
-indx_hydrotalcite = 22
-indx_Portlandite = 23
-indx_C4AH11 = 24
-indx_CSHQJenD = 25
-indx_CSHQJenH = 26
-indx_CSHQTobD = 27
-indx_CSHQTobH = 28
-indx_C3AFS = 29
-indx_Brc = 30
-indx_ettringite03_ss = 31
-indx_ettringite13 = 32
-indx_ettringite9 = 33
+indx_Hcation = 13
+indx_Cl = 14
+indx_Cacation = 15
+indx_Mgcation = 16
+indx_Nacation = 17
+indx_HCO3anoion = 18
+indx_CO2aq = 19
+indx_Cal = 20
+indx_hydrotalcite = 21
+indx_Portlandite = 22
+indx_C4AH11 = 23
+indx_CSHQJenD = 24
+indx_CSHQJenH = 25
+indx_CSHQTobD = 26
+indx_CSHQTobH = 27
+indx_C3AFS = 28
+indx_Brc = 29
+indx_ettringite03_ss = 30
+indx_ettringite13 = 31
+indx_ettringite9 = 32
 #------------------------------------------------------------------------------#
 # Auxiliary functions
 #------------------------------------------------------------------------------#
@@ -377,9 +375,20 @@ params = {"plot_at_selected_steps": plot_at_selected_steps,
           "folder": folder,
           "files": files,
           "indx_ph": indx_pH,
+        "indx_C": indx_C,
+        "indx_Cl": indx_Cl,
+        "indx_Ca": indx_Ca,
+        "indx_Fe": indx_Fe,
+        "indx_K": indx_K,
+        "indx_Mg": indx_Mg,
+        "indx_Na": indx_Na,
+        "indx_S": indx_S,
+        "indx_Si": indx_Si,
+        "indx_Al": indx_Al,
           "xcells": xcells}
 
 plot_figures_ph(params)
+plot_figures_elements(params)
 
 # Animation options
 params["animation_starts_at_frame"] = 0 # the first frame index to be considered
@@ -390,4 +399,4 @@ params["animation_num_frames_to_jump"] = 1 # the number of frames to jump betwee
 params["animation_fps"] = 30  # the number of frames per second
 params["animation_interval_wait"] = 200  # the time (in milliseconds) to wait between each frame
 
-plot_animation_ph(params)
+#plot_animation_ph(params)
