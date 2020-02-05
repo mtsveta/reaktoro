@@ -5,41 +5,6 @@ import numpy as np
 T = 293.15 # in kevin
 P = 100000.0 # pascal
 
-def load_data():
-
-    data_folder = 'demos/python/data-files/'
-    file_with_species = 'species-sw.txt'
-    file_with_species_codes = 'species-codes.txt'
-    file_with_elements = 'elements.txt'
-    file_with_phases = 'phases.txt'
-
-    def get_data_from_file(filepath):
-        items = []
-        with open(filepath,'r') as file:
-            for line in file:
-                for word in line.split():
-                    items.append(word.replace("'", "")) #items.append(re.sub(r'[^\w]', '', word))
-        return items
-
-    species = get_data_from_file(data_folder + file_with_species)
-    species_codes = get_data_from_file(data_folder + file_with_species_codes)
-    elements = get_data_from_file(data_folder + file_with_elements)
-
-
-    # Fetch all the aqueous species
-    aqueous_species = [] # codes 'S', 'T', 'W'
-    gaseous_species = [] # codes 'G'
-    minerals = [] # code 'O', 'M', 'I', J
-    for item in zip(species, species_codes):
-        # 'S' = solute, 'T' = ?, 'W' = water
-        if item[1] == 'S' or item[1] == 'T' or item[1] == 'W': aqueous_species.append(item[0])
-        # 'G' = gaseous
-        if item[1] == 'G': gaseous_species.append(item[0])
-        # 'G' = gaseous, 'I' = ?, 'J' = ?, 'O' = ?,
-        if item[1] == 'M' or item[1] == 'I' or item[1] == 'J' or item[1] == 'O': minerals.append(item[0])
-
-    return aqueous_species, gaseous_species, minerals
-
 # Load the database
 database_path = 'databases/thermofun/cemdata18-thermofun.json'
 database = thermofun.Database(database_path)
