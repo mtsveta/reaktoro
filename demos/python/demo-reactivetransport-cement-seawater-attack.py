@@ -116,7 +116,7 @@ indx_S = 10
 indx_Si = 11
 indx_Al = 12
 indx_Hcation = 13
-indx_Cl = 14
+indx_Clanoion = 14
 indx_Cacation = 15
 indx_Mgcation = 16
 indx_Nacation = 17
@@ -150,6 +150,9 @@ def titlestr(t):
 def make_results_folders():
     os.system('mkdir -p results')
     os.system('mkdir -p figures/ph')
+    os.system('mkdir -p figures/elements')
+    os.system('mkdir -p figures/aqueous_species')
+    os.system('mkdir -p figures/minerals')
     os.system('mkdir -p videos')
 
 def plotfile(file):
@@ -385,10 +388,32 @@ params = {"plot_at_selected_steps": plot_at_selected_steps,
         "indx_S": indx_S,
         "indx_Si": indx_Si,
         "indx_Al": indx_Al,
-          "xcells": xcells}
+        "indx_Hcation": indx_Hcation,
+        "indx_Clanoion": indx_Clanoion,
+        "indx_Cacation": indx_Cacation, 
+        "indx_Mgcation": indx_Mgcation, 
+        "indx_Nacation": indx_Nacation,
+        "indx_HCO3anoion": indx_HCO3anoion,
+        "indx_CO2aq": indx_CO2aq, 
+        "indx_Cal":indx_Cal, 
+        "indx_hydrotalcite": indx_hydrotalcite,
+        "indx_Portlandite": indx_Portlandite,
+        "indx_C4AH11": indx_C4AH11,
+        "indx_CSHQJenD": indx_CSHQJenD, 
+        "indx_CSHQJenH": indx_CSHQJenH, 
+        "indx_CSHQTobD": indx_CSHQTobD,
+        "indx_CSHQTobH": indx_CSHQTobH,
+        "indx_C3AFS": indx_C3AFS,
+        "indx_Brc": indx_Brc,
+        "indx_ettringite03_ss": indx_ettringite03_ss,
+        "indx_ettringite13": indx_ettringite13,
+        "indx_ettringite9": indx_ettringite9,
+        "xcells": xcells}
 
 plot_figures_ph(params)
 plot_figures_elements(params)
+#plot_figures_aqueous_species(params)
+#plot_figures_minerals(params)
 
 # Animation options
 params["animation_starts_at_frame"] = 0 # the first frame index to be considered

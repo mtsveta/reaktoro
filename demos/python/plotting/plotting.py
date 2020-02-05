@@ -1,6 +1,7 @@
 import numpy  as np
 import matplotlib.pyplot as plt
 from matplotlib import animation
+from matplotlib import colors as mcolors
 
 minute = 60
 hour = 60 * minute
@@ -54,6 +55,7 @@ def plot_figures_elements(params):
                params["indx_Mg"], params["indx_Na"], params["indx_S"], params["indx_Si"], params["indx_Al"]]
     labels = ['C', 'Cl', 'Ca', 'Fe', 'K', 'Mg', 'Na', 'S', 'Si', 'Al']
 
+    """
     indx_C = params["indx_C"]
     indx_Cl = params["indx_Cl"]
     indx_Ca = params["indx_Ca"]
@@ -65,7 +67,7 @@ def plot_figures_elements(params):
     indx_Si = params["indx_Si"]
     indx_Al = params["indx_Al"]
     indx_Fe = params["indx_S"]
-
+    """
     colors = ['grey', 'tan', 'gold', 'yellowgreen', 'palevioletred',
               'steelblue', 'salmon', 'ligthseagreen', 'firebrick', 'olivedrab']
     xcells = params["xcells"]
@@ -88,14 +90,86 @@ def plot_figures_elements(params):
         data_Al = data[indx_Al]
         data_Fe = data[indx_Fe]
         """
-        plt.axes(xlim=(-0.01, 1.001), ylim=(8.5, 10.0))
+        #plt.axes(xlim=(-0.01, 1.001), ylim=(8.5, 10.0))
+        plt.axes(xlim=(-0.01, 1.001))
         plt.xlabel('Distance [m]')
         plt.ylabel('Elements amounts [molal]')
         plt.title(titlestr(t))
         for j in range(0, len(indices)):
             plt.plot(xcells, data[indices[j]], label=labels[j], **line(colors[j]))
         plt.legend(loc='lower right')
-        plt.savefig('figures/ph/pH-{}.pdf'.format(i))
+        plt.savefig('figures/elements/elements-{}.pdf'.format(i))
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+def plot_figures_aqueous_species(params):
+
+    plot_at_selected_steps = params["plot_at_selected_steps"]
+    dt = params["dt"]
+    folder = params["folder"]
+    files = params["files"]
+    xcells = params["xcells"]
+
+    indices = [params["indx_Hcation"], params["indx_Clanoion"], params["indx_Cacation"], 
+                params["indx_Mgcation"], params["indx_Nacation"], params["indx_HCO3anoion"], 
+                params["indx_CO2aq"]]
+    labels = ['H+', 'Cl-', 'Ca+2', 'Na+', 'HCO3-', 'CO2(aq)']
+    colors = ['darkcyan', 'mediumaqumarine', 'aqumarine', 
+              'bisque', 'burlywood', 'sienna', 'saddlebrown']
+    
+    xcells = params["xcells"]
+
+    for i in plot_at_selected_steps:
+        print("On pH figure at time step: {}".format(i))
+        t = i * dt
+        filearray = np.loadtxt(folder + '/' + files[i-1], skiprows=1)
+        data = filearray.T
+        #plt.axes(xlim=(-0.01, 1.001), ylim=(8.5, 10.0))
+        plt.axes(xlim=(-0.01, 1.001))
+        plt.xlabel('Distance [m]')
+        plt.ylabel('Species amounts [molal]')
+        plt.title(titlestr(t))
+        for j in range(0, len(indices)):
+            plt.plot(xcells, data[indices[j]], label=labels[j], **line(colors[j]))
+        plt.legend(loc='lower right')
+        plt.savefig('figures/aqueous_species/aqueous-species-{}.pdf'.format(i))
+        plt.tight_layout()
+        plt.show()
+        plt.close()
+
+def plot_figures_minerals(params):
+
+    plot_at_selected_steps = params["plot_at_selected_steps"]
+    dt = params["dt"]
+    folder = params["folder"]
+    files = params["files"]
+    xcells = params["xcells"]
+
+    indices = [params["indx_Hcation"], params["indx_Clanoion"], params["indx_Cacation"], 
+                params["indx_Mgcation"], params["indx_Nacation"], params["indx_HCO3anoion"], 
+                params["indx_CO2aq"]]
+    labels = ['Calcite', 'Hydrotalcite', 'Portlandite', 'C4AH11', 'CSHQJenD', 'CSHQJenH', 
+              'CSHQTobD', 'CSHQTobH', 'C3AFS', 'Brucite', 'Ettringite03_ss', 'Ettringite13', 'Ettringite9']
+    colors = ['khaki', 'gold', 'orange', 'orangered', 'crimson', 'darkmagenta', 'indigo', 
+              'black', 'darkblue', 'royalblue', 'cornflowerblue', 'lightsteelblue', 'slategrey']
+    
+    xcells = params["xcells"]
+
+    for i in plot_at_selected_steps:
+        print("On pH figure at time step: {}".format(i))
+        t = i * dt
+        filearray = np.loadtxt(folder + '/' + files[i-1], skiprows=1)
+        data = filearray.T
+        #plt.axes(xlim=(-0.01, 1.001), ylim=(8.5, 10.0))
+        plt.axes(xlim=(-0.01, 1.001))
+        plt.xlabel('Distance [m]')
+        plt.ylabel('Species amounts [molal]')
+        plt.title(titlestr(t))
+        for j in range(0, len(indices)):
+            plt.plot(xcells, data[indices[j]], label=labels[j], **line(colors[j]))
+        plt.legend(loc='lower right')
+        plt.savefig('figures/minerals/minerals-{}.pdf'.format(i))
         plt.tight_layout()
         plt.show()
         plt.close()
