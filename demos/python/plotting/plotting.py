@@ -34,7 +34,7 @@ def plot_figures_ph(params):
         filearray = np.loadtxt(results_folder + '/' + files[i-1], skiprows=1)
         data = filearray.T
         data_ph = data[indx_ph]
-        plt.axes(xlim=(-0.01, 0.501), ylim=(8.5, 10.0))
+        plt.axes(xlim=(-0.01, xcells[-1]), ylim=(8.5, 10.0))
         plt.xlabel('Distance [m]')
         plt.ylabel('pH')
         plt.title(titlestr(t))
@@ -59,12 +59,12 @@ def plot_figures_Eh(params):
         t = i * dt
         filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
-        data_ph = data[indx_Eh]
-        plt.axes(xlim=(-0.01, 0.501), ylim=(-0.5, 0.75))
+        data_Eh = data[indx_Eh]
+        plt.axes(xlim=(-0.01, xcells[-1]), ylim=(-0.5, 0.75))
         plt.xlabel('Distance [m]')
         plt.ylabel('Eh')
         plt.title(titlestr(t))
-        plt.plot(xcells, data_ph, label='Eh', **line('darkseagreen'))
+        plt.plot(xcells, data_Eh, label='Eh', **line('darkseagreen'))
         plt.legend(loc='lower right')
         plt.savefig(figures_folder + '/Eh/Eh-{}.pdf'.format(i))
         plt.tight_layout()
@@ -86,7 +86,7 @@ def plot_figures_SI(params):
         filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         data_SI = data[indx_SI]
-        plt.axes(xlim=(-0.01, 0.501), ylim=(0, 2.5))
+        plt.axes(xlim=(-0.01, xcells[-1]), ylim=(0, 2.5))
         plt.xlabel('Distance [m]')
         plt.ylabel('SI')
         plt.title(titlestr(t))
@@ -145,8 +145,7 @@ def plot_figures_elements(params):
         data_Al = data[indx_Al]
         data_Fe = data[indx_Fe]
         """
-        plt.axes(xlim=(-0.01, 0.501), ylim=(1e-7, 1e1))
-        #plt.axes(xlim=(-0.01, 0.501))
+        plt.axes(xlim=(-0.01, xcells[-1]), ylim=(1e-7, 1e1))
         plt.xlabel('Distance [m]')
         plt.ylabel('Elements molality [molal]')
         plt.yscale('log')
@@ -181,7 +180,7 @@ def plot_figures_aqueous_species(params):
         filearray = np.loadtxt(results_folder + '/' + files[i-1], skiprows=1)
         data = filearray.T
 
-        plt.axes(xlim=(-0.01, 0.501), ylim=(1e-11, 1e0))
+        plt.axes(xlim=(-0.01, xcells[-1]), ylim=(1e-11, 1e0))
         plt.xlabel('Distance [m]')
         plt.ylabel('Species molality [molal]')
         plt.yscale('log')
@@ -213,8 +212,7 @@ def plot_figures_solids(params):
         t = i * dt
         filearray = np.loadtxt(results_folder + '/' + files[i-1], skiprows=1)
         data = filearray.T
-        plt.axes(xlim=(-0.01, 0.501), ylim=(1e-26, 1e-4))
-        #plt.axes(xlim=(-0.01, 0.501))
+        plt.axes(xlim=(-0.01, xcells[-1]), ylim=(1e-26, 1e-4))
         plt.xlabel('Distance [m]')
         plt.ylabel('Mineral volum [%vol]')
         plt.yscale('log')
@@ -246,7 +244,7 @@ def plot_animation_ph(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(10.5, 10.7))
+    ax = plt.axes(xlim=(-0.01, xcells[-1])) # , ylim=(8.5, 10.0)
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('pH')
     ax.set_title(titlestr(0.0))
@@ -294,7 +292,7 @@ def plot_animation_Eh(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(-0.5, 0.75))
+    ax = plt.axes(xlim=(-0.01, xcells[-1]), ylim=(-0.5, 0.75))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('Eh')
     ax.set_title(titlestr(0.0))
@@ -342,7 +340,7 @@ def plot_animation_SI(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(0, 2.5))
+    ax = plt.axes(xlim=(-0.01, xcells[-1]), ylim=(0, 2.5))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('SI')
     ax.set_title(titlestr(0.0))
@@ -396,7 +394,7 @@ def plot_animation_elements(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(1e-7, 1e1))
+    ax = plt.axes(xlim=(-0.01, xcells[-1]), ylim=(1e-7, 1e1))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('Elements molality [molal]')
     plt.yscale('log')
@@ -456,7 +454,7 @@ def plot_animation_aqueous_species(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax =  plt.axes(xlim=(-0.01, 0.501), ylim=(1e-11, 1e0))
+    ax =  plt.axes(xlim=(-0.01, xcells[-1]), ylim=(1e-11, 1e0))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('Species molality [molal]')
     plt.yscale('log')
@@ -512,7 +510,7 @@ def plot_animation_solids(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax =  plt.axes(xlim=(-0.01, 0.501), ylim=(1e-26, 1e-4))
+    ax =  plt.axes(xlim=(-0.01, xcells[-1]), ylim=(1e-26, 1e-4))
     ax.set_xlabel('Distance [m]')
     plt.ylabel('Mineral volum [%vol]')
     plt.yscale('log')
