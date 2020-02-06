@@ -54,9 +54,11 @@ dx = (xr - xl)/ncells
 alpha = v*dt/dx
 ndigits = len(str(nsteps))
 xcells = np.linspace(xl, xr, ncells)  # the x-coordinates of the plots
-folder = 'results'
+results_folder = 'results-nacl'
+videos_folder = "videos-nacl"
+figures_folder = "figures-nacl"
 
-CFL = dt * v  / dx
+CFL = dt * v / dx
 print("CFL = ", CFL)
 
 # Options for the figure plotting
@@ -136,14 +138,14 @@ def titlestr(t):
 
 # Step 6: Creating folders for the results' output
 def make_results_folders():
-    os.system('mkdir -p results')
-    os.system('mkdir -p figures/ph')
-    os.system('mkdir -p figures/Eh')
-    os.system('mkdir -p figures/SI')
-    os.system('mkdir -p figures/elements')
-    os.system('mkdir -p figures/aqueous_species')
-    os.system('mkdir -p figures/minerals')
-    os.system('mkdir -p videos')
+    os.system('mkdir -p ' + results_folder)
+    os.system('mkdir -p ' + figures_folder + '/ph')
+    os.system('mkdir -p ' + figures_folder + '/Eh')
+    os.system('mkdir -p ' + figures_folder + '/SI')
+    os.system('mkdir -p ' + figures_folder + '/elements')
+    os.system('mkdir -p ' + figures_folder + '/aqueous_species')
+    os.system('mkdir -p ' + figures_folder + '/minerals')
+    os.system('mkdir -p ' + videos_folder)
 
 def load_data():
 
@@ -311,11 +313,13 @@ def plot():
 
     print("Collecting files...")
     # Collect files with results corresponding to smart or reference (classical) solver
-    files = [file for file in natsorted(os.listdir(folder))]
+    files = [file for file in natsorted(os.listdir(results_folder))]
 
     params = {"plot_at_selected_steps": plot_at_selected_steps,
               "dt": dt,
-              "folder": folder,
+              "results_folder": results_folder,
+              "figures_folder": figures_folder,
+              "videos_folder": videos_folder,
               "files": files,
               "indx_ph": indx_pH,
               "indx_Eh": indx_Eh,

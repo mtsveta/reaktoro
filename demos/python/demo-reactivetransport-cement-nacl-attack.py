@@ -36,13 +36,13 @@ year = 365 * day
 
 # Step 3: Define parameters for the reactive transport simulation
 xl = 0.0          # the x-coordinate of the left boundary
-xr = 2.0          # the x-coordinate of the right boundary
-ncells = 200      # the number of cells in the discretization
-nsteps = 1000      # the number of steps in the reactive transport simulation
+xr = 1.0          # the x-coordinate of the right boundary
+ncells = 50      # the number of cells in the discretization
+nsteps = 140      # the number of steps in the reactive transport simulation
 #nsteps = 3000      # the number of steps in the reactive transport simulation
 D  = 2.3e-9       # the diffusion coefficient (in units of m2/s)
 v  = 1.0/day           # the fluid pore velocity (in units of m/s)
-dt = 5*minute    # the time step (30 minutes in units of s)
+dt = 10*minute    # the time step (30 minutes in units of s)
 T = 293.15        # in kevin
 P = 100000.0      # in pascal
 
@@ -54,13 +54,14 @@ dx = (xr - xl)/ncells
 alpha = v*dt/dx
 ndigits = len(str(nsteps))
 xcells = np.linspace(xl, xr, ncells)  # the x-coordinates of the plots
-folder = 'results-nacl'
-
-CFL = dt * v  / dx
+results_folder = 'results-nacl'
+videos_folder = "videos-nacl"
+figures_folder = "figures-nacl"
+CFL = dt * v / dx
 print("CFL = ", CFL)
 
 # Options for the figure plotting
-plot_at_selected_steps = [1, 10, 60, 120, 240, 480, 960]  # the time steps at which the results are plotted
+plot_at_selected_steps = [1, 10, 60, 120, 200]  # the time steps at which the results are plotted
 
 # Step 4: The list of quantities to be output for each mesh cell, each time step
 output_quantities = """
@@ -136,14 +137,14 @@ def titlestr(t):
 
 # Step 6: Creating folders for the results' output
 def make_results_folders():
-    os.system('mkdir -p results')
-    os.system('mkdir -p figures/ph')
-    os.system('mkdir -p figures/Eh')
-    os.system('mkdir -p figures/SI')
-    os.system('mkdir -p figures/elements')
-    os.system('mkdir -p figures/aqueous_species')
-    os.system('mkdir -p figures/minerals')
-    os.system('mkdir -p videos')
+    os.system('mkdir -p ' + results_folder)
+    os.system('mkdir -p ' + figures_folder + '/ph')
+    os.system('mkdir -p ' + figures_folder + '/Eh')
+    os.system('mkdir -p ' + figures_folder + '/SI')
+    os.system('mkdir -p ' + figures_folder + '/elements')
+    os.system('mkdir -p ' + figures_folder + '/aqueous_species')
+    os.system('mkdir -p ' + figures_folder + '/minerals')
+    os.system('mkdir -p ' + videos_folder)
 
 def load_data():
 
@@ -175,7 +176,6 @@ def load_data():
         if item[1] == 'M' or item[1] == 'I' or item[1] == 'J' or item[1] == 'O': minerals.append(item[0])
 
     return aqueous_species, gaseous_species, minerals
-
 
 #------------------------------------------------------------------------------#
 # Reactive transport simulations
@@ -313,7 +313,7 @@ def simulate():
     output = rt.output()
     for item in output_quantities:
         output.add(item)
-    output.filename(folder + '/state.txt')  # Set the name of the output files
+    output.filename(results_folder + '/state.txt')  # Set the name of the output files
 
     make_results_folders()
 
@@ -337,11 +337,13 @@ def plot():
 
     print("Collecting files...")
     # Collect files with results corresponding to smart or reference (classical) solver
-    files = [file for file in natsorted(os.listdir(folder))]
+    files = [file for file in natsorted(os.listdir(results_folder))]
 
     params = {"plot_at_selected_steps": plot_at_selected_steps,
               "dt": dt,
-              "folder": folder,
+              "results_folder": results_folder,
+              "figures_folder": figures_folder,
+              "videos_folder": videos_folder,
               "files": files,
               "indx_ph": indx_pH,
               "indx_Eh": indx_Eh,
@@ -384,7 +386,7 @@ def plot():
     params["animation_starts_at_frame"] = 0  # the first frame index to be considered
     # params["animation_ends_at_frame"] = 600 # the last frame index to be considered
     # params["animation_num_frames_to_jump"] = 1 # the number of frames to jump between current and next
-    params["animation_ends_at_frame"] = 10 * 30  # the last frame index to be considered
+    params["animation_ends_at_frame"] = 10 * 10  # the last frame index to be considered
     params["animation_num_frames_to_jump"] = 1  # the number of frames to jump between current and next
     params["animation_fps"] = 30  # the number of frames per second
     params["animation_interval_wait"] = 200  # the time (in milliseconds) to wait between each frame
@@ -403,7 +405,7 @@ if __name__ == '__main__':
     make_results_folders()
 
     # Run the reactive transport simulations
-    simulate()
+    # simulate()
 
     # Plotting of the figures and videos
     plot()

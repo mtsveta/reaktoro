@@ -22,7 +22,8 @@ def plot_figures_ph(params):
 
     plot_at_selected_steps = params["plot_at_selected_steps"]
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    figures_folder = params["figures_folder"]
     files = params["files"]
     indx_ph = params["indx_ph"]
     xcells = params["xcells"]
@@ -30,16 +31,16 @@ def plot_figures_ph(params):
     for i in plot_at_selected_steps:
         print("On pH figure at time step: {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i-1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i-1], skiprows=1)
         data = filearray.T
         data_ph = data[indx_ph]
-        plt.axes(xlim=(-0.01, 2.001), ylim=(8.5, 10.0))
+        plt.axes(xlim=(-0.01, 0.501), ylim=(8.5, 10.0))
         plt.xlabel('Distance [m]')
         plt.ylabel('pH')
         plt.title(titlestr(t))
         plt.plot(xcells, data_ph, label='pH', **line('teal'))
         plt.legend(loc='lower right')
-        plt.savefig('figures/ph/pH-{}.pdf'.format(i))
+        plt.savefig(figures_folder + '/ph/pH-{}.pdf'.format(i))
         plt.tight_layout()
         plt.close()
 
@@ -47,7 +48,8 @@ def plot_figures_Eh(params):
 
     plot_at_selected_steps = params["plot_at_selected_steps"]
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    figures_folder = params["figures_folder"]
     files = params["files"]
     indx_Eh = params["indx_Eh"]
     xcells = params["xcells"]
@@ -55,16 +57,16 @@ def plot_figures_Eh(params):
     for i in plot_at_selected_steps:
         print("On Eh figure at time step: {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         data_ph = data[indx_Eh]
-        plt.axes(xlim=(-0.01, 2.001), ylim=(-0.5, 0.75))
+        plt.axes(xlim=(-0.01, 0.501), ylim=(-0.5, 0.75))
         plt.xlabel('Distance [m]')
         plt.ylabel('Eh')
         plt.title(titlestr(t))
         plt.plot(xcells, data_ph, label='Eh', **line('darkseagreen'))
         plt.legend(loc='lower right')
-        plt.savefig('figures/Eh/Eh-{}.pdf'.format(i))
+        plt.savefig(figures_folder + '/Eh/Eh-{}.pdf'.format(i))
         plt.tight_layout()
         plt.close()
 
@@ -72,7 +74,8 @@ def plot_figures_SI(params):
 
     plot_at_selected_steps = params["plot_at_selected_steps"]
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    figures_folder = params["figures_folder"]
     files = params["files"]
     indx_SI = params["indx_SI"]
     xcells = params["xcells"]
@@ -80,16 +83,16 @@ def plot_figures_SI(params):
     for i in plot_at_selected_steps:
         print("On SI figure at time step: {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         data_SI = data[indx_SI]
-        plt.axes(xlim=(-0.01, 2.001), ylim=(0, 2.5))
+        plt.axes(xlim=(-0.01, 0.501), ylim=(0, 2.5))
         plt.xlabel('Distance [m]')
         plt.ylabel('SI')
         plt.title(titlestr(t))
         plt.plot(xcells, data_SI, label='SI', **line('coral'))
         plt.legend(loc='lower right')
-        plt.savefig('figures/SI/SI-{}.pdf'.format(i))
+        plt.savefig(figures_folder + '/SI/SI-{}.pdf'.format(i))
         plt.tight_layout()
         plt.close()
 
@@ -97,7 +100,8 @@ def plot_figures_elements(params):
 
     plot_at_selected_steps = params["plot_at_selected_steps"]
     dt = params["dt"]
-    folder = params["folder"]
+    figures_folder = params["figures_folder"]
+    results_folder = params["results_folder"]
     files = params["files"]
     xcells = params["xcells"]
 
@@ -126,7 +130,7 @@ def plot_figures_elements(params):
     for i in plot_at_selected_steps:
         print("On elements figure at time step: {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i-1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i-1], skiprows=1)
         data = filearray.T
         """
         data_C = data[indx_C]
@@ -141,8 +145,8 @@ def plot_figures_elements(params):
         data_Al = data[indx_Al]
         data_Fe = data[indx_Fe]
         """
-        plt.axes(xlim=(-0.01, 2.001), ylim=(1e-7, 1e1))
-        #plt.axes(xlim=(-0.01, 2.001))
+        plt.axes(xlim=(-0.01, 0.501), ylim=(1e-7, 1e1))
+        #plt.axes(xlim=(-0.01, 0.501))
         plt.xlabel('Distance [m]')
         plt.ylabel('Elements molality [molal]')
         plt.yscale('log')
@@ -151,7 +155,7 @@ def plot_figures_elements(params):
             #if small_range_element[j]:
             plt.plot(xcells, data[indices[j]], label=labels[j], **line(colors[j]))
         plt.legend(loc='upper right')
-        plt.savefig('figures/elements/elements-small-range-{}.pdf'.format(i))
+        plt.savefig(figures_folder + '/elements/elements-small-range-{}.pdf'.format(i))
         plt.tight_layout()
         plt.close()
 
@@ -159,7 +163,8 @@ def plot_figures_aqueous_species(params):
 
     plot_at_selected_steps = params["plot_at_selected_steps"]
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    figures_folder = params["figures_folder"]
     files = params["files"]
     xcells = params["xcells"]
 
@@ -173,10 +178,10 @@ def plot_figures_aqueous_species(params):
     for i in plot_at_selected_steps:
         print("On aqueous species figure at time step: {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i-1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i-1], skiprows=1)
         data = filearray.T
 
-        plt.axes(xlim=(-0.01, 2.001), ylim=(1e-11, 1e0))
+        plt.axes(xlim=(-0.01, 0.501), ylim=(1e-11, 1e0))
         plt.xlabel('Distance [m]')
         plt.ylabel('Species molality [molal]')
         plt.yscale('log')
@@ -184,7 +189,7 @@ def plot_figures_aqueous_species(params):
         for j in range(0, len(indices)):
             plt.plot(xcells, data[indices[j]], label=labels[j], **line(colors[j]))
         plt.legend(loc='lower right')
-        plt.savefig('figures/aqueous_species/aqueous-species-{}.pdf'.format(i))
+        plt.savefig(figures_folder + '/aqueous_species/aqueous-species-{}.pdf'.format(i))
         plt.tight_layout()
         plt.close()
 
@@ -192,7 +197,8 @@ def plot_figures_solids(params):
 
     plot_at_selected_steps = params["plot_at_selected_steps"]
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    figures_folder = params["figures_folder"]
     files = params["files"]
     xcells = params["xcells"]
 
@@ -205,10 +211,10 @@ def plot_figures_solids(params):
     for i in plot_at_selected_steps:
         print("On solids figure at time step: {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i-1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i-1], skiprows=1)
         data = filearray.T
-        plt.axes(xlim=(-0.01, 2.001), ylim=(1e-26, 1e-4))
-        #plt.axes(xlim=(-0.01, 2.001))
+        plt.axes(xlim=(-0.01, 0.501), ylim=(1e-26, 1e-4))
+        #plt.axes(xlim=(-0.01, 0.501))
         plt.xlabel('Distance [m]')
         plt.ylabel('Mineral volum [%vol]')
         plt.yscale('log')
@@ -216,14 +222,15 @@ def plot_figures_solids(params):
         for j in range(0, len(indices)):
             plt.plot(xcells, data[indices[j]], label=labels[j], **line(colors[j]))
         plt.legend(loc='center right')
-        plt.savefig('figures/minerals/minerals-{}.pdf'.format(i))
+        plt.savefig(figures_folder + '/solids/solids-{}.pdf'.format(i))
         plt.tight_layout()
         plt.close()
 
 def plot_animation_ph(params):
 
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    videos_folder = params["videos_folder"]
     files = params["files"]
     indx_ph = params["indx_ph"]
     xcells = params["xcells"]
@@ -239,7 +246,7 @@ def plot_animation_ph(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 2.001), ylim=(8.5, 10.0))
+    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(10.5, 10.7))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('pH')
     ax.set_title(titlestr(0.0))
@@ -255,7 +262,7 @@ def plot_animation_ph(params):
     def animate(i):
         print("On pH animation on step {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         data_ph = data[indx_ph]
         objects[0].set_data(xcells, data_ph)
@@ -265,12 +272,13 @@ def plot_animation_ph(params):
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=animation_frame_range, interval=animation_interval_wait, blit=True)
 
-    anim.save('videos/pH.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
+    anim.save(videos_folder + '/pH.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
 
 def plot_animation_Eh(params):
 
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    videos_folder = params["videos_folder"]
     files = params["files"]
     indx_Eh = params["indx_Eh"]
     xcells = params["xcells"]
@@ -286,7 +294,7 @@ def plot_animation_Eh(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 2.001), ylim=(-0.5, 0.75))
+    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(-0.5, 0.75))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('Eh')
     ax.set_title(titlestr(0.0))
@@ -302,7 +310,7 @@ def plot_animation_Eh(params):
     def animate(i):
         print("On Eh animation on step {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         data_Eh = data[indx_Eh]
         objects[0].set_data(xcells, data_Eh)
@@ -312,12 +320,13 @@ def plot_animation_Eh(params):
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=animation_frame_range, interval=animation_interval_wait, blit=True)
 
-    anim.save('videos/Eh.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
+    anim.save(videos_folder + '/Eh.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
 
 def plot_animation_SI(params):
 
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    videos_folder = params["videos_folder"]
     files = params["files"]
     indx_SI = params["indx_SI"]
     xcells = params["xcells"]
@@ -333,7 +342,7 @@ def plot_animation_SI(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 2.001), ylim=(0, 2.5))
+    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(0, 2.5))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('SI')
     ax.set_title(titlestr(0.0))
@@ -349,7 +358,7 @@ def plot_animation_SI(params):
     def animate(i):
         print("On SI animation on step {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         data_SI = data[indx_SI]
         objects[0].set_data(xcells, data_SI)
@@ -359,12 +368,13 @@ def plot_animation_SI(params):
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=animation_frame_range, interval=animation_interval_wait, blit=True)
 
-    anim.save('videos/SI.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
+    anim.save(videos_folder + '/SI.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
 
 def plot_animation_elements(params):
 
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    videos_folder = params["videos_folder"]
     files = params["files"]
     xcells = params["xcells"]
 
@@ -386,7 +396,7 @@ def plot_animation_elements(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, 2.001), ylim=(1e-7, 1e1))
+    ax = plt.axes(xlim=(-0.01, 0.501), ylim=(1e-7, 1e1))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('Elements molality [molal]')
     plt.yscale('log')
@@ -410,7 +420,7 @@ def plot_animation_elements(params):
     def animate(i):
         print("On elements on step {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         for j in range(0, len(indices)):
             objects[j].set_data(xcells, data[indices[j]])
@@ -418,12 +428,13 @@ def plot_animation_elements(params):
         return tuple(objects)
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=animation_frame_range, interval=animation_interval_wait, blit=True)
-    anim.save('videos/elements.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
+    anim.save(videos_folder + '/elements.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
 
 def plot_animation_aqueous_species(params):
 
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    videos_folder = params["videos_folder"]
     files = params["files"]
     xcells = params["xcells"]
 
@@ -445,7 +456,7 @@ def plot_animation_aqueous_species(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax =  plt.axes(xlim=(-0.01, 2.001), ylim=(1e-11, 1e0))
+    ax =  plt.axes(xlim=(-0.01, 0.501), ylim=(1e-11, 1e0))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('Species molality [molal]')
     plt.yscale('log')
@@ -466,7 +477,7 @@ def plot_animation_aqueous_species(params):
     def animate(i):
         print("On elements on step {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         for j in range(0, len(indices)):
             objects[j].set_data(xcells, data[indices[j]])
@@ -474,12 +485,13 @@ def plot_animation_aqueous_species(params):
         return tuple(objects)
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=animation_frame_range, interval=animation_interval_wait, blit=True)
-    anim.save('videos/species.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
+    anim.save(videos_folder + '/species.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
 
 def plot_animation_solids(params):
 
     dt = params["dt"]
-    folder = params["folder"]
+    results_folder = params["results_folder"]
+    videos_folder = params["videos_folder"]
     files = params["files"]
     xcells = params["xcells"]
 
@@ -500,7 +512,7 @@ def plot_animation_solids(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax =  plt.axes(xlim=(-0.01, 2.001), ylim=(1e-26, 1e-4))
+    ax =  plt.axes(xlim=(-0.01, 0.501), ylim=(1e-26, 1e-4))
     ax.set_xlabel('Distance [m]')
     plt.ylabel('Mineral volum [%vol]')
     plt.yscale('log')
@@ -522,7 +534,7 @@ def plot_animation_solids(params):
     def animate(i):
         print("On solids on step {}".format(i))
         t = i * dt
-        filearray = np.loadtxt(folder + '/' + files[i - 1], skiprows=1)
+        filearray = np.loadtxt(results_folder + '/' + files[i - 1], skiprows=1)
         data = filearray.T
         for j in range(0, len(indices)):
             objects[j].set_data(xcells, data[indices[j]])
@@ -530,4 +542,4 @@ def plot_animation_solids(params):
         return tuple(objects)
 
     anim = animation.FuncAnimation(fig, animate, init_func=init, frames=animation_frame_range, interval=animation_interval_wait, blit=True)
-    anim.save('videos/solids.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
+    anim.save(videos_folder + '/solids.mp4', fps=animation_fps, extra_args=['-vcodec', 'libx264'])
