@@ -36,13 +36,12 @@ year = 365 * day
 
 # Step 3: Define parameters for the reactive transport simulation
 xl = 0.0          # the x-coordinate of the left boundary
-xr = 2.0          # the x-coordinate of the right boundary
-ncells = 200      # the number of cells in the discretization
-nsteps = 1000      # the number of steps in the reactive transport simulation
-#nsteps = 3000      # the number of steps in the reactive transport simulation
+xr = 1.0          # the x-coordinate of the right boundary
+ncells = 100      # the number of cells in the discretization
+nsteps = 600      # the number of steps in the reactive transport simulation
 D  = 2.3e-9       # the diffusion coefficient (in units of m2/s)
-v  = 1.0/day           # the fluid pore velocity (in units of m/s)
-dt = 5*minute    # the time step (30 minutes in units of s)
+v  = 1.0/week           # the fluid pore velocity (in units of m/s)
+dt = 30*minute    # the time step (30 minutes in units of s)
 T = 293.15        # in kevin
 P = 100000.0      # in pascal
 
@@ -54,15 +53,15 @@ dx = (xr - xl)/ncells
 alpha = v*dt/dx
 ndigits = len(str(nsteps))
 xcells = np.linspace(xl, xr, ncells)  # the x-coordinates of the plots
-results_folder = 'results-nacl'
-videos_folder = "videos-nacl"
-figures_folder = "figures-nacl"
+results_folder = 'results-sw'
+videos_folder = "videos-sw"
+figures_folder = "figures-sw"
 
 CFL = dt * v / dx
 print("CFL = ", CFL)
 
 # Options for the figure plotting
-plot_at_selected_steps = [1, 10, 60, 120, 240, 480, 960]  # the time steps at which the results are plotted
+plot_at_selected_steps = [1, 10, 30, 60, 120, 240, 360, 540, 600]  # the time steps at which the results are plotted
 
 # Step 4: The list of quantities to be output for each mesh cell, each time step
 output_quantities = """
@@ -94,6 +93,8 @@ output_quantities = """
     phaseVolume(C3AFS0.84H4.32-C3FS0.84H4.32)
     phaseVolume(Brc)
     phaseVolume(tricarboalu03-ettringite03_ss)
+    elementMolality(H) 
+    elementMolality(O)
 """.split()
 
 indx_pH = 0
@@ -124,7 +125,8 @@ indx_CSHQ = 24
 indx_C3AFS = 25
 indx_Brc = 26
 indx_ettringite = 27
-
+indx_H = 28
+indx_O = 29
 #------------------------------------------------------------------------------#
 # Auxiliary functions
 #------------------------------------------------------------------------------#
@@ -144,7 +146,7 @@ def make_results_folders():
     os.system('mkdir -p ' + figures_folder + '/SI')
     os.system('mkdir -p ' + figures_folder + '/elements')
     os.system('mkdir -p ' + figures_folder + '/aqueous_species')
-    os.system('mkdir -p ' + figures_folder + '/minerals')
+    os.system('mkdir -p ' + figures_folder + '/solids')
     os.system('mkdir -p ' + videos_folder)
 
 def load_data():
@@ -289,7 +291,7 @@ def simulate():
     output = rt.output()
     for item in output_quantities:
         output.add(item)
-    output.filename('results/state.txt')  # Set the name of the output files
+    output.filename(results_folder + '/state.txt')  # Set the name of the output files
 
     make_results_folders()
 
@@ -309,7 +311,6 @@ def simulate():
         step += 1
 
 def plot():
-
 
     print("Collecting files...")
     # Collect files with results corresponding to smart or reference (classical) solver
@@ -349,31 +350,34 @@ def plot():
               "indx_C3AFS": indx_C3AFS,
               "indx_Brc": indx_Brc,
               "indx_ettringite": indx_ettringite,
+              "indx_H": indx_H,
+              "indx_O": indx_O,
               "xcells": xcells}
 
-    #plot_figures_ph(params)
-    #plot_figures_Eh(params)
-    #plot_figures_SI(params)
-    #plot_figures_elements(params)
-    #plot_figures_aqueous_species(params)
-    #plot_figures_solids(params)
+    plot_figures_ph(params)
+    plot_figures_Eh(params)
+    plot_figures_SI(params)
+    plot_figures_elements(params)
+    plot_figures_aqueous_species(params)
+    plot_figures_solids(params)
 
     # Animation options
     params["animation_starts_at_frame"] = 0  # the first frame index to be considered
     # params["animation_ends_at_frame"] = 600 # the last frame index to be considered
     # params["animation_num_frames_to_jump"] = 1 # the number of frames to jump between current and next
-    params["animation_ends_at_frame"] = 10 * 30  # the last frame index to be considered
+    params["animation_ends_at_frame"] = 600  # the last frame index to be considered
     params["animation_num_frames_to_jump"] = 1  # the number of frames to jump between current and next
     params["animation_fps"] = 30  # the number of frames per second
     params["animation_interval_wait"] = 200  # the time (in milliseconds) to wait between each frame
 
+    '''
     plot_animation_ph(params)
     plot_animation_Eh(params)
     plot_animation_SI(params)
     plot_animation_elements(params)
     plot_animation_aqueous_species(params)
     plot_animation_solids(params)
-
+    '''
 # Step 5: Define the main function
 if __name__ == '__main__':
 

@@ -41,6 +41,7 @@ editor.setPressures([P], "pascal")
 editor.addAqueousPhase(aqueous_species).setChemicalModelHKF()
 editor.addGaseousPhase(gaseous_species)
 
+
 # Add mineral species
 phase_indices = np.array([2, 2, 6, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
                           1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
@@ -56,14 +57,15 @@ for i in range(0, len(phase_indices)):
 system = ChemicalSystem(editor)
 num_elements = system.numElements()
 num_species = system.numSpecies()
+num_phases = system.numPhases()
 print(f"System with with {num_elements} elements, {num_species} species, {system.numPhases()} phases")
 
 # Must coincide with: 'Al' 'C' 'Ca' 'Cl' 'Fe' 'H' 'K' 'Mg' 'Na' 'Nit' 'O' 'S' 'Si' 'Zz'
 # Our list of elements: List with 14 elements: Al C Ca Cl Fe H K Mg N Na O S Si Z
 # Have to swap b value for 8th and 9th elements!
-print(f"List with {(system.numElements())} elements:", end=" ")
-for element in system.elements(): print(element.name(), end=" ")
-print("")
+#print(f"List with {(system.numElements())} elements:", end=" ")
+#for element in system.elements(): print(element.name(), end=" ")
+#print("")
 
 # -------------------------------------------------------------------------------------------------------------------- #
 # Cement
@@ -90,7 +92,6 @@ problem_cement.setTemperature(T, "kelvin")
 problem_cement.setPressure(P, "pascal")
 problem_cement.setElementInitialAmounts(b_cement)
 problem_cement.fixSpeciesAmount("Qtz", 0.107827, "mol")
-#problem_cement.fixSpeciesAmount("C3AFS0.84H4.32", 0.0, "mol")
 
 state_cement = equilibrate(problem_cement)
 state_cement.output("state_cement_without_magnetite_natrolite.txt")
@@ -118,17 +119,11 @@ b_nacl = np.array([1.43733259290492e-12, 1.21929100962448e-11, 1.43733259290492e
                    5.34889415162815e-08, 0.000238186684843354, 0.239687078800178, 1.43733259290492e-12,
                    0.107827100001437, 0])
 
-# With 1 kg of water
-'''
-b_nacl = np.array([1.0e-12, 6.736879e-12, 1.0e-12, 0.5,
-                   1.0e-12, 111.01675, 1.e-12, 1.e-12,
-                   1.e-12, 0.5, 55.724028, 1e-12,
-                   0.107827100001437, 0])
-'''
 problem_nacl = EquilibriumInverseProblem(system)
 problem_nacl.setTemperature(T, "kelvin")
 problem_nacl.setPressure(P, "pascal")
 problem_nacl.setElementInitialAmounts(b_nacl)
+#problem_nacl.add("H20", 0.001, "g") #only works with a bit of water
 problem_nacl.fixSpeciesAmount("Qtz", 0.107827, "mol")
 
 state_nacl = equilibrate(problem_nacl)

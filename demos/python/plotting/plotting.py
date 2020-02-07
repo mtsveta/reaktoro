@@ -244,7 +244,7 @@ def plot_animation_ph(params):
 
     # Plot of mineral's volume the space coordinates
     fig = plt.figure()
-    ax = plt.axes(xlim=(-0.01, xcells[-1])) # , ylim=(8.5, 10.0)
+    ax = plt.axes(xlim=(-0.01, xcells[-1]), ylim=(8.5, 12.0))
     ax.set_xlabel('Distance [m]')
     ax.set_ylabel('pH')
     ax.set_title(titlestr(0.0))
