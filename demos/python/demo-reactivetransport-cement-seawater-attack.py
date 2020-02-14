@@ -39,7 +39,7 @@ xl = 0.0          # the x-coordinate of the left boundary
 xr = 1.0          # the x-coordinate of the right boundary
 ncells = 100      # the number of cells in the discretization
 nsteps = 600      # the number of steps in the reactive transport simulation
-D  = 2.3e-9       # the diffusion coefficient (in units of m2/s)
+D  = 2.3e-10       # the diffusion coefficient (in units of m2/s)
 v  = 1.0/week           # the fluid pore velocity (in units of m/s)
 dt = 30*minute    # the time step (30 minutes in units of s)
 T = 293.15        # in kevin
@@ -53,12 +53,13 @@ dx = (xr - xl)/ncells
 alpha = v*dt/dx
 ndigits = len(str(nsteps))
 xcells = np.linspace(xl, xr, ncells)  # the x-coordinates of the plots
-results_folder = 'results-sw'
-videos_folder = "videos-sw"
-figures_folder = "figures-sw"
+results_folder = 'results-sw-phasevolume'
+videos_folder = "videos-sw-phasevolume"
+figures_folder = "figures-sw-phasevolume"
 
 CFL = dt * v / dx
 print("CFL = ", CFL)
+input()
 
 # Options for the figure plotting
 plot_at_selected_steps = [1, 10, 30, 60, 120, 240, 360, 540, 600]  # the time steps at which the results are plotted
@@ -185,9 +186,15 @@ def load_data():
 # Reactive transport simulations
 #------------------------------------------------------------------------------#
 def simulate():
+
+
     # Load the database
     database_path = 'databases/thermofun/cemdata18-thermofun.json'
     database = thermofun.Database(database_path)
+
+    #substance = thermofun.Substance()
+    #substance.thermoReferenceProperties()
+    #termofun.substance[] = database.mapSubstances()['monocarbonate']
 
     # Load species from the date files
     aqueous_species, gaseous_species, minerals = load_data()
@@ -226,6 +233,8 @@ def simulate():
     for element in system.elements(): print(element.name(), end=" ")
     print("")
 
+    options = EquilibriumOptions()
+    options.epsilon = 1e-20
 
     # -------------------------------------------------------------------------------------------------------------------- #
     # Cement / Initial boundary condition
@@ -240,11 +249,13 @@ def simulate():
     problem_cement.setTemperature(T, "kelvin")
     problem_cement.setPressure(P, "pascal")
     problem_cement.setElementInitialAmounts(b_cement)
+    #problem_cement.add("H2", 1, "g")
     problem_cement.fixSpeciesAmount("Qtz", 0.107827, "mol")
+    #problem_cement.fixSpeciesAmount("Qtz", 0.107827, "mol")
 
     state_cement = equilibrate(problem_cement)
-    state_cement.output("state_cement.txt")
-
+    state_cement.output("state_cement-epsilon-1e-20.txt")
+    input()
     # -------------------------------------------------------------------------------------------------------------------- #
     # Sea water (SW) / Left boundary condition
     # -------------------------------------------------------------------------------------------------------------------- #
@@ -260,17 +271,35 @@ def simulate():
     problem_sw.setElementInitialAmounts(b_sw)
     problem_sw.fixSpeciesAmount("Qtz", 0.107827, "mol")
 
+
     state_sw = equilibrate(problem_sw)
     state_sw.output("state_sw.txt")
 
+    input()
     # Step 9: Scale the volumes of the phases in the initial condition
-    state_cement.scalePhaseVolume('Aqueous', 0.1, 'm3') # corresponds to the initial porosity of 10%.
-    state_cement.scaleVolume(1.0, 'm3')
-    #state_cement.scalePhaseVolume('Quartz', 0.882, 'm3')
-    #state_cement.scalePhaseVolume('Calcite', 0.018, 'm3')
-
+    state_cement.scalePhaseVolume('Aqueous', 4.464e-6 * 0.1, 'm3') # corresponds to the initial porosity of 10%.
+    state_cement.scaleVolume(4.464e-6, 'm3')
+    '''
+    phaseVolume(Cal)
+    phaseVolume(hydrotalcite)
+    phaseVolume(Portlandite)
+    phaseVolume(C4AH11)
+    phaseVolume(CSHQ - JenD - CSHQ - JenH - CSHQ - TobD - CSHQ - TobH - KSiOH - NaSiOH)
+    phaseVolume(C3AFS0
+    .84
+    H4
+    .32 - C3FS0
+    .84
+    H4
+    .32)
+    phaseVolume(Brc)
+    phaseVolume(tricarboalu03 - ettringite03_ss)
+    '''
+    #state_cement.scalePhaseVolume('Qtz', 0.882, 'm3') # 0.882 = 98 * 0.9
+    #state_cement.scalePhaseVolume('Cal', 0.018, 'm3') # 0.018 = 2 * 0.9
+    #state_cement.scale
     # Step 10: Scale the boundary condition state
-    state_sw.scaleVolume(1.0, 'm3')
+    state_sw.scaleVolume(4.464e-6, 'm3')
 
     # Step 11: Create the mesh for the column
     mesh = Mesh(ncells, xl, xr)

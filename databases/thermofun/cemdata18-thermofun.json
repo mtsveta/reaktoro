@@ -17303,8 +17303,11 @@
         ]
       },
       "sm_gibbs_energy": {
-        "values": [
+        "old_values": [
           -7337459.1
+        ],
+        "values": [
+          -7336317.1
         ],
         "units": [
           "J/mol"
