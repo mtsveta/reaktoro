@@ -53,15 +53,14 @@ dx = (xr - xl)/ncells
 alpha = v*dt/dx
 ndigits = len(str(nsteps))
 xcells = np.linspace(xl, xr, ncells)  # the x-coordinates of the plots
-results_folder = 'results-sw'
-videos_folder = "videos-sw"
-figures_folder = "figures-sw"
-
+results_folder = 'results-nacl'
+videos_folder = "videos-nacl"
+figures_folder = "figures-nacl"
 CFL = dt * v / dx
 print("CFL = ", CFL)
 
 # Options for the figure plotting
-plot_at_selected_steps = [1, 10, 30, 60, 120, 240, 360, 540, 600]  # the time steps at which the results are plotted
+plot_at_selected_steps = [1, 10, 30, 60, 120, 240, 360, 480, 540, 600]  # the time steps at which the results are plotted
 
 # Step 4: The list of quantities to be output for each mesh cell, each time step
 output_quantities = """
@@ -127,6 +126,7 @@ indx_Brc = 26
 indx_ettringite = 27
 indx_H = 28
 indx_O = 29
+
 #------------------------------------------------------------------------------#
 # Auxiliary functions
 #------------------------------------------------------------------------------#
@@ -180,7 +180,6 @@ def load_data():
 
     return aqueous_species, gaseous_species, minerals
 
-
 #------------------------------------------------------------------------------#
 # Reactive transport simulations
 #------------------------------------------------------------------------------#
@@ -190,10 +189,34 @@ def simulate():
     database = thermofun.Database(database_path)
 
     # Load species from the date files
-    aqueous_species, gaseous_species, minerals = load_data()
+    aqueous_species = ['Al(SO4)+', 'Al(SO4)2-', 'Al+3', 'AlO+', 'AlO2-', 'AlO2H@', 'AlOH+2', 'AlHSiO3+2', 'AlSiO5-3',
+                       'Ca(CO3)@', 'Ca(HCO3)+', 'Ca(SO4)@', 'Ca+2', 'CaOH+', 'Ca(HSiO3)+', 'CaSiO3@', 'Fe(CO3)@',
+                       'Fe(HCO3)+', 'Fe(HSO4)+', 'Fe(SO4)@', 'Fe+2', 'FeCl+', 'FeOH+', 'Fe(HSO4)+2', 'Fe(SO4)+',
+                       'Fe(SO4)2-', 'Fe+3', 'Fe2(OH)2+4', 'Fe3(OH)4+5', 'FeCl+2', 'FeCl2+', 'FeCl3@', 'FeO+', 'FeO2-',
+                       'FeO2H@', 'FeOH+2', 'FeHSiO3+2', 'K(SO4)-', 'K+', 'KOH@', 'Mg(CO3)@', 'Mg(HCO3)+', 'Mg+2',
+                       'MgOH+',
+                       'MgSO4@', 'Mg(HSiO3)+', 'MgSiO3@', 'Na(CO3)-', 'Na(HCO3)@', 'Na(SO4)-', 'Na+', 'NaOH@', 'HSiO3-',
+                       'Si4O10-4', 'SiO2@', 'SiO3-2', 'CO2@', 'CO3-2', 'HCO3-', 'CH4@', 'ClO4-', 'Cl-', 'H2@', 'N2@',
+                       'O2@',
+                       'S2O3-2', 'HSO3-', 'SO3-2', 'HSO4-', 'SO4-2', 'H2S@', 'HS-', 'S-2', 'OH-', 'H+', 'H2O@']
+    gaseous_species = ['CO2(g)', 'CH4(g)', 'H2(g)', 'N2(g)', 'O2(g)', 'H2S(g)', 'H2O(g)']
+
+    # Here, natrolite and Mag are removed from the minerals
+    minerals = ['monocarbonate', 'C2AClH5', 'C3AFS0.84H4.32', 'C3FS0.84H4.32', 'CSHQ-JenD', 'CSHQ-JenH', 'CSHQ-TobD',
+                'CSHQ-TobH', 'KSiOH', 'NaSiOH', 'straetlingite', 'straetlingite7', 'C4AH13', 'monosulphate12',
+                'tricarboalu03', 'ettringite03_ss', 'M075SH', 'M15SH', 'AlOHmic', 'Kln', 'C12A7', 'C3A', 'C3S', 'C4AF',
+                'CA', 'CA2', 'C2AH7.5', 'C3AH6', 'C4AH11', 'C4AH13', 'C4AH19', 'CAH10', 'monosulphate10.5',
+                'monosulphate12',
+                'monosulphate14', 'monosulphate16', 'monosulphate9', 'chabazite', 'zeoliteP_Ca', 'straetlingite5.5',
+                'monocarbonate9', 'hemicarbonat10.5', 'hemicarbonate', 'hemicarbonate9', 'monocarbonate', 'C4AsClH12',
+                'ettringite13', 'ettringite9', 'Arg', 'Cal', 'C3FH6', 'C4FH13', 'Fe-hemicarbonate', 'Femonocarbonate',
+                'Lim',
+                'Portlandite', 'Anh', 'Gp', 'hemihydrate', 'FeCO3(pr)', 'Sd', 'FeOOHmic', 'Py', 'Tro', 'Melanterite',
+                'K2SO4',
+                'syngenite', 'hydrotalcite', 'Brc', 'Na2SO4', 'zeoliteX', 'zeoliteY', 'Sulfur', 'Qtz', 'Amor-Sl']
     print("Aqueous species: ", aqueous_species)
-    print("\nGaseous species: ", gaseous_species)
-    print("\nMinerals species: ", minerals)
+    print("Gaseous species: ", gaseous_species)
+    print("Minerals species: ", minerals)
 
     # Create chemical species
     editor = ChemicalEditor(database)
@@ -203,9 +226,11 @@ def simulate():
     editor.addGaseousPhase(gaseous_species)
 
     # Add mineral species
-    phase_indices = np.array([2, 2, 6, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                              1, 1, 1, 1])
+    phase_indices = np.array(
+        [2, 2, 6, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+         1, 1])
+
     # Add solid solutions (using provided above indices) and pure minerals
     index_minerals = 0
     for i in range(0, len(phase_indices)):
@@ -246,22 +271,23 @@ def simulate():
     state_cement.output("state_cement.txt")
 
     # -------------------------------------------------------------------------------------------------------------------- #
-    # Sea water (SW) / Left boundary condition
+    # NaCl-brine / Left boundary condition
     # -------------------------------------------------------------------------------------------------------------------- #
     # Bulk composition of reactive subsystem, moles of BCs
-    b_sw = np.array([1e-12, 8.39047799118904e-07, 4.60274559011631e-06, 0.00024470481263518,
-                     1e-12, 0.0480862507085869 + 2, 4.5682055764741e-06, 2.37779781110928e-05,
-                     5.4730517594269e-08, 0.000209584727160819, 0.239750374257753 + 1, 1.26338032622899e-05,
-                     0.107827168643251, 0])
+    b_nacl = np.array([1.43733259290492e-12, 1.21929100962448e-11, 1.43733259290492e-12, 0.000238186684843354,
+                       1.43733259290492e-12, 0.0480657296087116, 1.43733259290492e-12, 1.43733259290492e-12,
+                       5.34889415162815e-08, 0.000238186684843354, 0.239687078800178, 1.43733259290492e-12,
+                       0.107827100001437, 0])
 
-    problem_sw = EquilibriumInverseProblem(system)
-    problem_sw.setTemperature(T, "kelvin")
-    problem_sw.setPressure(P, "pascal")
-    problem_sw.setElementInitialAmounts(b_sw)
-    problem_sw.fixSpeciesAmount("Qtz", 0.107827, "mol")
+    problem_nacl = EquilibriumInverseProblem(system)
+    problem_nacl.setTemperature(T, "kelvin")
+    problem_nacl.setPressure(P, "pascal")
+    problem_nacl.setElementInitialAmounts(b_nacl)
+    problem_nacl.add("H20", 0.001, "g")
+    problem_nacl.fixSpeciesAmount("Qtz", 0.107827, "mol")
 
-    state_sw = equilibrate(problem_sw)
-    state_sw.output("state_sw.txt")
+    state_nacl = equilibrate(problem_nacl)
+    state_nacl.output("state_nacl.txt")
 
     # Step 9: Scale the volumes of the phases in the initial condition
     state_cement.scalePhaseVolume('Aqueous', 0.1, 'm3') # corresponds to the initial porosity of 10%.
@@ -270,7 +296,7 @@ def simulate():
     #state_cement.scalePhaseVolume('Calcite', 0.018, 'm3')
 
     # Step 10: Scale the boundary condition state
-    state_sw.scaleVolume(1.0, 'm3')
+    state_nacl.scaleVolume(1.0, 'm3')
 
     # Step 11: Create the mesh for the column
     mesh = Mesh(ncells, xl, xr)
@@ -283,7 +309,7 @@ def simulate():
     rt.setMesh(mesh)
     rt.setVelocity(v)
     rt.setDiffusionCoeff(D)
-    rt.setBoundaryState(state_sw)
+    rt.setBoundaryState(state_nacl)
     rt.setTimeStep(dt)
     rt.initialize()
 
@@ -311,6 +337,7 @@ def simulate():
         step += 1
 
 def plot():
+
 
     print("Collecting files...")
     # Collect files with results corresponding to smart or reference (classical) solver
@@ -369,7 +396,6 @@ def plot():
     params["animation_num_frames_to_jump"] = 1  # the number of frames to jump between current and next
     params["animation_fps"] = 30  # the number of frames per second
     params["animation_interval_wait"] = 200  # the time (in milliseconds) to wait between each frame
-
     '''
     plot_animation_ph(params)
     plot_animation_Eh(params)
