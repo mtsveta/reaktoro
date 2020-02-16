@@ -169,7 +169,7 @@ def plotfile(file):
 
 # Step 4: Construct the chemical system with its phases and species
 database_path = 'databases/thermofun/cemdata18-thermofun.json'
-db = Database('database_path')
+db = Database(database_path)
 
 editor = ChemicalEditor(database)
 editor.setTemperatures([T], "kelvin")
