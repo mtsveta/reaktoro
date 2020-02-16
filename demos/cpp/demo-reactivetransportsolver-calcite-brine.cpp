@@ -81,6 +81,9 @@ struct Results
 
     /// The accumulated timing information of all smart equilibrium calculations.
     SmartEquilibriumTiming smart_equilibrium_timing;
+
+    // Rate of the smart equlibrium estimation w.r.t to the total chemical equilibrium calculation
+    double smart_equilibrium_acceptance_rate = 0.0;
 };
 
 /// Forward declaration
@@ -115,7 +118,7 @@ int main()
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 10; // the number of steps in the reactive transport simulation
+    params.nsteps = 10000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -138,7 +141,7 @@ int main()
 
     // Execute reactive transport with different solvers
     params.use_smart_eqilibirum_solver = true; runReactiveTransport(params, results);
-    params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;
     results.smart_total = results.smart_equilibrium_timing.solve;
@@ -155,6 +158,9 @@ int main()
               << results.conventional_total / results.smart_total_ideal_search << std::endl;
     std::cout << "speed up (with ideal search & store): "
               << results.conventional_total / results.smart_total_ideal_search_store << std::endl << std::endl;
+    std::cout << " smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " / "
+              << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells *params.nsteps
+              << " fully evaluated GEMS out of " << params.ncells * params.nsteps  << std::endl;
 
     std::cout << "time_reactive_transport_conventional: " << results.time_reactive_transport_conventional << std::endl;
     std::cout << "time_reactive_transport_smart       : " << results.time_reactive_transport_smart << std::endl;
@@ -273,7 +279,7 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     while (step < params.nsteps)
     {
         // Print some progress
-        std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        //std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.step(field);
@@ -298,7 +304,10 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     else    JsonOutput(folder + "/" + "analysis-conventional.json") << analysis;
 
     // Step **: Save equilibrium timing to compare the speedup of smart equilibrium solver versus conventional one
-    if(params.use_smart_eqilibirum_solver) results.smart_equilibrium_timing = analysis.smart_equilibrium.timing;
+    if(params.use_smart_eqilibirum_solver) {
+        results.smart_equilibrium_timing = analysis.smart_equilibrium.timing;
+        results.smart_equilibrium_acceptance_rate = analysis.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
+    }
     else results.equilibrium_timing = analysis.equilibrium.timing;
 }
 

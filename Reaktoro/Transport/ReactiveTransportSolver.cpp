@@ -177,7 +177,8 @@ struct ReactiveTransportSolver::Impl
         // Left boundary condition cell
         Index icell_bc = 0;
         // Get porosity of the left boundary cell
-        const auto phi_bc = field[icell_bc].properties().fluidVolume().val / field[icell_bc].properties().volume().val;
+        //const auto phi_bc = field[icell_bc].properties().fluidVolume().val / field[icell_bc].properties().volume().val;
+        double phi_bc = field[icell_bc].properties().fluidVolume().val; // version in the smart equilibrium paper
 
         // Ensure the result of each fluid element transport calculation can be saved
         result.transport_of_element.resize(num_elements);
