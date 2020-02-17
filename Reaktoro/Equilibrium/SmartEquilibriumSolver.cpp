@@ -333,6 +333,18 @@ struct SmartEquilibriumSolver::Impl
         // Reset the result of the last smart equilibrium calculation
         result = {};
 
+        ///*
+        // If be is not changed from be_prev too much, skip this simulation
+        Vector be_prev = state.elementAmounts();
+        const double diff = (be_prev - be).norm() / be.norm();
+        if(diff < 1e-13)
+        {
+            result.estimate.accepted = true;
+            toc(0, result.timing.solve);
+            return result;
+        }
+        //*/
+
         // Perform a smart estimate of the chemical state
         timeit( estimate(state, T, P, be),
             result.timing.estimate= );

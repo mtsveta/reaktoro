@@ -141,7 +141,7 @@ int main()
 
     // Execute reactive transport with different solvers
     params.use_smart_eqilibirum_solver = true; runReactiveTransport(params, results);
-    //params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
+    params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;
     results.smart_total = results.smart_equilibrium_timing.solve;
@@ -190,16 +190,34 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     // Create aqueous phase with all possible elements
     // Set a chemical model of the phase with the Pitzer equation of state
     // With an exception for the CO2, for which Drummond model is set
+
+    /*
+    // HKF selected species
+    editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--");
+    */
+    /*
+    // HKF full system
+    editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C");
+    */
+    /*
+    // Pitzer selected species
+    editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--")
+            .setChemicalModelPitzerHMW()
+            .setActivityModelDrummondCO2();
+    */
+    ///*
+    // Pitzer full system
     editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
             .setChemicalModelPitzerHMW()
             .setActivityModelDrummondCO2();
+    //*/
     editor.addMineralPhase("Quartz");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Dolomite");
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
-    //if (params.use_smart_eqilibirum_solver) std::cout << "system = \n" << system << std:: endl;
+    if (params.use_smart_eqilibirum_solver) std::cout << "system = \n" << system << std:: endl;
 
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumProblem problem_ic(system);
@@ -341,7 +359,15 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-eqreltol-" + reltol_stream.str() +
                            "-eqabstol-" + abstol_stream.str() +
                            (params.use_smart_eqilibirum_solver == true ? "-smart" : "-reference");      // name of the folder with results
-    std::string folder = "results" + test_tag;
+    //std::string folder = "results-pitzer-full" + test_tag;
+    //std::string folder = "results-pitzer-selected-species" + test_tag; // Local(2)
+    //std::string folder = "results-hkf-full" + test_tag; // Local(3)
+    //std::string folder = "results-hkf-secelted-species" + test_tag; // Local(4)
+    //std::string folder = "../results-pitzer-full-with-skipping-1e-14" + test_tag; // Local(5)
+    //std::string folder = "../results-pitzer-full-with-skipping-1e-14-both-solvers" + test_tag; // Local(6)
+    //std::string folder = "../results-pitzer-full-with-skipping-1e-13" + test_tag; // Local(5)
+    std::string folder = "../results-pitzer-full-with-skipping-1e-13-both-solvers" + test_tag; // Local(8)
+
     if (stat(folder.c_str(), &status) == -1) mkdir(folder.c_str());
 
     std::cout << "\nsolver                         : " << (params.use_smart_eqilibirum_solver == true ? "smart" : "conventional") << std::endl;

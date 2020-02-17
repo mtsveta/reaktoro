@@ -190,7 +190,6 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     SmartEquilibriumOptions smart_equilibrium_options;
     smart_equilibrium_options.reltol = params.smart_equlibrium_reltol;
     smart_equilibrium_options.abstol = params.smart_equlibrium_abstol;
-    smart_equilibrium_options.tol = params.tol;
 
     // Step **: Construct the chemical system with its phases and species (using ChemicalEditor)
     Database database("supcrt07.xml");
@@ -215,7 +214,8 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
                             "Na+", "NaSO4-",
                             "O2(aq)",
                             "H2S(aq)", "HS-", "S5--", "S4--", "S3--", "S2--",
-                            "SO4--", "NaSO4-", "MgSO4(aq)", "CaSO4(aq)", "KSO4-", "HSO4-"}).setChemicalModelDebyeHuckel(dhModel);
+                            "SO4--", "NaSO4-", "MgSO4(aq)", "CaSO4(aq)", "KSO4-", "HSO4-"}).setChemicalModelPitzerHMW();
+    //.setChemicalModelDebyeHuckel(dhModel);
     editor.addMineralPhase("Pyrrhotite");
     editor.addMineralPhase("Siderite");
 
@@ -322,7 +322,7 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     while (step < params.nsteps)
     {
         // Print some progress
-        std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        //std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.step(field);
@@ -373,9 +373,10 @@ auto makeResultsFolder(const Params& params) -> std::string
 {
     struct stat status = {0};               // structure to get the file status
 
-    std::ostringstream tol_stream, dt_stream;
+    std::ostringstream reltol_stream, abstol_stream, dt_stream;
     dt_stream << params.dt;
-    tol_stream << std::scientific << std::setprecision(1) << params.tol;
+    reltol_stream << std::scientific << std::setprecision(1) << params.smart_equlibrium_reltol;
+    abstol_stream << std::scientific << std::setprecision(1) <<  params.smart_equlibrium_abstol;
 
     std::string test_tag = "-dt-" + dt_stream.str() +
                            "-ncells-" + std::to_string(params.ncells) +
@@ -384,8 +385,9 @@ auto makeResultsFolder(const Params& params) -> std::string
     std::string smart_test_tag = "-dt-" + dt_stream.str() +
                                  "-ncells-" + std::to_string(params.ncells) +
                                  "-nsteps-" + std::to_string(params.nsteps) +
-                                 "-tol-" + tol_stream.str() + "-smart";      // name of the folder with results
-    std::string folder = "results-pitzer-geometric-nnsearch";
+                                 "-eqreltol-" + reltol_stream.str() +
+                                 "-eqabstol-" + abstol_stream.str() + "-smart";      // name of the folder with results
+    std::string folder = "results-pitzer";
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :
              folder + test_tag;
