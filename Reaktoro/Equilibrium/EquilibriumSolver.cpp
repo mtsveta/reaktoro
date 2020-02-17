@@ -468,18 +468,18 @@ struct EquilibriumSolver::Impl
         // Reset the result of last equilibrium calculation
         result = {};
 
-        ///*
+        /*
         // If be is not changed from be_prev too much, skip this simulation
         Vector be_prev = state.elementAmounts();
         const double diff = (be_prev - be).norm() / be.norm();
-        if(diff < 1e-13)
+        if(diff < 1e-12)
         {
             //skipped++;
             //std::cout << "totally skipped = " << skipped << std::endl;
 
             return result;
         }
-        //*/
+        */
 
         // Set temperature and pressure of the chemical state
         state.setTemperature(T);

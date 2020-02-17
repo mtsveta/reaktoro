@@ -195,25 +195,43 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     // HKF selected species
     editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--");
     */
-    /*
+    ///*
     // HKF full system
     editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C");
-    */
+    editor.addMineralPhase("Quartz");
+    editor.addMineralPhase("Calcite");
+    editor.addMineralPhase("Dolomite");
+    //*/
     /*
     // Pitzer selected species
     editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--")
             .setChemicalModelPitzerHMW()
             .setActivityModelDrummondCO2();
     */
-    ///*
+    /*
     // Pitzer full system
     editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
             .setChemicalModelPitzerHMW()
             .setActivityModelDrummondCO2();
-    //*/
+    */
+    /*
+    // Debey-Huckel full system
+    editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
+           .setChemicalModelDebyeHuckel()
+           .setActivityModelDrummondCO2();
     editor.addMineralPhase("Quartz");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Dolomite");
+    */
+    /*
+    // Debey-Huckel selected species
+    editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--")
+            .setChemicalModelDebyeHuckel()
+            .setActivityModelDrummondCO2();
+    editor.addMineralPhase("Quartz");
+    editor.addMineralPhase("Calcite");
+    editor.addMineralPhase("Dolomite");
+    */
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
@@ -366,7 +384,16 @@ auto makeResultsFolder(const Params& params) -> std::string
     //std::string folder = "../results-pitzer-full-with-skipping-1e-14" + test_tag; // Local(5)
     //std::string folder = "../results-pitzer-full-with-skipping-1e-14-both-solvers" + test_tag; // Local(6)
     //std::string folder = "../results-pitzer-full-with-skipping-1e-13" + test_tag; // Local(5)
-    std::string folder = "../results-pitzer-full-with-skipping-1e-13-both-solvers" + test_tag; // Local(8)
+    //std::string folder = "../results-pitzer-full-with-skipping-1e-13-both-solvers" + test_tag; // Local(8)
+
+
+    //std::string folder = "results-debey-huckel-full" + test_tag; // Local(1)
+    //std::string folder = "results-debey-huckel-selected-species" + test_tag; // Local(2)
+
+    //std::string folder = "results-hkf-full-no-skipping" + test_tag;
+    //std::string folder = "results-hkf-full-with-skipping-1e-14" + test_tag;
+    //std::string folder = "results-hkf-full-with-skipping-1e-13" + test_tag;
+    std::string folder = "results-hkf-full-with-skipping-1e-12" + test_tag;
 
     if (stat(folder.c_str(), &status) == -1) mkdir(folder.c_str());
 
