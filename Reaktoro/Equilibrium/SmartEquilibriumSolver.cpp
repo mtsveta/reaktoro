@@ -16,6 +16,7 @@
 #include "SmartEquilibriumSolver.hpp"
 
 // C++ includes
+#include <algorithm>
 #include <deque>
 
 // Reaktoro includes
@@ -72,8 +73,37 @@ namespace Reaktoro {
         /// The indices of the equilibrium and kinetic species
         Indices ies, iks;
 
+        std::deque<Index> priority;
+
+        std::deque<Index> ranking;
+
         /// Auxiliary vectors delta(n) and delta(lna) in estimate function version v0
         Vector delta_ne, delta_lnae;
+
+        Vector a_dn;
+        Vector a_dy;
+        Vector a_dz;
+        Vector a_n0;
+        Vector a_y0;
+        Vector a_z0;
+        Vector a_n;
+        Vector a_y;
+        Vector a_z;
+        Vector b_dn;
+        Vector b_dy;
+        Vector b_dz;
+        Vector b_n0;
+        Vector b_y0;
+        Vector b_z0;
+        Vector b_n;
+        Vector b_y;
+        Vector b_z;
+        Vector a_u;
+        Vector b_u;
+        Vector a_x;
+        Vector b_x;
+        Vector a_r;
+        Vector b_r;
 
         /// A class used to store the node of tree for smart equilibrium calculations.
         struct TreeNode
@@ -146,11 +176,126 @@ namespace Reaktoro {
             // Update the chemical properties of the system
             properties = solver.properties();
 
-            // Store the computed solution into the knowledge tree
-            timeit( tree.push_back({be, state, properties, solver.sensitivity()}),
-                    result.timing.learn_storage= );
+        // Store the computed solution into the knowledge tree
+        timeit( tree.push_back({be, state, properties, solver.sensitivity()}),
+            result.timing.learn_storage= );
+
+        // Update priority and the ranking
+        priority.push_back(priority.size());
+
+        ranking.push_back(0);
+    }
+
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    auto estimate(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+    {
+        result.estimate.accepted = false;
+
+        // Skip estimation if no previous full computation has been done
+        if(tree.empty())
+            return;
+
+        // Relative and absolute tolerance parameters
+        const auto reltol = options.reltol;
+        const auto abstol = options.abstol;
+
+        //---------------------------------------------------------------------------------------
+        // Step 1: Search for the reference element (closest to the new state input conditions)
+        //---------------------------------------------------------------------------------------
+        tic(0);
+
+        Vector n;
+        Vector du, dn;
+        Vector x;
+
+        double nmin, ntot, uerror;
+        Index inmin, iuerror;
+
+        double nerror;
+        Index inerror;
+
+        for(auto inode : priority)
+        {
+            const auto& node = tree[inode];
+            const auto& n0 = node.state.speciesAmounts();
+            const auto& be0 = node.be;
+            auto u0 = node.properties.chemicalPotentials();
+            auto x0 = node.properties.moleFractions();
+            const auto& dndb = node.sensitivity.dndb;
+            n = n0 + dndb * (be - be0);
+            du = u0.ddn * (n - n0);
+
+            nmin = n.minCoeff(&inmin);
+            ntot = sum(n);
+
+            if(nmin/ntot < -1e-5)
+                continue;
+
+            du.noalias() = abs(du / u0.val);
+
+            // error = max(abs(du)/abs(u0.val));
+            uerror = du.maxCoeff(&iuerror);
+
+            if(uerror < reltol)
+            {
+                ranking[inode] += 1;
+
+                auto comp = [&](Index l, Index r) { return ranking[l] > ranking[r]; };
+                std::sort(priority.begin(), priority.end(), comp);
+
+                // ChemicalState statetmp(state);
+                // solver.solve(statetmp, T, P, be);
+
+                // const auto utmp = solver.properties().chemicalPotentials().val;
+                // const auto ntmp = statetmp.speciesAmounts();
+
+                // du = abs((utmp - u0.val)/u0.val);
+                // dn = abs((ntmp - n0)/n0);
+                // uerror = du.maxCoeff(&iuerror);
+                // nerror = dn.maxCoeff(&inerror);
+
+                // if(uerror > reltol && ntmp[iuerror] > 1e-10 && nerror > reltol)
+                // {
+                //     std::cout << "==========================================================" << std::endl;
+                //     std::cout << "species = " << system.species()[iuerror].name() << std::endl;
+                //     std::cout << "uerror = " << uerror << std::endl;
+                //     std::cout << "nerror = " << nerror << std::endl;
+                //     std::cout << "n(exact) = " << ntmp[iuerror] << std::endl;
+                //     std::cout << "n(trial) = " << n[iuerror] << std::endl;
+                //     std::cout << "|n(exact) - n(trial)|/n(exact) = " << std::abs(n[iuerror] - ntmp[iuerror])/std::abs(ntmp[iuerror]) << std::endl;
+                // }
+
+                // if(std::abs((n[n.size() - 1] - ntmp[n.size() - 1])/ntmp[n.size() - 1]) > 0.1 && ntmp[n.size() - 1] > 1e-10)
+                // {
+                //     std::cout << "--------------------------------------------------" << std::endl;
+                //     std::cout << "Dolomite" << std::endl;
+                //     std::cout << "n(exact) = " << ntmp[n.size() - 1] << std::endl;
+                //     std::cout << "n(trial) = " << n[n.size() - 1] << std::endl;
+                //     std::cout << "|n(exact) - n(trial)|/n(exact) = " << std::abs((n[n.size() - 1] - ntmp[n.size() - 1])/ntmp[n.size() - 1]) << std::endl;
+                // }
+
+                state.setSpeciesAmounts(n);
+                // state.setElementDualPotentials(y);
+                // state.setSpeciesDualPotentials(z);
+
+                // Update the chemical properties of the system
+                properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+                result.estimate.accepted = true;
+                return;
+            }
         }
-        /// Estimate the equilibrium state using sensitivity derivatives,
+
+        // std::cout << "ranking = " << std::endl;
+        // for(auto i : priority)
+        //     std::cout << ranking[i] << ", ";
+        // std::cout << std::endl;
+
+        if(result.estimate.accepted == false)
+            return;
+
+    }
+
+    /// Estimate the equilibrium state using sensitivity derivatives,
         /// where search is performed by the NN algorithm and acceptance cirteria is using n and ln(a)
         auto estimate_nnsearch_acceptance_based_on_lna(ChemicalState& state, double T, double P, VectorConstRef be) -> void
         {
@@ -548,154 +693,6 @@ namespace Reaktoro {
             toc(2, result.timing.estimate_acceptance);
 
             // Check if smart estimation failed with respect to variation of chemical potentials or amounts
-            if(is_error_acceptable == false)
-                return;
-
-            // Set the estimate accepted status to true
-            result.estimate.accepted = true;
-
-            // Update the chemical properties of the system
-            properties = properties0;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
-        }
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
-    auto estimate(ChemicalState& state, double T, double P, VectorConstRef be) -> void
-    {
-        result.estimate.accepted = false;
-
-        // Skip estimation if no previous full computation has been done
-        if(tree.empty())
-            return;
-
-        // Relative and absolute tolerance parameters
-        const auto reltol = options.reltol;
-        const auto abstol = options.abstol;
-
-            //---------------------------------------------------------------------------------------
-            // Step 1: Search for the reference element (closest to the new state input conditions)
-            //---------------------------------------------------------------------------------------
-            tic(0);
-
-            // Comparison function based on the Euclidean distance
-            auto distancefn = [&](const TreeNode& a, const TreeNode& b)
-            {
-                Vector be_a = a.be/sum(a.be);
-                Vector be_b = b.be/sum(b.be);
-                Vector be_x = be/sum(be);
-
-                return (be_a - be_x).squaredNorm() < (be_b - be_x).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
-            };
-            // Comparison function based on the Euclidean distance
-            auto distancefn = [&](const TreeNode& a, const TreeNode& b)
-            {
-                const auto& be_a = a.be;
-                const auto& be_b = b.be;
-                return (be_a - be).squaredNorm() < (be_b - be).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
-            };
-
-            // Find the entry with minimum "input" distance
-            auto it = std::min_element(tree.begin(), tree.end(), distancefn);
-
-            toc(0, result.timing.estimate_search);
-
-            //----------------------------------------------------------------------------
-            // Step 2: Calculate predicted state with a first-order Taylor approximation
-            //----------------------------------------------------------------------------
-            tic(1);
-
-            // Get all the data stored in the reference element
-            const auto& be0 = it->be;
-            const auto& state0 = it->state;
-            const auto& properties0 = it->properties;
-            const auto& sensitivity0 = it->sensitivity;
-            const auto& T0 = state0.temperature();
-            const auto& P0 = state0.pressure();
-            const auto& n0 = state0.speciesAmounts();
-            const auto& y0 = state0.elementDualPotentials();
-            const auto& z0 = state0.speciesDualPotentials();
-            const auto u0 = properties0.chemicalPotentials();
-            const auto x0 = properties0.moleFractions();
-
-
-
-            const double RT = universalGasConstant*T0;
-
-
-            // Calculate perturbation of n
-            dn.noalias() = sensitivity0.dndb * (be - be0);
-            dy.noalias() = sensitivity0.dydb * (be - be0);
-            dz.noalias() = sensitivity0.dzdb * (be - be0);
-
-            n.noalias() = n0 + dn;
-            // y.noalias() = y0 + dy;
-            // z.noalias() = z0 + dz;
-            y.noalias() = y0;
-            z.noalias() = z0;
-            // y.noalias() = y0 + dy * RT;
-            // z.noalias() = z0 + dz * RT;
-
-            u = u0.val + u0.ddn * dn; // u = u_ref + dudn_ref * dn
-            x = x0.val + x0.ddn * dn; // x = x_ref + dxdn_ref * dn
-
-            // MatrixConstRef Ae = partition.formulaMatrixEquilibriumPartition();
-
-            Matrix A = system.formulaMatrix();
-
-            Vector r = abs(u - tr(A)*y - z);  // TODO: We should actually collect the entries in u and z corresponding to equilibrium species
-            r /= universalGasConstant*T0;
-            // Vector r = abs(sensitivity0.drdb * (be - be0));
-
-            Index ispecies;
-
-            const double error = (x.cwiseProduct(r)).maxCoeff(&ispecies);
-
-            bool is_error_acceptable = error < 1e-1;
-
-            // if(is_error_acceptable == false)
-            {
-                std::cout << "*****************************" << std::endl;
-                std::cout << "*** Failed Smart Estimate ***" << std::endl;
-                std::cout << "*****************************" << std::endl;
-                std::cout << "Error = " << error << std::endl;
-                std::cout << "Triggered by species = " << system.species(ispecies).name() << std::endl;
-                std::cout << "-----------------------------" << std::endl;
-                std::cout << std::left << std::setw(25) << "Species";
-                std::cout << std::left << std::setw(25) << "r[i]";
-                std::cout << std::left << std::setw(25) << "x[i]";
-                std::cout << std::left << std::setw(25) << "r[i] * x[i]";
-                std::cout << std::endl;
-                std::cout << std::scientific;
-                for(auto i = 0; i < r.size(); ++i)
-                {
-                    if(i == ispecies) std::cout << "***************" << std::endl;
-                    std::cout << std::left << std::setw(25) << system.species(i).name();
-                    std::cout << std::left << std::setw(25) << r[i];
-                    std::cout << std::left << std::setw(25) << x[i];
-                    std::cout << std::left << std::setw(25) << r[i] * x[i];
-                    std::cout << std::endl;
-                    if(i == ispecies) std::cout << "***************" << std::endl;
-                }
-                std::cout << "=============================" << std::endl;
-            }
-
-            toc(1, result.timing.estimate_mat_vec_mul);
-
-            //----------------------------------------------
-            // Step 3: Checking the acceptance criterion
-            //----------------------------------------------
-            tic(2);
-
-            // Correct negative mole numbers
-            for(auto i = 0; i < n.size(); ++i)
-                if(n[i] < 0.0) n[i] = 1e-12;  // TODO: 1e-12 should be replaced by a value provided via options.
-
-            state.setSpeciesAmounts(n);
-            state.setElementDualPotentials(y0 + dy * RT);
-            state.setSpeciesDualPotentials(z0 + dz * RT);
-
-                toc(2, result.timing.estimate_acceptance);
-
-            // Check if smart estimation failed with respect to variation of chemical potentials or amounts
-            // if(!is_error_acceptable || !amount_check)
             if(is_error_acceptable == false)
                 return;
 
