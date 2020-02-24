@@ -167,6 +167,9 @@ int main()
               << results.conventional_total / results.smart_total_ideal_search << std::endl;
     std::cout << "speed up (with ideal search & store): "
               << results.conventional_total / results.smart_total_ideal_search_store << std::endl << std::endl;
+    std::cout << " smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " / "
+              << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells *params.nsteps
+              << " fully evaluated GEMS out of " << params.ncells * params.nsteps  << std::endl;
 
     std::cout << "time_reactive_transport_conventional: " << results.time_reactive_transport_conventional << std::endl;
     std::cout << "time_reactive_transport_smart       : " << results.time_reactive_transport_smart << std::endl;
@@ -197,31 +200,52 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     // Create aqueous phase with all possible elements
     // Set a chemical model of the phase with the Pitzer equation of state
     // With an exception for the CO2, for which Drummond model is set
+
+    /*
+    // HKF selected species
+    editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--");
+    */
+    ///*
+    // HKF full system
+    editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C");
+    editor.addMineralPhase("Quartz");
+    editor.addMineralPhase("Calcite");
+    editor.addMineralPhase("Dolomite");
+    //*/
+    /*
+    // Pitzer selected species
+    editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--")
+            .setChemicalModelPitzerHMW()
+            .setActivityModelDrummondCO2();
+    */
+    /*
+    // Pitzer full system
     editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
             .setChemicalModelPitzerHMW()
             .setActivityModelDrummondCO2();
-    editor.addMineralPhase("Dolomite");
-    editor.addMineralPhase("Calcite");
-    editor.addMineralPhase("Quartz");
-
+    */
     /*
-    MineralReaction reaction = editor.addMineralReaction("Calcite");
-    reaction.setEquation("Calcite = Ca++ + CO3--");
-    reaction.addMechanism("logk = -5.81 mol/(m2*s); Ea = 23.5 kJ/mol");
-    reaction.addMechanism("logk = -0.30 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0");
-    reaction.setSpecificSurfaceArea(5000, "cm2/g");
+    // Debey-Huckel full system
+    editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
+           .setChemicalModelDebyeHuckel()
+           .setActivityModelDrummondCO2();
+    editor.addMineralPhase("Quartz");
+    editor.addMineralPhase("Calcite");
+    editor.addMineralPhase("Dolomite");
+    */
+    /*
+    // Debey-Huckel selected species
+    editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3--")
+            .setChemicalModelDebyeHuckel()
+            .setActivityModelDrummondCO2();
+    editor.addMineralPhase("Quartz");
+    editor.addMineralPhase("Calcite");
+    editor.addMineralPhase("Dolomite");
     */
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
-    //if (params.use_smart_eqilibirum_solver) std::cout << "system = \n" << system << std:: endl;
-    /*
-    // Step **: Create the ReactionSystem instances
-    ReactionSystem reactions(editor);
-    // Step **: Create the ReactionSystem instances
-    Partition partition(system);
-    partition.setKineticSpecies({"Calcite"});
-    */
+    if (params.use_smart_eqilibirum_solver) std::cout << "system = \n" << system << std:: endl;
 
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumProblem problem_ic(system);

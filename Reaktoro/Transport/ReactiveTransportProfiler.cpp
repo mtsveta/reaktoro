@@ -269,8 +269,6 @@ struct ReactiveTransportProfiler::Impl
                 if (!results[i].smart_kinetics_at_cell[j].estimate.accepted)
                     info.cells_where_learning_was_required_at_step[i].push_back(j);
             }
-            //std::cout << std::endl;
-
         }
 
         return info;
