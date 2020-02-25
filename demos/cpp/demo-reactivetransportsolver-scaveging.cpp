@@ -125,9 +125,9 @@ int main()
     params.xr = 100.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 10000; // the number of steps in the reactive transport simulation
+    params.nsteps = 5000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
-    params.dt = 0.0416*day; // the time step (in units of s)
+    params.dt = 1 * hour; // the time step (in units of s)
 
     // Define physical and chemical parameters
     params.D = 0.0;     // the diffusion coefficient (in units of m2/s)
@@ -137,7 +137,7 @@ int main()
 
     // Define parameters of the equilibrium solvers
     params.smart_equlibrium_reltol = 1e-1;
-    params.smart_equlibrium_abstol = 1e-8;
+    params.smart_equlibrium_abstol = 1e-16;
     params.tol = 8e-1;
     params.track_statistics = true;
 
@@ -214,14 +214,16 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
                             "Na+", "NaSO4-",
                             "O2(aq)",
                             "H2S(aq)", "HS-", "S5--", "S4--", "S3--", "S2--",
-                            "SO4--", "NaSO4-", "MgSO4(aq)", "CaSO4(aq)", "KSO4-", "HSO4-"}).setChemicalModelPitzerHMW();
-    //.setChemicalModelDebyeHuckel(dhModel);
+                            "SO4--", "NaSO4-", "MgSO4(aq)", "CaSO4(aq)", "KSO4-", "HSO4-"})
+                            //.setChemicalModelDebyeHuckel(dhModel);
+                            .setChemicalModelPitzerHMW();
+    //
     editor.addMineralPhase("Pyrrhotite");
     editor.addMineralPhase("Siderite");
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
-    //if (params.use_smart_eqilibirum_solver) std::cout << "system = \n" << system << std:: endl;
+    if (params.use_smart_eqilibirum_solver) std::cout << "system = \n" << system << std:: endl;
 
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumInverseProblem problem_ic(system);
@@ -387,6 +389,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  "-nsteps-" + std::to_string(params.nsteps) +
                                  "-eqreltol-" + reltol_stream.str() +
                                  "-eqabstol-" + abstol_stream.str() + "-smart";      // name of the folder with results
+    //std::string folder = "results-debey-huckel";
     std::string folder = "results-pitzer";
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :
