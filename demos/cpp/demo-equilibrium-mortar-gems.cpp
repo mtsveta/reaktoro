@@ -28,13 +28,8 @@ using namespace Reaktoro;
 /// ~~~
 int main()
 {
-    //auto folder = "../demos/resources/gems/Mortar-dat.lst";
-    //auto folder = "../demos/resources/gems/CalciteBC-dat.lst";
-    // Use an exported project file from GEMS to initialize a Gems object,
-    //Gems gems("../../demos/resources/gems/CalciteBC-dat.lst");
-    //Gems gems("../demos/resources/gems/CalciteBC-dat.lst");
     Gems gems("../demos/resources/gems/Mortar-dat.lst");
-    //Gems gems(folder);
+    //Gems gems("../demos/resources/gems/CalColumn-dat.lst");
 
     // and then use it to construct the ChemicalSystem object.
     ChemicalSystem system = gems;
@@ -44,7 +39,7 @@ int main()
     ChemicalState state = gems.state(system);
 
     // Output the equilibrium state calculated by GEMS to a file.
-    state.output("state-gems.txt");
+    state.output("state-mortar-gems.txt");
 
     // Perturb the equilibrium state calculated by GEMS
     state.setSpeciesAmount("CO2@", 0.1);
@@ -53,5 +48,5 @@ int main()
     equilibrate(state);
 
     // Output the updated equilibrium state to a file.
-    state.output("state-gems-updated.txt");
+    state.output("state-mortar-gems-updated.txt");
 }
