@@ -92,6 +92,7 @@ struct default_packet_traits
     HasBetaInc = 0,
 
     HasRound  = 0,
+    HasRint   = 0,
     HasFloor  = 0,
     HasCeil   = 0,
 
@@ -244,14 +245,23 @@ pshiftleft(const long int& a) { return a << N; }
 /** \internal \returns the significant and exponent of the underlying floating point numbers
   * See https://en.cppreference.com/w/cpp/numeric/math/frexp
   */
-template<typename Packet> EIGEN_DEVICE_FUNC inline Packet
-pfrexp(const Packet &a, Packet &exponent) { return std::frexp(a,&exponent); }
+template <typename Packet>
+EIGEN_DEVICE_FUNC inline Packet pfrexp(const Packet& a, Packet& exponent) {
+  int exp;
+  EIGEN_USING_STD_MATH(frexp);
+  Packet result = frexp(a, &exp);
+  exponent = static_cast<Packet>(exp);
+  return result;
+}
 
 /** \internal \returns a * 2^exponent
   * See https://en.cppreference.com/w/cpp/numeric/math/ldexp
   */
 template<typename Packet> EIGEN_DEVICE_FUNC inline Packet
-pldexp(const Packet &a, const Packet &exponent) { return std::ldexp(a,exponent); }
+pldexp(const Packet &a, const Packet &exponent) {
+  EIGEN_USING_STD_MATH(ldexp);
+  return ldexp(a, static_cast<int>(exponent));
+}
 
 /** \internal \returns zeros */
 template<typename Packet> EIGEN_DEVICE_FUNC inline Packet
@@ -259,7 +269,7 @@ pzero(const Packet& a) { return pxor(a,a); }
 
 template<> EIGEN_DEVICE_FUNC inline float pzero<float>(const float& a) {
   EIGEN_UNUSED_VARIABLE(a);
-  return 0.;
+  return 0.f;
 }
 
 template<> EIGEN_DEVICE_FUNC inline double pzero<double>(const double& a) {
@@ -485,10 +495,7 @@ template<typename Packet> EIGEN_DEVICE_FUNC inline Packet preverse(const Packet&
 /** \internal \returns \a a with real and imaginary part flipped (for complex type only) */
 template<typename Packet> EIGEN_DEVICE_FUNC inline Packet pcplxflip(const Packet& a)
 {
-  // FIXME: uncomment the following in case we drop the internal imag and real functions.
-//   using std::imag;
-//   using std::real;
-  return Packet(imag(a),real(a));
+  return Packet(numext::imag(a),numext::real(a));
 }
 
 /**************************
@@ -568,6 +575,11 @@ Packet pround(const Packet& a) { using numext::round; return round(a); }
 /** \internal \returns the floor of \a a (coeff-wise) */
 template<typename Packet> EIGEN_DECLARE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS
 Packet pfloor(const Packet& a) { using numext::floor; return floor(a); }
+
+/** \internal \returns the rounded value of \a a (coeff-wise) with current
+ * rounding mode */
+template<typename Packet> EIGEN_DECLARE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS
+Packet print(const Packet& a) { using numext::rint; return rint(a); }
 
 /** \internal \returns the ceil of \a a (coeff-wise) */
 template<typename Packet> EIGEN_DECLARE_FUNCTION_ALLOWING_MULTIPLE_DEFINITIONS
@@ -662,10 +674,10 @@ inline void palign(PacketType& first, const PacketType& second)
 #if !defined(EIGEN_GPUCC)
 
 template<> inline std::complex<float> pmul(const std::complex<float>& a, const std::complex<float>& b)
-{ return std::complex<float>(real(a)*real(b) - imag(a)*imag(b), imag(a)*real(b) + real(a)*imag(b)); }
+{ return std::complex<float>(a.real()*b.real() - a.imag()*b.imag(), a.imag()*b.real() + a.real()*b.imag()); }
 
 template<> inline std::complex<double> pmul(const std::complex<double>& a, const std::complex<double>& b)
-{ return std::complex<double>(real(a)*real(b) - imag(a)*imag(b), imag(a)*real(b) + real(a)*imag(b)); }
+{ return std::complex<double>(a.real()*b.real() - a.imag()*b.imag(), a.imag()*b.real() + a.real()*b.imag()); }
 
 #endif
 
