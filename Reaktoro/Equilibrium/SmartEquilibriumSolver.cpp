@@ -18,6 +18,7 @@
 // C++ includes
 #include <algorithm>
 #include <deque>
+#include <tuple>
 
 // Eigen includes
 #include <Reaktoro/deps/eigen3/Eigen/LU>
@@ -72,9 +73,20 @@ struct SmartEquilibriumSolver::Impl
 
     std::deque<Index> ranking;
 
+    //----------------------------------------------------------------------------------
+    // TODO: move these vars into their corresponding fuctions
+    /// The vector of amounts of equilibrium species
+    Vector ne, ze, xe, ue, re;
 
+    /// Auxiliary vectors
+    Vector dne, dye, dze;
 
+    /// The indices of the equilibrium and kinetic species
+    Indices ies, iks;
 
+    /// Auxiliary vectors delta(n) and delta(lna) in estimate function version v0
+    Vector delta_ne, delta_lnae;
+    //----------------------------------------------------------------------------------
 
     Vector a_dn;
     Vector a_dy;
@@ -109,11 +121,8 @@ struct SmartEquilibriumSolver::Impl
         ChemicalState state;
         ChemicalProperties properties;
         EquilibriumSensitivity sensitivity;
-        Indices isensitive;
-        Indices imajor;
-        ChemicalVector u;
-        ChemicalVector x;
-        Matrix dudb;
+        Matrix Mb;
+        VectorXi imajor;
     };
 
     /// The tree used to save the calculated equilibrium states and respective sensitivities
@@ -125,7 +134,7 @@ struct SmartEquilibriumSolver::Impl
 
     /// Construct an SmartEquilibriumSolver::Impl instance with given partition.
     Impl(const Partition& partition_)
-            : partition(partition_), system(partition_.system()), solver(partition_)
+    : partition(partition_), system(partition_.system()), solver(partition_)
     {
         setPartition(partition_);
     }
@@ -179,15 +188,11 @@ struct SmartEquilibriumSolver::Impl
         properties = solver.properties();
 
         // Store the computed solution into the knowledge tree
-        timeit( tree.push_back({be, state, properties, solver.sensitivity()}),
-            result.timing.learn_storage= );
-
-        // Update priority and the ranking
         priority.push_back(priority.size());
 
         ranking.push_back(0);
 
-        const auto& R = universalGasConstant;
+        const auto RT = universalGasConstant * T;
 
         const auto& n = state.speciesAmounts();
 
@@ -199,10 +204,6 @@ struct SmartEquilibriumSolver::Impl
 
         const Matrix dudb = dudn * dndb;
 
-        Matrix dnudb = diag(n) * dudb;
-        dnudb += diag(u.val) * dndb;
-        dnudb /= R*T;
-
         const double nsum = sum(n);
 
         const auto& A = system.formulaMatrix();
@@ -210,20 +211,34 @@ struct SmartEquilibriumSolver::Impl
         Canonicalizer canonicalizer(A);
         canonicalizer.updateWithPriorityWeights(n);
 
-        const double epsmajor = 1e-14 * nsum;
-        Indices imajor;
-        imajor.reserve(n.size());
-        for(auto i : canonicalizer.Q())
-            if(n[i] >= epsmajor)
-                imajor.push_back(i);
+        const auto eps_n = options.amount_fraction_cutoff * nsum;
+        const auto eps_x = options.mole_fraction_cutoff;
 
-        Indices isensitive;
-        isensitive.reserve(canonicalizer.numBasicVariables());
-        for(auto i : canonicalizer.indicesBasicVariables())
-            if(x.val[i] > options.mole_fraction_cutoff)
-                isensitive.push_back(i);
+        const auto S = canonicalizer.S();
 
-        timeit( tree.push_back({be, be/sum(be), state, properties, solver.sensitivity(), isensitive, imajor, u, x, dudb}),
+        auto imajorminor = canonicalizer.Q();
+        const auto nummajor = std::partition(imajorminor.begin(), imajorminor.end(),
+            [&](Index i) { return n[i] >= eps_n && x.val[i] >= eps_x; }) - imajorminor.begin();
+
+        const auto imajor = imajorminor.head(nummajor);
+
+        // const auto iprimary = canonicalizer.indicesBasicVariables();
+        // const auto isecondary = canonicalizer.indicesNonBasicVariables();
+
+        // Indices imajor;
+        // imajor.reserve(isecondary.size());
+        // for(auto i = 0; i < isecondary.size(); ++i)
+        //     if(n[isecondary[i]] >= eps_n && x.val[isecondary[i]] >= eps_x)
+        //         imajor.push_back(i);
+
+        // VectorXi isecondary_major = isecondary(imajor);
+
+        const Vector um = u.val(imajor);
+        const auto dumdb = rows(dudb, imajor);
+
+        const Matrix Mb = diag(inv(um)) * dumdb;
+
+        timeit( tree.push_back({be, be/sum(be), state, properties, solver.sensitivity(), Mb, imajor}),
             result.timing.learning_storage= );
     }
 
@@ -245,10 +260,12 @@ struct SmartEquilibriumSolver::Impl
         //---------------------------------------------------------------------------------------
         tic(0);
 
+        Vector rs;
         Vector n, ns;
         Vector du, dus, dns;
         Vector x;
         Vector bebar = be/sum(be);
+        Vector dbe;
 
         double nmin, ntot, uerror;
         Index inmin, iuerror;
@@ -256,61 +273,51 @@ struct SmartEquilibriumSolver::Impl
         double nerror;
         Index inerror;
 
+
+        // Check if an entry in the database pass the error test.
+        // It returns (`success`, `error`, `ispecies`), where
+        //   - `success` is true if error test succeeds, false otherwise.
+        //   - `error` is the first error violating the tolerance
+        //   - `ispecies` is the index of the species that fails the error test
+        auto pass_error_test = [&](const auto& node) -> std::tuple<bool, double, Index>
+        {
+            using std::abs;
+            using std::max;
+            const auto& be0 = node.be;
+            const auto& Mb0 = node.Mb;
+            const auto& imajor = node.imajor;
+
+            dbe.noalias() = be - be0;
+
+            double error = 0.0;
+            for(auto i = 0; i < imajor.size(); ++i) {
+                error = max(error, abs(Mb0.row(i) * dbe));
+                if(error >= reltol)
+                    return { false, error, imajor[i] };
+            }
+
+            return { true, error, n.size() };
+        };
+
         for(auto inode : priority)
         {
             const auto& node = tree[inode];
-            const auto& n0 = node.state.speciesAmounts();
-            const auto& be0 = node.be;
-            const auto& bebar0 = node.bebar;
-            const auto& u0 = node.u;
-            const auto& dndb = node.sensitivity.dndb;
-            const auto& imajor = node.imajor;
-            const auto& is = node.isensitive;
-            const auto& dudb0 = node.dudb;
 
-            const auto us0 = u0.val(is);
-            const auto dusdb0 = rows(dudb0, is);
+            const auto [success, error, ispecies] = pass_error_test(node);
 
-            dus = dusdb0 * (be - be0);
-            dus.noalias() = abs(dus / us0);
-
-            // du = dudb0 * (be - be0);
-            // du.noalias() = abs(du / u0.val);
-
-            // std::cout << "------------------------------------------------------" << std::endl;
-            // std::cout << "Sensitive Species:" << std::endl;
-            // auto j = 0;
-            // for(auto i : is) {
-            //     auto name = system.species(i).name();
-            //     std::cout << std::left << std::setw(15) << name;
-            //     std::cout << std::left << std::setw(15) << dus[j];
-            //     std::cout << std::left << std::setw(15) << du[i];
-            //     std::cout << std::left << std::setw(15) << n0[i];
-            //     std::cout << std::left << std::setw(15) << std::abs(u0.val[i])/(universalGasConstant * T);
-            //     std::cout << std::endl;
-            //     ++j;
-            // }
-            // std::cout << "------------------------------------------------------" << std::endl;
-
-            // const auto ns0 = n0(is);
-            // const auto us0 = u0.val(is);
-            // const auto dnsdb0 = rows(dndb, is);
-            // const auto dusdns0 = u0.ddn(is, is);
-
-            // dns = dnsdb0 * (be - be0);
-            // dus = dusdns0 * dns;
-            // dus.noalias() = abs(dus / us0);
-
-            uerror = dus.maxCoeff(&iuerror);
-
-            if(uerror < reltol)
+            if(success)
             {
-                n = n0 + dndb * (be - be0);
+                const auto& be0 = node.be;
+                const auto& n0 = node.state.speciesAmounts();
+                const auto& dndb0 = node.sensitivity.dndb;
+
+                n = n0 + dndb0 * (be - be0);
 
                 nmin = n.minCoeff(&inmin);
                 ntot = sum(n);
 
-                if(nmin/ntot < -1e-5)
+                // if(nmin/ntot < -options.amount_fraction_cutoff)
+                if(nmin < -1.0e-5)
                     continue;
 
                 ranking[inode] += 1;
@@ -318,55 +325,6 @@ struct SmartEquilibriumSolver::Impl
                 auto comp = [&](Index l, Index r) { return ranking[l] > ranking[r]; };
                 std::sort(priority.begin(), priority.end(), comp);
 
-                // ChemicalState statetmp(state);
-                // solver.solve(statetmp, T, P, be);
-
-                // const auto utmp = solver.properties().chemicalPotentials().val;
-                // const auto ntmp = statetmp.speciesAmounts();
-
-                // Vector du = abs((utmp - u0.val)/u0.val);
-                // Vector dn = abs((ntmp - n0)/n0);
-                // auto actual_uerror = du.maxCoeff(&iuerror);
-                // auto actual_nerror = dn.maxCoeff(&inerror);
-
-                // if(actual_uerror > reltol && ntmp[iuerror] > 1e-10 && actual_nerror > reltol)
-                // {
-                //     std::cout << "==========================================================" << std::endl;
-                //     std::cout << "species = " << system.species()[iuerror].name() << std::endl;
-                //     std::cout << "uerror = " << uerror << std::endl;
-                //     std::cout << "nerror = " << nerror << std::endl;
-                //     std::cout << "n(exact) = " << ntmp[iuerror] << std::endl;
-                //     std::cout << "n(trial) = " << n[iuerror] << std::endl;
-                //     std::cout << "|n(exact) - n(trial)|/n(exact) = " << std::abs(n[iuerror] - ntmp[iuerror])/std::abs(ntmp[iuerror]) << std::endl;
-                // }
-
-                // const auto utmp = solver.properties().chemicalPotentials().val;
-                // const auto ntmp = statetmp.speciesAmounts();
-
-                // Vector du = abs((utmp - u0.val)/u0.val);
-                // Vector dn = abs((ntmp - n0)/n0);
-                // auto actual_uerror = du.maxCoeff(&iuerror);
-                // auto actual_nerror = dn.maxCoeff(&inerror);
-
-                // if(actual_uerror > reltol && ntmp[iuerror] > 1e-10 && actual_nerror > reltol)
-                // {
-                //     std::cout << "==========================================================" << std::endl;
-                //     std::cout << "species = " << system.species()[iuerror].name() << std::endl;
-                //     std::cout << "uerror = " << uerror << std::endl;
-                //     std::cout << "nerror = " << nerror << std::endl;
-                //     std::cout << "n(exact) = " << ntmp[iuerror] << std::endl;
-                //     std::cout << "n(trial) = " << n[iuerror] << std::endl;
-                //     std::cout << "|n(exact) - n(trial)|/n(exact) = " << std::abs(n[iuerror] - ntmp[iuerror])/std::abs(ntmp[iuerror]) << std::endl;
-                // }
-
-                // if(std::abs((n[n.size() - 1] - ntmp[n.size() - 1])/ntmp[n.size() - 1]) > 0.1 && ntmp[n.size() - 1] > 1e-10)
-                // {
-                //     std::cout << "--------------------------------------------------" << std::endl;
-                //     std::cout << "Dolomite" << std::endl;
-                //     std::cout << "n(exact) = " << ntmp[n.size() - 1] << std::endl;
-                //     std::cout << "n(trial) = " << n[n.size() - 1] << std::endl;
-                //     std::cout << "|n(exact) - n(trial)|/n(exact) = " << std::abs((n[n.size() - 1] - ntmp[n.size() - 1])/ntmp[n.size() - 1]) << std::endl;
-                // }
 
                 state.setSpeciesAmounts(n);
                 // state.setElementDualPotentials(y);
@@ -377,16 +335,11 @@ struct SmartEquilibriumSolver::Impl
                 result.estimate.accepted = true;
                 return;
             }
+            else continue;
         }
 
-        // std::cout << "ranking = " << std::endl;
-        // for(auto i : priority)
-        //     std::cout << ranking[i] << ", ";
-        // std::cout << std::endl;
-
-        if(result.estimate.accepted == false)
-            return;
-
+        result.estimate.accepted = false;
+        return;
     }
 
     /// Estimate the equilibrium state using sensitivity derivatives,
