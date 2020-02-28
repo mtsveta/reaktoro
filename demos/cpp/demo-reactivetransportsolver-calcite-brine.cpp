@@ -137,7 +137,7 @@ int main()
     // Define parameters of the equilibrium solvers
     params.smart_equlibrium_reltol = 0.01;
     params.smart_equlibrium_abstol = 1e-8;
-    params.activity_model = "pitzer ";
+    params.activity_model = "hkf";
     //params.activity_model = "pitzer";
     params.tol = 1e-1;
     params.track_statistics = true;
@@ -445,5 +445,5 @@ auto outputConsole(const Params& params) -> void {
     std::cout << "eqabstol  : " << params.smart_equlibrium_abstol << std::endl;
     std::cout << "eqreltol  : " << params.smart_equlibrium_reltol << std::endl;
     std::cout << "tol       : " << params.tol << std::endl;
-
+    std::cout << "activity model : " << params.activity_model << std::endl;
 }
