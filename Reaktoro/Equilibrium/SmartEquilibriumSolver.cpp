@@ -79,24 +79,12 @@ struct SmartEquilibriumSolver::Impl
     /// The storage for matrix du/db = du/dn * dn/db
     Matrix dudb;
 
-    //----------------------------------------------------------------------------------
-    // TODO: move these vars into their corresponding fuctions
-    /// The vector of amounts of equilibrium species
-    Vector ne, ze, xe, ue, re;
     /// The storage for vector u(imajor)
     Vector um;
 
-    /// Auxiliary vectors
-    Vector dne, dye, dze;
     /// The storage for matrix Mb = inv(u(imajor)) * du(imajor)/db.
     Matrix Mb;
 
-    /// The indices of the equilibrium and kinetic species
-    Indices ies, iks;
-
-    /// Auxiliary vectors delta(n) and delta(lna) in estimate function version v0
-    Vector delta_ne, delta_lnae;
-    //----------------------------------------------------------------------------------
     /// The record of the knowledge database containing input, output and derivatives data.
     struct Record
     {
@@ -124,8 +112,6 @@ struct SmartEquilibriumSolver::Impl
         /// The indices of the species with significant amounts and mole fractions.
         VectorXi imajor;
     };
-
-
 
     /// The cluster storing learned input-output data with same classification.
     struct Cluster
@@ -156,6 +142,43 @@ struct SmartEquilibriumSolver::Impl
     /// The database with learned input-output data points.
     Database database;
 
+
+    //----------------------------------------------------------------------------------
+    /// The solution of the equilibrium problem
+    Vector y, z, x, u, r;
+
+    /// Auxiliary vectors
+    Vector dn, dy, dz;
+
+    std::deque<Index> priority;
+
+    std::deque<Index> ranking;
+
+    //----------------------------------------------------------------------------------
+    // TODO: move these vars into their corresponding fuctions
+    /// The vector of amounts of equilibrium species
+    Vector ne, ze, xe, ue, re;
+
+    /// Auxiliary vectors
+    Vector dne, dye, dze;
+
+    /// The indices of the equilibrium and kinetic species
+    Indices ies, iks;
+
+    /// Auxiliary vectors delta(n) and delta(lna) in estimate function version v0
+    Vector delta_ne, delta_lnae;
+    //----------------------------------------------------------------------------------
+
+    struct TreeNode
+    {
+        Vector be;
+        Vector bebar; // not nessesary
+        ChemicalState state;
+        ChemicalProperties properties;
+        EquilibriumSensitivity sensitivity;
+        Matrix Mb;
+        VectorXi imajor;
+    };
     /// The tree used to save the calculated equilibrium states and respective sensitivities
     std::deque<TreeNode> tree;
 
@@ -167,7 +190,7 @@ struct SmartEquilibriumSolver::Impl
     Impl(const Partition& partition_)
     : partition(partition_), system(partition_.system()), solver(partition_)
     {
-
+        // TODO: is this partition needed in kinetics
         setPartition(partition_);
         // Auxiliary variables
         const auto Ne = partition.numEquilibriumSpecies();
@@ -236,16 +259,18 @@ struct SmartEquilibriumSolver::Impl
 
         // Get the indices of the primary and secondary species at the calculated equilibrium state
         const auto& iprimary = state.equilibrium().indicesPrimarySpecies();
+        const auto& isecondary = state.equilibrium().indicesSecondarySpecies();
 
 
-        std::cout << "PRIMARY SPECIES = ";
-        for(auto i : iprimary)
-            std::cout << system.species(i).name() << " ";
-        std::cout << std::endl;
 
 
-        // Compute the mole fractions of the species in the calculated equilibrium state
-        const auto x = properties.moleFractions().val;
+        // std::cout << "PRIMARY SPECIES = ";
+        // for(auto i : iprimary)
+        //     std::cout << system.species(i).name() << " ";
+        // std::cout << std::endl;
+
+
+
 
         // Compute the sum of species amounts in the calculated equilibrium state
         const auto nsum = sum(n);
@@ -253,13 +278,6 @@ struct SmartEquilibriumSolver::Impl
         // Auxiliary tolerance values for species amounts and species mole fractions
         const auto eps_n = options.amount_fraction_cutoff * nsum;
         const auto eps_x = options.mole_fraction_cutoff;
-
-        // Identify the species with significant amounts -- the major species
-        nummajor = std::partition(imajorminor.begin(), imajorminor.end(),
-            [&](Index i) { return n[i] >= eps_n && x[i] >= eps_x; }) - imajorminor.begin();
-
-        // The indices of the major species
-        const auto imajor = imajorminor.head(nummajor);
 
         // The chemical potentials at the calculated equilibrium state
         const auto u = properties.chemicalPotentials();
@@ -271,14 +289,19 @@ struct SmartEquilibriumSolver::Impl
         // Compute the matrix du/db = du/dn * dn/db
         dudb = dudn * dndb;
 
-        // Assemble the vector with chemical potentials of major species
-        um = u.val(imajor);
+        // The indices of the major secondary species
+        // const auto imajor = isecondary.head(std::min(iprimary.size(), isecondary.size()));
+        const auto imajor = isecondary;
 
-        // The rows in du/db corresponding to major species
-        const auto dumdb = rows(dudb, imajor);
+        // The rows in dn/db corresponding to major secondary species
+        const auto ns = rows(n, imajor);
+        const auto dnsdb = rows(dndb, imajor);
+        const auto max_ns = max(ns);
 
-        // Compute matrix Mb that is used to compute delta(u)/u due to changes in b
-        Mb = diag(inv(um)) * dumdb;
+        assert(max_ns != 0.0);
+
+        // Compute matrix Mb that is used to compute delta(ns)/max(ns) due to changes in b
+        Mb.noalias() = dnsdb * (1.0 / max_ns);
 
         // Find the cluster
         auto iter = std::find_if(database.clusters.begin(), database.clusters.end(),
@@ -391,16 +414,6 @@ struct SmartEquilibriumSolver::Impl
 
                 const auto [success, error, ispecies] = pass_error_test(record);
 
-
-                if(success == false)
-                {
-                    std::cout << "FAILED ERROR TEST" << std::endl;
-                    std::cout << "  SPECIES = " << system.species(ispecies).name() << std::endl;
-                    std::cout << "  ERROR = " << error << std::endl;
-                    std::cout << "  PRIMARY SPECIES = "; for(auto i : iprimary) std::cout << system.species(i).name() << " "; std::cout << std::endl;
-                }
-
-
                 if(success)
                 {
                     const auto& be0 = record.be;
@@ -413,7 +426,8 @@ struct SmartEquilibriumSolver::Impl
 
                     n.noalias() = n0 + dndb0 * (be - be0);
 
-                    const double nmin = min(n(imajor));
+                    // const double nmin = min(n(imajor));
+                    const double nmin = min(n);
                     const double nsum = sum(n);
 
                     const auto eps_n = options.amount_fraction_cutoff * nsum;
@@ -423,6 +437,7 @@ struct SmartEquilibriumSolver::Impl
 
                     database.clusters[jcluster].priority.increment(irecord);
                     database.connectivity.increment(icluster, jcluster);
+                    database.priority.increment(jcluster);
 
                     state.setSpeciesAmounts(n);
                     state.equilibrium().setElementChemicalPotentials(y0);
@@ -1046,8 +1061,31 @@ struct SmartEquilibriumSolver::Impl
         }
         return result;
     }
-};
 
+    auto outputClusterInfo() const -> void
+    {
+        for(auto i : database.priority.ordering())
+        {
+            std::cout << "CLUSTER #" << i << std::endl;
+            std::cout << "  RANK OF CLUSTER: " << database.priority.rank()[i] << std::endl;
+            std::cout << "  PRIMARY SPECIES: ";
+            for(auto j : database.clusters[i].iprimary)
+                std::cout << system.species(j).name() << " ";
+            std::cout << std::endl;
+            std::cout << "  NUMBER OF RECORDS: " << database.clusters[i].records.size() << std::endl;
+            std::cout << "  RANK OF RECORDS: ";
+            for(auto j : database.clusters[i].priority.ordering())
+                std::cout << database.clusters[i].priority.rank()[j] << " ";
+            std::cout << std::endl;
+            std::cout << "  NEXT CLUSTER: " << database.connectivity.ordering(i)[1] << std::endl;
+            std::cout << "  NEXT CLUSTER PRIMARY SPECIES: ";
+            for(auto j : database.clusters[database.connectivity.ordering(i)[1]].iprimary)
+                std::cout << system.species(j).name() << " ";
+            std::cout << std::endl;
+            std::cout << std::endl;
+        }
+    }
+};
 
 SmartEquilibriumSolver::SmartEquilibriumSolver()
 : pimpl(new Impl())
@@ -1072,7 +1110,14 @@ auto SmartEquilibriumSolver::operator=(SmartEquilibriumSolver other) -> SmartEqu
 }
 
 SmartEquilibriumSolver::~SmartEquilibriumSolver()
-{}
+{
+    // TODO Remove this from the desctructor.
+    // TODO Remove this from the desctructor.
+    // TODO Remove this from the desctructor.
+    // TODO Remove this from the desctructor.
+    // TODO Remove this from the desctructor.
+    pimpl->outputClusterInfo();
+}
 
 auto SmartEquilibriumSolver::setOptions(const SmartEquilibriumOptions& options) -> void
 {
