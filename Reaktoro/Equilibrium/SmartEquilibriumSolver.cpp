@@ -360,6 +360,120 @@ struct SmartEquilibriumSolver::Impl
         return;
     }
 
+     /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    auto estimate_priority_based_acceptance_potential(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+    {
+        result.estimate.accepted = false;
+
+        // Skip estimation if no previous full computation has been done
+        if(tree.empty())
+            return;
+
+        // Relative and absolute tolerance parameters
+        const auto reltol = options.reltol;
+        const auto abstol = options.abstol;
+
+        //---------------------------------------------------------------------------------------
+        // Step 1: Search for the reference element (closest to the new state input conditions)
+        //---------------------------------------------------------------------------------------
+        tic(0);
+
+        Vector rs;
+        // Amounts of speceis
+        Vector n, ns;
+        // Variations of the potentials and species
+        Vector du, dus, dns;
+        Vector x;
+        //Vector bebar = be/sum(be);
+        Vector dbe;
+
+        double nmin, nsum, uerror;
+        Index inmin, iuerror;
+
+        double nerror;
+        Index inerror;
+
+
+        // Check if an entry in the database pass the error test.
+        // It returns (`success`, `error`, `ispecies`), where
+        //   - `success` is true if error test succeeds, false otherwise.
+        //   - `error` is the first error violating the tolerance
+        //   - `ispecies` is the index of the species that fails the error test
+        auto pass_error_test = [&](const auto& node) -> std::tuple<bool, double, Index>
+        {
+            using std::abs;
+            using std::max;
+            const auto& be0 = node.be;
+            const auto& Mb0 = node.Mb;
+            const auto& imajor = node.imajor;
+
+            dbe.noalias() = be - be0;
+
+            double error = 0.0;
+            for(auto i = 0; i < imajor.size(); ++i) {
+                error = max(error, abs(Mb0.row(i) * dbe));
+                if(error >= reltol)
+                    return { false, error, imajor[i] };
+            }
+
+            return { true, error, n.size() };
+        };
+
+        auto inode_prev = priority.begin();
+        for(auto inode=priority.begin(); inode!=priority.end(); ++inode)
+        {
+            const auto& node = tree[*inode];
+            const auto& imajor = node.imajor;
+
+            const auto [success, error, ispecies] = pass_error_test(node);
+
+            if(success)
+            {
+                const auto& be0 = node.be;
+                const auto& n0 = node.state.speciesAmounts();
+                const auto& y0 = node.state.elementDualPotentials();
+                const auto& z0 = node.state.speciesDualPotentials();
+                const auto& dndb0 = node.sensitivity.dndb;
+
+                n = n0 + dndb0 * (be - be0);
+
+                nmin = min(n(imajor));
+                nsum = sum(n);
+
+                const auto eps_n = options.amount_fraction_cutoff * nsum;
+
+                if(nmin < -eps_n)
+                    continue;
+
+                toc(0, result.timing.estimate_search);
+
+                ranking[*inode] += 1;
+
+                auto comp = [&](Index l, Index r) { return ranking[l] > ranking[r]; };
+                //std::sort(priority.begin(), priority.end(), comp);
+                //std::stable_sort(priority.begin(), inode + 1, comp);
+                if ( !((inode == priority.begin()) || (ranking[*inode_prev] >= ranking[*inode])) ) {
+                    std::stable_sort(priority.begin(), inode + 1, comp);
+                }
+
+                state.setSpeciesAmounts(n);
+                state.setElementDualPotentials(y0);
+                state.setSpeciesDualPotentials(z0);
+
+                // Update the chemical properties of the system
+                properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+                result.estimate.accepted = true;
+                return;
+            }
+            else {
+                inode_prev = inode;
+                continue;
+            }
+        }
+
+        result.estimate.accepted = false;
+        return;
+    }
     /// Estimate the equilibrium state using sensitivity derivatives,
     /// where search is performed by the NN algorithm and acceptance cirteria is using n and ln(a)
     auto estimate_nnsearch_acceptance_based_on_lna(ChemicalState& state, double T, double P, VectorConstRef be) -> void

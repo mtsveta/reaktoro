@@ -590,7 +590,7 @@ struct ReactiveTransportSolver::Impl
         // Increment the current number of reactive transport steps
         ++steps;
 
-         return rt_result;
+        return rt_result;
     }
 };
 
@@ -610,7 +610,8 @@ ReactiveTransportSolver::ReactiveTransportSolver(const ReactiveTransportSolver& 
 }
 
 ReactiveTransportSolver::~ReactiveTransportSolver()
-{}
+{
+}
 
 auto ReactiveTransportSolver::operator=(ReactiveTransportSolver other) -> ReactiveTransportSolver&
 {
