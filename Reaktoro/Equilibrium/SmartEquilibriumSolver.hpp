@@ -40,9 +40,6 @@ struct SmartEquilibriumResult;
 class SmartEquilibriumSolver
 {
 public:
-    /// Construct a default SmartEquilibriumSolver instance.
-    SmartEquilibriumSolver();
-
     /// Construct an SmartEquilibriumSolver instance with given chemical system
     explicit SmartEquilibriumSolver(const ChemicalSystem& system);
 

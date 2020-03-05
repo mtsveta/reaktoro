@@ -67,6 +67,9 @@ struct SmartEquilibriumSolver::Impl
     /// The amounts of the species in the chemical system
     Vector n;
 
+    /// The amounts of the equilibrium species
+    Vector ne;
+
     /// The amounts of the elements in the equilibrium partition
     Vector be;
 
@@ -133,6 +136,11 @@ struct SmartEquilibriumSolver::Impl
     /// The database with learned input-output data points.
     Database database;
 
+    /// Construct an SmartEquilibriumSolver::Impl instance with given chemical system.
+    Impl(const ChemicalSystem& system)
+    : Impl(Partition(system))
+    {
+    }
     //----------------------------------------------------------------------------------
     // Old algorithms variables:
     //----------------------------------------------------------------------------------
@@ -174,21 +182,19 @@ struct SmartEquilibriumSolver::Impl
     /// The tree used to save the calculated equilibrium states and respective sensitivities
     std::deque<TreeNode> tree;
 
-    /// Construct a default SmartEquilibriumSolver::Impl instance.
-    Impl()
-    {}
-
-    /// Construct an SmartEquilibriumSolver::Impl instance with given partition.
-    Impl(const Partition& partition_)
-    : partition(partition_),
-      system(partition_.system()),
-      properties(partition_.system()),
-      solver(partition_)
+    /// Construct an SmartEquilibriumSolver::Impl instance with given chemical system.
+    Impl(const ChemicalSystem& system)
+    : Impl(Partition(system))
     {
-        // TODO: is this partition needed in kinetics
-        setPartition(partition_);
-        // Initialize the canonicalizer with the formula matrix A
-        canonicalizer.compute(system.formulaMatrix());
+    }
+
+    /// Construct an SmartEquilibriumSolver::Impl instance with given partition of the chemical system.
+    Impl(const Partition& partition)
+    : system(partition.system()), partition(partition),
+      properties(partition.system()), solver(partition)
+    {
+        // Initialize the canonicalizer with the formula matrix Ae of the equilibrium species
+        canonicalizer.compute(partition.formulaMatrixEquilibriumPartition());
     }
 
     /// Set the options for the equilibrium calculation.
@@ -251,14 +257,29 @@ struct SmartEquilibriumSolver::Impl
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_MATRICES);
 
-        // The species amounts at the calculated equilibrium state
-        const auto& n = state.speciesAmounts();
+        // The indices of the equilibrium species
+        const auto& ies = partition.indicesEquilibriumSpecies();
 
-        // Update the canonical form of formula matrix A so that we can identify primary species
-        canonicalizer.updateWithPriorityWeights(n);
+        // The number of equilibrium species
+        const auto& Ne = partition.numEquilibriumSpecies();
+
+        // The amounts of the species at the calculated equilibrium state
+        n = state.speciesAmounts();
+
+        // The amounts of the equilibrium species amounts at the calculated equilibrium state
+        ne = n(ies);
+
+        // Update the canonical form of formula matrix Ae so that we can identify primary species
+        canonicalizer.updateWithPriorityWeights(ne);
+
+        // The indices of the equilibrium species ordered as (primary, secondary)
+        const auto& iequilibrium = canonicalizer.Q();
+
+        // The number of primary species among the equilibrium species
+        const auto& Np = canonicalizer.numBasicVariables();
 
         // Store the indices of primary and secondary species in state
-        state.equilibrium().setIndicesEquilibriumSpecies(canonicalizer.Q(), canonicalizer.numBasicVariables());
+        state.equilibrium().setIndicesEquilibriumSpecies(iequilibrium, Np);
 
         // The indices of the primary species at the calculated equilibrium state
         const auto& iprimary = state.equilibrium().indicesPrimarySpecies();
@@ -268,7 +289,7 @@ struct SmartEquilibriumSolver::Impl
 
         // Auxiliary references to the derivatives dn/db and du/dn
         const auto& dndb = solver.sensitivity().dndb;
-        const auto& dudn = u.ddn;
+        const auto& dudn = u.ddn(ies, ies);
 
         // Compute the matrix du/db = du/dn * dn/db
         dudb = dudn * dndb;
@@ -415,30 +436,34 @@ struct SmartEquilibriumSolver::Impl
                     //---------------------------------------------------------------------
                     tic(TAYLOR_STEP);
 
+                    const auto& ies = partition.indicesEquilibriumSpecies();
                     const auto& be0 = record.be;
                     const auto& n0 = record.state.speciesAmounts();
                     const auto& y0 = record.state.equilibrium().elementChemicalPotentials();
                     const auto& z0 = record.state.equilibrium().speciesStabilities();
-                    const auto& ies0 = record.state.equilibrium().indicesEquilibriumSpecies();
-                    const auto& kp0 = record.state.equilibrium().numPrimarySpecies();
+                    const auto& ips0 = record.state.equilibrium().indicesEquilibriumSpecies();
+                    const auto& Np0 = record.state.equilibrium().numPrimarySpecies();
                     const auto& dndb0 = record.sensitivity.dndb;
+                    const auto& ne0 = n(ies);
 
-                    n.noalias() = n0 + dndb0 * (be - be0);
+                    ne.noalias() = ne0 + dndb0 * (be - be0);
 
-                    const double nmin = min(n);  // TODO: this should be amounts of equilibrium species only!
-                    const double nsum = sum(n);  // TODO: this should be amounts of equilibrium species only!
+                    n(ies) = ne;
 
-                    const auto eps_n = options.amount_fraction_cutoff * nsum;
+                    const double ne_min = min(ne);
+                    const double ne_sum = sum(ne);
+
+                    const auto eps_n = options.amount_fraction_cutoff * ne_sum;
 
                     // Check if all projected species amounts are not negative beyond tolerance
-                    if(nmin < -eps_n)
+                    if(ne_min < -eps_n)
                         continue;
 
                     // Set the chemical state result with estimated amounts
                     state.setSpeciesAmounts(n);
                     state.equilibrium().setElementChemicalPotentials(y0);
                     state.equilibrium().setSpeciesStabilities(z0);
-                    state.equilibrium().setIndicesEquilibriumSpecies(ies0, kp0);
+                    state.equilibrium().setIndicesEquilibriumSpecies(ips0, Np0);
 
                     // Update the chemical properties of the system
                     properties = record.properties;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
@@ -1007,17 +1032,15 @@ struct SmartEquilibriumSolver::Impl
     /// Solve the equilibrium problem with given problem definition
     auto solve(ChemicalState& state, const EquilibriumProblem& problem) -> SmartEquilibriumResult
     {
-        setPartition(problem.partition());
         const auto T = problem.temperature();
         const auto P = problem.pressure();
-        const auto& iee = partition.indicesEquilibriumElements(); // This statement needs to be after setPartition
+        const auto& iee = partition.indicesEquilibriumElements();
         be = problem.elementAmounts()(iee);
         return solve(state, T, P, be);
     }
 
     auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult
     {
-        tic(SOLVE_STEP);
         tic(SOLVE_STEP);
 
         // Absolutely ensure an exact Hessian of the Gibbs energy function is used in the calculations
@@ -1027,18 +1050,14 @@ struct SmartEquilibriumSolver::Impl
         result = {};
 
         // Perform a smart estimate of the chemical state
-        //timeit( estimate_nnsearch_acceptance_based_on_lna(state, T, P, be),
-        //        result.timing.estimate= );
-        //timeit( estimate_nnsearch_acceptance_based_on_residual(state, T, P, be),
-        //         result.timing.estimate= );
-        timeit(estimate_nnsearch_acceptance_based_on_residual_no_quartz(state, T, P, be),
-              result.timing.estimate= );
+        timeit( estimate(state, T, P, be),
+            result.timing.estimate= );
 
         // Perform a learning step if the smart prediction is not sactisfatory
         if(!result.estimate.accepted)
             timeit( learn(state, T, P, be), result.timing.learn= );
 
-        toc(SOLVE_STEP, result.timing.solve);
+        result.timing.solve = toc(SOLVE_STEP);
 
         return result;
     }
@@ -1102,10 +1121,6 @@ struct SmartEquilibriumSolver::Impl
         }
     }
 };
-
-SmartEquilibriumSolver::SmartEquilibriumSolver()
-: pimpl(new Impl())
-{}
 
 SmartEquilibriumSolver::SmartEquilibriumSolver(const ChemicalSystem& system)
 : pimpl(new Impl(Partition(system)))
