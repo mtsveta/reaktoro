@@ -25,6 +25,8 @@ using namespace std::placeholders;
 #include <Reaktoro/Common/ChemicalVector.hpp>
 #include <Reaktoro/Common/Exception.hpp>
 #include <Reaktoro/Common/Profiling.hpp>
+#include <Reaktoro/Math/Matrix.hpp>
+#include <Reaktoro/Common/StringUtils.hpp>
 #include <Reaktoro/Common/Units.hpp>
 #include <Reaktoro/Core/ChemicalProperties.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
@@ -39,6 +41,8 @@ using namespace std::placeholders;
 #include <Reaktoro/Equilibrium/SmartEquilibriumSolver.hpp>
 #include <Reaktoro/Kinetics/KineticOptions.hpp>
 #include <Reaktoro/Kinetics/KineticResult.hpp>
+#include <Reaktoro/Kinetics/KineticProblem.hpp>
+#include <Reaktoro/Thermodynamics/Water/WaterConstants.hpp>
 
 namespace Reaktoro {
 
@@ -80,8 +84,8 @@ struct KineticSolver::Impl
     /// The number of equilibrium and kinetic species
     Index Ne, Nk;
 
-    /// The number of elements in the equilibrium partition
-    Index Ee;
+    /// The number of elements in the equilibrium and kinetic partition
+    Index Ee, Ek;
 
     /// The formula matrix of the equilibrium species
     Matrix Ae, Ak;
@@ -128,35 +132,13 @@ struct KineticSolver::Impl
     /// The function that calculates the source term in the problem
     std::function<ChemicalVector(const ChemicalProperties&)> source_fn;
 
-    Impl()
-    {}
-
-    Impl(const ReactionSystem& reactions)
-    : reactions(reactions), system(reactions.system()), equilibrium(system), smart_equilibrium(system)
+    /// Construct an instance of KineticSolver::Impl
+    Impl(const ReactionSystem& reactions, const Partition& partition)
+    : reactions(reactions),
+      system(partition.system()),
+      partition(partition),
+      equilibrium(partition)
     {
-        setPartition(Partition(system));
-    }
-
-    auto setOptions(const KineticOptions& options) -> void
-    {
-        // Initialise the options of the kinetic solver
-        this->options = options;
-
-        // Set options for the equilibrium calculations
-        equilibrium.setOptions(options.equilibrium);
-        smart_equilibrium.setOptions(options.smart_equilibrium);
-
-    }
-
-    auto setPartition(const Partition& partition_) -> void
-    {
-        // Initialise the partition member
-        partition = partition_;
-
-        // Set the partition of the equilibrium and smart equilibrium solver
-        smart_equilibrium.setPartition(partition);
-        equilibrium.setPartition(partition);
-
         // Set the indices of the equilibrium and kinetic species
         ies = partition.indicesEquilibriumSpecies();
         iks = partition.indicesKineticSpecies();
@@ -171,6 +153,7 @@ struct KineticSolver::Impl
 
         // Set the number of equilibrium and kinetic elements
         Ee = iee.size();
+        Ek = ike.size();
 
         // Initialise the formula matrix of the equilibrium partition
         Ae = partition.formulaMatrixEquilibriumPartition();
@@ -245,6 +228,12 @@ struct KineticSolver::Impl
             std::cout << "Nk " << Nk << std::endl;
             */
         }
+    }
+
+    auto setOptions(const KineticOptions& options_) -> void
+    {
+        // Initialise the options of the kinetic solver
+        options = options_;
     }
 
     auto addSource(ChemicalState state, double volumerate, std::string units) -> void
@@ -328,12 +317,16 @@ struct KineticSolver::Impl
         };
     }
 
-    auto initialize(ChemicalState& state, double tstart) -> void {
+    auto initialize(ChemicalState& state, double tstart) -> void
+    {
+        // Initialise the temperature and pressure variables
+        T = state.temperature();
+        P = state.pressure();
 
         // Extract the composition of the equilibrium and kinetic species
-        const auto &n = state.speciesAmounts();
-        nk = n(iks);
+        const auto& n = state.speciesAmounts();
         ne = n(ies);
+        nk = n(iks);
 
         // Assemble the vector benk = [be nk]
         benk.resize(Ee + Nk);
@@ -645,16 +638,17 @@ struct KineticSolver::Impl
     auto jacobian(ChemicalState& state, double t, VectorConstRef u, MatrixRef res) -> int
     {
         // Calculate the sensitivity of the equilibrium state
-        //timeit( sensitivity = options.use_smart_equilibrium_solver ? smart_equilibrium.sensitivity() : equilibrium.sensitivity(),
-        //        result.timing.integrate_sensitivity+=);
         sensitivity = equilibrium.sensitivity();
 
         // Extract the columns of the kinetic rates derivatives w.r.t. the equilibrium and kinetic species
         drdne = cols(r.ddn, ies);
         drdnk = cols(r.ddn, iks);
 
+        // The sensitivity derivatives with respect to equilibrium species
+        const auto dnedbe = sensitivity.dndb(ies, iee);
+
         // Calculate the derivatives of `r` w.r.t. `be` using the equilibrium sensitivity
-        drdbe = drdne * sensitivity.dndb;
+        drdbe = drdne * dnedbe;
 
         // Assemble the partial derivatives of the reaction rates `r` w.r.t. to `u = [be nk]`
         drdu << drdbe, drdnk;
@@ -670,7 +664,7 @@ struct KineticSolver::Impl
             dqdnk = cols(q.ddn, iks);
 
             // Calculate the derivatives of `q` w.r.t. `be` using the equilibrium sensitivity
-            dqdbe = dqdne * sensitivity.dndb;
+            dqdbe = dqdne * dnedbe;
 
             // Assemble the partial derivatives of the source rates `q` w.r.t. to `u = [be nk]`
             dqdu << dqdbe, dqdnk;
@@ -685,15 +679,25 @@ struct KineticSolver::Impl
 };
 
 KineticSolver::KineticSolver()
-: pimpl(new Impl())
-{}
+{
+    RuntimeError("Cannot proceed with KineticSolver().",
+        "KineticSolver() constructor is deprecated. "
+        "Use constructor KineticSolver(const ReactionSystem&, const Partition&) instead.");
+}
 
 KineticSolver::KineticSolver(const KineticSolver& other)
 : pimpl(new Impl(*other.pimpl))
 {}
 
 KineticSolver::KineticSolver(const ReactionSystem& reactions)
-: pimpl(new Impl(reactions))
+{
+    RuntimeError("Cannot proceed with KineticSolver(const ReactionSystem&).",
+        "KineticSolver(const ReactionSystem&) constructor is deprecated. "
+        "Use constructor KineticSolver(const ReactionSystem&, const Partition&) instead.");
+}
+
+KineticSolver::KineticSolver(const ReactionSystem& reactions, const Partition& partition)
+: pimpl(new Impl(reactions, partition))
 {}
 
 KineticSolver::~KineticSolver()
@@ -712,7 +716,9 @@ auto KineticSolver::setOptions(const KineticOptions& options) -> void
 
 auto KineticSolver::setPartition(const Partition& partition) -> void
 {
-    pimpl->setPartition(partition);
+    RuntimeError("Cannot proceed with KineticSolver::setPartition.",
+        "KineticSolver::setPartition is deprecated. "
+        "Use constructor KineticSolver(const ReactionSystem&, const Partition&) instead.");
 }
 
 auto KineticSolver::addSource(const ChemicalState& state, double volumerate, std::string units) -> void
