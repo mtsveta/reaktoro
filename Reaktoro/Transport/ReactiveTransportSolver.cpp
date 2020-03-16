@@ -17,10 +17,15 @@
 
 // C++ includes
 #include <algorithm>
+#include <fstream>
+#include <iomanip>
+
+// Eigen includes
+#include <Reaktoro/deps/eigen3/Eigen/Dense>
 
 // Reaktoro includes
+#include <Reaktoro/Common/Exception.hpp>
 #include <Reaktoro/Common/Profiling.hpp>
-// TODO: do we need these includes?
 #include <Reaktoro/Core/ChemicalOutput.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
 #include <Reaktoro/Core/ChemicalSystem.hpp>
@@ -268,6 +273,7 @@ struct ReactiveTransportSolver::Impl
 
                 // Solve with a smart equilibrium solver
                 smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell));
+                //smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell), steps, icell);
                 //smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell), steps, icell);
 
                 // Update chemical properties of the field

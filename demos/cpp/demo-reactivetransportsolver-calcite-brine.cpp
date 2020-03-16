@@ -167,7 +167,7 @@ int main()
                                                 - results.smart_equilibrium_timing.learn_storage;
 
     // Output speed-us
-    std::cout << std::defaultfloat << "speed up                            : "
+    std::cout << "speed up                            : "
               << results.conventional_total / results.smart_total << std::endl;
     std::cout << "speed up (with ideal search)        : "
               << results.conventional_total / results.smart_total_ideal_search << std::endl;
@@ -425,7 +425,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  "-" + params.activity_model +
                                  "-smart";
 
-    std::string folder = "results-custering-primary-species-morning-version";
+    std::string folder = "results-custering-primary-species-paper";
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :
              folder + test_tag;
