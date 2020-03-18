@@ -42,10 +42,10 @@ class ReactiveTransportSolver
 {
 public:
     /// Construct a ReactiveTransportSolver instance with given chemical system.
-    explicit ReactiveTransportSolver(const Partition& partition);
-
-    /// Construct a ReactiveTransportSolver instance.
     explicit ReactiveTransportSolver(const ChemicalSystem& system);
+
+    /// Construct a ReactiveTransportSolver instance with given chemical system.
+    explicit ReactiveTransportSolver(const Partition& partition);
 
     /// Construct a ReactiveTransportSolver instance when system, reactions, and partition are provided.
     ReactiveTransportSolver(const ChemicalSystem& system, const ReactionSystem& reactions, const Partition& partition);
