@@ -45,9 +45,6 @@ struct SmartEquilibriumOptions
     /// The relative tolerance used in the acceptance test.
     double reltol = 1.0e-3;
 
-    /// The absolute tolerance used in the acceptance test.
-    double abstol = 1.0e-8;
-
     /// The small negative cutoff value for estimated species mole amounts.
     double cutoff = -1e-5;
 };
