@@ -58,10 +58,7 @@ public:
     /// Set the options for the equilibrium calculation.
     auto setOptions(const SmartEquilibriumOptions& options) -> void;
 
-    /// Set the partition of the chemical system.
-    auto setPartition(const Partition& partition) -> void;
-
-    /// Solve a chemical equilibrium problem provided amount of elements.
+    /// Solve a chemical equilibrium problem.
     /// @param state[in,out] The initial guess and the final state of the equilibrium calculation
     /// @param T The temperature (in units of K)
     /// @param P The pressure (in units of Pa)
