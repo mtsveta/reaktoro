@@ -1213,12 +1213,6 @@ auto SmartEquilibriumSolver::operator=(SmartEquilibriumSolver other) -> SmartEqu
 
 SmartEquilibriumSolver::~SmartEquilibriumSolver()
 {
-    // TODO Remove this from the desctructor.
-    // TODO Remove this from the desctructor.
-    // TODO Remove this from the desctructor.
-    // TODO Remove this from the desctructor.
-    // TODO Remove this from the desctructor.
-    pimpl->outputClusterInfo();
 }
 
 auto SmartEquilibriumSolver::setOptions(const SmartEquilibriumOptions& options) -> void
@@ -1249,6 +1243,11 @@ auto SmartEquilibriumSolver::properties() const -> const ChemicalProperties&
 auto SmartEquilibriumSolver::result() const -> const SmartEquilibriumResult&
 {
     return pimpl->result;
+}
+
+auto SmartEquilibriumSolver::outputClusterInfo() const -> void
+{
+    return pimpl->outputClusterInfo();
 }
 
 } // namespace Reaktoro
