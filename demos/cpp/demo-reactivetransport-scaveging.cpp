@@ -242,6 +242,11 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
                                 "SO4--", "NaSO4-", "MgSO4(aq)", "CaSO4(aq)", "KSO4-", "HSO4-"})
                 .setChemicalModelDebyeHuckel(dhModel);
     }
+    else if(params.activity_model == "dk-full"){
+        // Debye-Huckel full system
+        editor.addAqueousPhaseWithElements("C Ca Cl Fe H K Mg Na O S")
+                .setChemicalModelDebyeHuckel(dhModel);
+    }
     editor.addMineralPhase("Pyrrhotite");
     editor.addMineralPhase("Siderite");
 
@@ -328,7 +333,6 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     output.add("speciesMolality(H+)");
     output.add("speciesMolality(HS-)");
     output.add("speciesMolality(S2--)");
-    output.add("speciesMolality(SO4--)");
     output.add("speciesMolality(CO3--)");
     output.add("speciesMolality(HSO4-)");
     output.add("speciesMolality(H2S(aq))");
