@@ -53,6 +53,7 @@ extern void exportUtils(py::module& m);
 // Equilibrium module
 extern void exportEquilibriumCompositionProblem(py::module& m);
 extern void exportEquilibriumInverseProblem(py::module& m);
+extern void exportEquilibriumInverseSolver(py::module& m);
 extern void exportEquilibriumOptions(py::module& m);
 extern void exportEquilibriumPath(py::module& m);
 extern void exportEquilibriumProblem(py::module& m);
@@ -160,6 +161,7 @@ PYBIND11_MODULE(PyReaktoro, m)
     // Equilibrium module
     exportEquilibriumCompositionProblem(m);
     exportEquilibriumInverseProblem(m);
+    exportEquilibriumInverseSolver(m);
     exportEquilibriumOptions(m);
     exportEquilibriumPath(m);
     exportEquilibriumProblem(m);
