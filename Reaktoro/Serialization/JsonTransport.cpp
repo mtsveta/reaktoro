@@ -86,7 +86,7 @@ void to_json(json& j, const ReactiveTransportAnalysis& obj) {
     j["computing_costs_per_time_step"]["smart_equilibrium"] = obj.computing_costs_per_time_step.smart_equilibrium;
     j["computing_costs_per_time_step"]["smart_equilibrium_with_ideal_search"] = obj.computing_costs_per_time_step.smart_equilibrium_with_ideal_search;
     j["computing_costs_per_time_step"]["smart_equilibrium_estimate"] = obj.computing_costs_per_time_step.smart_equilibrium_estimate;
-    j["computing_costs_per_time_step"]["smart_equilibrium_accept"] = obj.computing_costs_per_time_step.smart_equilibrium_accept;
+    j["computing_costs_per_time_step"]["smart_equilibrium_accept"] = obj.computing_costs_per_time_step.smart_equilibrium_acceptance;
     j["computing_costs_per_time_step"]["smart_equilibrium_nearest_neighbor_search"] = obj.computing_costs_per_time_step.smart_equilibrium_nearest_neighbor_search;
     j["computing_costs_per_time_step"]["smart_equilibrium_acceptance"] = obj.computing_costs_per_time_step.smart_equilibrium_acceptance;
     j["computing_costs_per_time_step"]["smart_equilibrium_mat_vec_mul"] = obj.computing_costs_per_time_step.smart_equilibrium_mat_vec_mul;
@@ -130,7 +130,7 @@ void from_json(const json& j, ReactiveTransportAnalysis& obj) {
     j.at("computing_costs_per_time_step").at("smart_equilibrium").get_to(obj.computing_costs_per_time_step.smart_equilibrium);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_with_ideal_search").get_to(obj.computing_costs_per_time_step.smart_equilibrium_with_ideal_search);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_estimate").get_to(obj.computing_costs_per_time_step.smart_equilibrium_estimate);
-    j.at("computing_costs_per_time_step").at("smart_equilibrium_accept").get_to(obj.computing_costs_per_time_step.smart_equilibrium_accept);
+    j.at("computing_costs_per_time_step").at("smart_equilibrium_accept").get_to(obj.computing_costs_per_time_step.smart_equilibrium_acceptance);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_nearest_neighbor_search").get_to(obj.computing_costs_per_time_step.smart_equilibrium_nearest_neighbor_search);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_gibbs_energy_minimization").get_to(obj.computing_costs_per_time_step.smart_equilibrium_gibbs_energy_minimization);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_storage").get_to(obj.computing_costs_per_time_step.smart_equilibrium_storage);

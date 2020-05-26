@@ -22,7 +22,6 @@
 #include <Reaktoro/Transport/TransportOptions.hpp>
 #include <Reaktoro/Transport/TransportResult.hpp>
 #include <Reaktoro/Transport/TransportSolver.hpp>
-
 namespace Reaktoro {
 
 void exportTransportSolver(py::module& m)
@@ -42,22 +41,6 @@ void exportTransportSolver(py::module& m)
         .def("initialize", &TransportSolver::initialize)
         .def("step", step1)
         .def("step", step2)
-        ;
-}
-
-void exportReactiveTransportSolver(py::module& m)
-{
-    py::class_<ReactiveTransportSolver>(m, "ReactiveTransportSolver")
-        .def(py::init<const ChemicalSystem&>())
-        .def("setMesh", &ReactiveTransportSolver::setMesh)
-        .def("setVelocity", &ReactiveTransportSolver::setVelocity)
-        .def("setDiffusionCoeff", &ReactiveTransportSolver::setDiffusionCoeff)
-        .def("setBoundaryState", &ReactiveTransportSolver::setBoundaryState)
-        .def("setTimeStep", &ReactiveTransportSolver::setTimeStep)
-        .def("system", &ReactiveTransportSolver::system, py::return_value_policy::reference_internal)
-        .def("output", &ReactiveTransportSolver::output)
-        .def("initialize", &ReactiveTransportSolver::initialize)
-        .def("step", &ReactiveTransportSolver::step)
         ;
 }
 
