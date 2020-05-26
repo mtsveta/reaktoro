@@ -471,7 +471,6 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     SmartEquilibriumOptions smart_equilibrium_options;
     smart_equilibrium_options.reltol = params.smart_equilibrium_reltol;
     smart_equilibrium_options.abstol = params.smart_equilibrium_abstol;
-    smart_equilibrium_options.cutoff = params.smart_equilibrium_cutoff;
     smart_equilibrium_options.learning.hessian = params.hessian;
 
     // Step **: Define chemical kinetic solver options

@@ -564,10 +564,12 @@ struct ReactiveTransportSolver::Impl
         }
         */
 
+        /*
         if(options.use_smart_kinetic_solver)
         {
             smart_kinetic_solver.printTree(steps);
         }
+        */
 
         // Update the output files with the chemical state of every cell
         for(Index icell = 0; icell < num_cells; ++icell)
