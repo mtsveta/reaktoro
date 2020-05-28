@@ -234,7 +234,9 @@ struct ReactiveTransportSolver::Impl
                 const auto P = states[icell].pressure();
 
                 // Solve with a smart equilibrium solver
-                smart_equilibrium_solver.solve(states[icell], T, P, b.row(icell));
+                //smart_equilibrium_solver.solve(states[icell], T, P, b.row(icell));
+                smart_equilibrium_solver.solve(states[icell], T, P, b.row(icell), steps, icell);
+
                 //if(!smart_equilibrium_solver.result().estimate.accepted) std::cout << " on (step, cell) : (" << steps << ", " << icell << ")" << std::endl;
 
                 // Update chemical properties of the field
