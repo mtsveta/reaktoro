@@ -132,6 +132,7 @@ namespace Reaktoro {
             solver.setPartition(partition_);
         }
 
+
         /// Learn how to perform a full equilibrium calculation (with tracking)
         auto learn(ChemicalState& state, double T, double P, VectorConstRef be) -> void
         {
@@ -410,6 +411,154 @@ namespace Reaktoro {
             properties = properties0;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
         }
 
+        /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences) v.1
+        auto estimate_no_quartz(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+        {
+            result.estimate.accepted = false;
+
+            // Skip estimation if no previous full computation has been done
+            if(tree.empty())
+                return;
+
+            MatrixConstRef Ae = partition.formulaMatrixEquilibriumPartition();
+
+            //---------------------------------------------------------------------------------------
+            // Step 1: Search for the reference element (closest to the new state input conditions)
+            //---------------------------------------------------------------------------------------
+            tic(0);
+
+            // Comparison function based on the Euclidean distance (scaled)
+            auto distancefn_scaled = [&](const TreeNode& a, const TreeNode& b)
+            {
+                Vector be_a = a.be/sum(a.be);
+                Vector be_b = b.be/sum(b.be);
+                Vector be_x = be/sum(be);
+
+                return (be_a - be_x).squaredNorm() < (be_b - be_x).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
+            };
+            // Comparison function based on the Euclidean distance
+            auto distancefn = [&](const TreeNode& a, const TreeNode& b)
+            {
+                const auto& be_a = a.be;
+                const auto& be_b = b.be;
+                return (be_a - be).squaredNorm() < (be_b - be).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
+            };
+
+            // Find the entry with minimum "input" distance
+            auto it = std::min_element(tree.begin(), tree.end(), distancefn);
+
+            toc(0, result.timing.estimate_search);
+
+            //----------------------------------------------------------------------------
+            // Step 2: Calculate predicted state with a first-order Taylor approximation
+            //----------------------------------------------------------------------------
+            tic(1);
+
+            // Get all the data stored in the reference element
+            const auto& be0 = it->be;
+            const auto& state0 = it->state;
+            const auto& properties0 = it->properties;
+            const auto& sensitivity0 = it->sensitivity;
+            const auto& T0 = state0.temperature();
+            const auto& P0 = state0.pressure();
+            const auto& n0 = state0.speciesAmounts();
+            const auto& y0 = state0.elementDualPotentials();
+            const auto& z0 = state0.speciesDualPotentials();
+            const auto u0 = properties0.chemicalPotentials();
+            const auto x0 = properties0.moleFractions();
+
+            // Amounts of species related to equilibrium and kinetics species
+            const auto& ne0 = n0(ies);
+            const auto& ze0 = z0(ies);
+            const auto& ue0 = u0.val(ies);
+            const auto& xe0 = x0.val(ies);
+
+            // Constant to scale the residual of the equilibrium species
+            const auto RT = universalGasConstant*T0;
+
+            // Calculate perturbation of n
+            dn.noalias() = sensitivity0.dndb * (be - be0);
+            dy.noalias() = sensitivity0.dydb * (be - be0);
+            dz.noalias() = sensitivity0.dzdb * (be - be0);
+
+            dne = dn;
+            dze = dz(ies);
+
+            y.noalias() = y0;
+            z.noalias() = z0;
+
+            ne.noalias() = ne0 + dne;
+            ze.noalias() = ze0;
+
+            // Negative cutoff control
+            bool neg_amount_check = ne.minCoeff() > -1e-5;
+
+             // If cutoff test didn't pass, estimation has failded
+            if(neg_amount_check == false)
+                return;
+
+            for(auto i = 0; i < ne.size(); ++i)
+                if(ne[i] <= 0.0)
+                    ne[i] = 1e-12;
+
+            // Recompute the change in n309.593
+            dne = ne - ne0;
+
+            // Calculate u(bar) = u(ref) + dudT(ref)*dT + dudP(ref)*dP + dudn(ref)*dn
+            u = u0.val + u0.ddn * dn;
+            ue = ue0 + u0.ddn(ies, ies) * dne;
+
+            // Calculate x(bar) = x(ref) + dxdn(ref)*dn
+            xe = xe0 + x0.ddn(ies, ies) * dne;
+
+            const auto& Aey = tr(Ae)*y;
+            const auto& Aeye = Aey(ies);
+
+            // Calculate the equilibrium residuals of the equilibrium species
+            re = abs(ue - Aey(ies) - ze)/RT;  // TODO: We should actually collect the entries in u and z corresponding to equilibrium species
+            // TODO: fix this exclusion of quartz in smarter
+            Vector re_no_quartz(re.size()-1);
+            for(auto i = 0; i < ne.size()-1; ++i)
+                re_no_quartz[i] = re[i];
+
+            // Eliminate species with mole fractions below cutoff from the residual analysis
+            for(auto i = 0; i < ne.size(); ++i)
+                if(xe[i] < options.mole_fraction_cutoff)
+                    re[i] = 0.0; // set their residuals to zero
+
+            // Estimate the residual error of the trial Taylor approximation
+            Index ispecies;
+            const double error = re.maxCoeff(&ispecies);
+            const double error_no_quartz = re_no_quartz.maxCoeff(&ispecies);
+
+            bool is_error_acceptable = error_no_quartz <= options.tol;
+
+            toc(1, result.timing.estimate_mat_vec_mul);
+
+            //----------------------------------------------
+            // Step 3: Checking the acceptance criterion
+            //----------------------------------------------
+            tic(2);
+
+            // Update three properties of the chemical state (for better initial guess of the GEM problem)
+            state.setSpeciesAmounts(ne, ies);
+            z(ies) = ze;
+            state.setElementDualPotentials(y);
+            state.setSpeciesDualPotentials(z);
+
+            toc(2, result.timing.estimate_acceptance);
+
+            // Check if smart estimation failed with respect to variation of chemical potentials or amounts
+            if(is_error_acceptable == false)
+                return;
+
+            // Set the estimate accepted status to true
+            result.estimate.accepted = true;
+
+            // Update the chemical properties of the system
+            properties = properties0;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+        }
+
         /// Solve the equilibrium problem with given initial state
         auto solve(ChemicalState& state) -> SmartEquilibriumResult
         {
@@ -444,12 +593,20 @@ namespace Reaktoro {
             result = {};
 
             // Perform a smart estimate of the chemical state
-            timeit( estimate(state, T, P, be),
+            //timeit( estimate_nnsearch_acceptance_based_on_lna(state, T, P, be),
+            //        result.timing.estimate= );
+            //timeit( estimate_no_quartz(state, T, P, be),
+            //      result.timing.estimate= );
+            timeit( estimate_nnsearch_acceptance_based_on_lna(state, T, P, be),
                     result.timing.estimate= );
 
             // Perform a learning step if the smart prediction is not sactisfatory
-            if(!result.estimate.accepted)
-            timeit( learn(state, T, P, be), result.timing.learn= );
+            if(!result.estimate.accepted){
+                timeit( learn(state, T, P, be), result.timing.learn= );
+                //std::cout << "learn" << std::endl;
+            }else{
+                //std::cout << "estimate" << std::endl;
+            }
 
             toc(0, result.timing.solve);
 
