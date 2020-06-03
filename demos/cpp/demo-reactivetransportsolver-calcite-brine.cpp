@@ -134,7 +134,7 @@ int main()
     // Define parameters of the equilibrium solvers
     params.smart_equlibrium_reltol = 1e-1;
     params.smart_equlibrium_abstol = 1e-8;
-    params.tol = 6e-1;
+    params.tol = 1e-1;
     params.track_statistics = true;
 
     // Output
@@ -150,7 +150,7 @@ int main()
               << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells *params.nsteps
               << " fully evaluated GEMS out of " << params.ncells * params.nsteps  << std::endl;
 
-    params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;
     results.smart_total = results.smart_equilibrium_timing.solve;
@@ -200,28 +200,46 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
             .setChemicalModelPitzerHMW()
             .setActivityModelDrummondCO2();
-    editor.addMineralPhase("Quartz");
-    editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Dolomite");
+    editor.addMineralPhase("Calcite");
+    editor.addMineralPhase("Quartz");
+
+    /*
+    MineralReaction reaction = editor.addMineralReaction("Calcite");
+    reaction.setEquation("Calcite = Ca++ + CO3--");
+    reaction.addMechanism("logk = -5.81 mol/(m2*s); Ea = 23.5 kJ/mol");
+    reaction.addMechanism("logk = -0.30 mol/(m2*s); Ea = 14.4 kJ/mol; a[H+] = 1.0");
+    reaction.setSpecificSurfaceArea(5000, "cm2/g");
+    */
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
     //if (params.use_smart_eqilibirum_solver) std::cout << "system = \n" << system << std:: endl;
+    /*
+    // Step **: Create the ReactionSystem instances
+    ReactionSystem reactions(editor);
+    // Step **: Create the ReactionSystem instances
+    Partition partition(system);
+    partition.setKineticSpecies({"Calcite"});
+    */
 
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumProblem problem_ic(system);
     problem_ic.setTemperature(params.T, "celsius");
     problem_ic.setPressure(params.P, "bar");
     problem_ic.add("H2O",   1.0, "kg");
+    problem_ic.add("O2",    1.0, "umol");
     problem_ic.add("NaCl",  0.7, "mol");
     problem_ic.add("CaCO3", 10,  "mol");
     problem_ic.add("SiO2",  10,  "mol");
+    problem_ic.add("MgCl2", 1e-10, "mol");
 
     // Step **: Define the boundary condition (BC)  of the reactive transport modeling problem
     EquilibriumProblem problem_bc(system);
     problem_bc.setTemperature(params.T, "celsius");
     problem_bc.setPressure(params.P, "bar");
     problem_bc.add("H2O",   1.00, "kg");
+    problem_bc.add("O2",    1.0, "umol");
     problem_bc.add("NaCl",  0.90, "mol");
     problem_bc.add("MgCl2", 0.05, "mol");
     problem_bc.add("CaCl2", 0.01, "mol");
@@ -253,6 +271,8 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
 
     // Step **: Define the reactive transport modeling
     ReactiveTransportSolver rtsolver(system);
+    //ReactiveTransportSolver rtsolver(system, partition);
+    //ReactiveTransportSolver rtsolver(system, reactions, partition);
     rtsolver.setOptions(reactive_transport_options);
     rtsolver.setMesh(mesh);
     rtsolver.setVelocity(params.v);
@@ -370,7 +390,9 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  "-ncells-" + std::to_string(params.ncells) +
                                  "-nsteps-" + std::to_string(params.nsteps) +
                                  "-tol-" + tol_stream.str() + "-smart";      // name of the folder with results
-    std::string folder = "results-pitzer-geometric-nnsearch";
+    std::string folder = "results-pitzer-geometric-nnsearch-restricted-to-equilibrium-with-element-amounts-with-z-y";
+
+
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :
              folder + test_tag;
