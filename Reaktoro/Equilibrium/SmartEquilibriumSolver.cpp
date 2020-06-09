@@ -595,10 +595,10 @@ namespace Reaktoro {
             // Perform a smart estimate of the chemical state
             //timeit( estimate_nnsearch_acceptance_based_on_lna(state, T, P, be),
             //        result.timing.estimate= );
-            //timeit( estimate_no_quartz(state, T, P, be),
-            //      result.timing.estimate= );
-            timeit( estimate_nnsearch_acceptance_based_on_lna(state, T, P, be),
-                    result.timing.estimate= );
+            timeit( estimate_no_quartz(state, T, P, be),
+                  result.timing.estimate= );
+            //timeit( estimate(state, T, P, be),
+            //        result.timing.estimate= );
 
             // Perform a learning step if the smart prediction is not sactisfatory
             if(!result.estimate.accepted){

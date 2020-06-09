@@ -40,6 +40,9 @@ struct SmartEquilibriumOptions
 
     /// The absolute tolerance used in the acceptance test.
     double abstol = 1e-8;
+
+    /// The small negative cutoff value for estimated species mole amounts.
+    double cutoff = -1e-5;
 };
 
 } // namespace Reaktoro

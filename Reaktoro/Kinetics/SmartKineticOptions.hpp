@@ -44,8 +44,12 @@ struct SmartKineticOptions
     /// The absolute tolerance for estimated species mole amounts.
     double abstol = 1e-14;
 
-    /// The smalll negative cutoff value for estimated species mole amounts.
-    double cutoff = -1e-14;
+    /// The small negative cutoff value for estimated species mole amounts.
+    double cutoff = -1e-5;
+
+    /// The cutoff value for species mole fractions. Species with mole fractions below this value are ignored during the acceptance test.
+    double mole_fraction_cutoff = 1.0e-6;
+
 
 };
 

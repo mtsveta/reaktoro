@@ -112,7 +112,7 @@ public:
     /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
     /// @param b The amount of elements updated from the transport
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void;
-
+    auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void;
     /// Return the result of the last smart kinetic calculation.
     auto result() const -> const SmartKineticResult&;
 
