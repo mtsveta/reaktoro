@@ -1,0 +1,87 @@
+/// Solve the ODE equations from a given start time to a final one.
+    auto solve_explicit_1st_order(double& t, double dt, VectorRef y) -> void
+    {
+        // Initialize the cvode context
+        initialize(t, y);
+
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        problem.function(t, y, f); // evaluate right-hand side at t
+        y += dt * f;
+
+        // Update time
+        t = t + dt;
+
+    }
+
+    /// Solve the ODE equations from a given start time to a final one.
+    auto solve_explicit_2nd_order(double& t, double dt, VectorRef y) -> void
+    {
+        // Initialize the cvode context
+        initialize(t, y);
+
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        // Values on the half-step
+        Vector y_k12, f_k12, J_k12;
+        // Final values
+        Vector y_k1;
+
+        // First half-step
+        problem.function(t, y, f); // evaluate right-hand side at t
+        y_k12 = y + dt/2 * f + dt*dt/8 * J * f;
+
+        // Final step
+        problem.function(t + dt/2, y_k12, f_k12); // evaluate right-hand side at t = t + dt/2
+        problem.jacobian(t + dt/2, y_k12, J_k12); // evaluate jacobian at t = t + dt/2
+        y_k1 = y + dt * f + dt*dt/6 * J * f + dt*dt/3 * J_k12 * f_k12;
+
+        // Update time
+        t = t + dt;
+
+    }
+    /// Solve the ODE equations from a given start time to a final one.
+    auto solve_implicit_1st_order(double& t, double dt, VectorRef y) -> void
+    {
+        // Initialize the cvode context
+        initialize(t, y);
+
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        // Initialize identity matrix and Jacobian on the t = t^{k+1}
+        Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
+
+        // Initial vector
+        Vector yk1 = y, yk = y;
+        // Residual and increment for the Newton method
+        Vector r, dy;
+        // Final time of integration
+        double tk1 = t + dt;
+
+        // Newton-Rapson iteration scheme
+        for(Index i = 0; i < options.max_num_nonlinear_iterations; i++)
+        {
+            // Evalute current value of Jacobian and right-hand side
+            problem.jacobian(tk1, yk, J); // evaluate jacobian at t_{k+1}
+            problem.function(tk1, yk, f); // evaluate right-hand side at t_{k+1}
+
+            // Calculate residual
+            r = yk1 - yk - dt * f;
+            // Find dy solving J * dy = - r
+            LU lu(I - dt * J);
+            dy = lu.solve(-r);
+
+            // Update yk1 and yk
+            y = yk1; // remember old value of yk1
+            yk1 = yk + dy; // update yk1
+            yk = y; // update yk
+        }
+        // Update final value
+        y = yk1;
+        // Update time
+        t = t + dt;
+
+    }

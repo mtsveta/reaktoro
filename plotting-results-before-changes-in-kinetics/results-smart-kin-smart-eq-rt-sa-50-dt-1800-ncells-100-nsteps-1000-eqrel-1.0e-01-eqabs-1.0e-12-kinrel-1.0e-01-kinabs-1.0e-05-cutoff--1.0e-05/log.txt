@@ -1,0 +1,126 @@
+dt      : 1800
+ncells  : 100
+nsteps  : 1000
+D       : 1e-09
+v       : 1.65344e-06
+CFD     : 0.297619
+T       : 60
+P       : 100
+equilibrium reltol   : 0.1
+equilibrium abstol   : 1e-12
+kinetics reltol      : 0.1
+kinetics abstol      : 1e-05
+equilibrium cuttoff  : -1e-05
+*********************************************************************
+*********************************************************************
+
+solver                         : conv_kin & smart_eq
+-----------------------------------------------------
+ - solve                   : 266.917
+   - initialize            : 1.11389 (0.417316 %)
+   - integrate             : 259.074 (97.0618 %)
+     - chemical properties : 65.6666 (24.6019 %)
+     - integrate_reaction_rates      : 5.24626 (1.9655 %)
+     - equilibration       : 6.49469 (2.43323 %)
+   - equilibrate             : 6.49469 (2.43323 %)
+     - learning          : 0.276723 (0.103674 %)
+       - store           : 0.107526 (0.0402847 %)
+     - estimation        : 5.9388 (2.22496 %)
+       - search          : 3.09906 (1.16106 %)
+-----------------------------------------------------
+ smart equilibrium acceptance rate   : 0.99492 / 508 learnings out of 100000
+-----------------------------------------------------
+ - solve - search              : 263.818
+ - solve - search - store      : 263.71
+ - solve - search - store - properties : 198.043
+*********************************************************************
+*********************************************************************
+
+solver                         : smart_kin & conv_eq
+-----------------------------------------------------
+ - solve                : 36.458
+   - learn              : 10.4062 (28.543 %)
+     - integrate             : 10.3752 (28.4578 %)
+       - chemical properties : 2.41539 (6.62512 %)
+       - integrate_reaction_rates      : 0.188949 (0.518266 %)
+       - equilibration       : 6.60228 (18.1093 %)
+     - store                 : 0.02548 (0.0698886 %)
+   - estimate           : 4.9349 (13.5358 %)
+     - search                : 4.03933 (11.0794 %)
+     - acceptance            : 0.608394 (1.66875 %)
+   - equilibrate           : 20.35 (55.8176 %)
+-----------------------------------------------------
+ acceptance rate      : 0.97524 / 2476 smartly estimated kinetics states out of 100000
+-----------------------------------------------------
+ - solve - search                 : 32.4187
+ - solve - search - store         : 32.3932
+ - solve - search - store - prop. : 29.9778
+*********************************************************************
+*********************************************************************
+
+solver                         : smart_kin & smart_eq
+-----------------------------------------------------
+ - solve                : 16.6558
+   - learn              : 9.38554 (56.3501 %)
+     - integrate             : 9.36048 (56.1996 %)
+       - chemical properties      : 2.07111 (12.4348 %)
+       - integrate_reaction_rates : 0.169089 (1.0152 %)
+       - equilibration            : 6.12857 (36.7955 %)
+     - store                 : 0.0203465 (0.122159 %)
+   - estimate           : 3.40435 (20.4394 %)
+     - search                : 2.63268 (15.8064 %)
+     - acceptance            : 0.509609 (3.05965 %)
+   - equilibrate        : 3.28842 (19.7434 %)
+     - learning              : 0.254424 (1.52754 %)
+       - store                    : 0.0969028 (0.581797 %)
+     - estimation            : 2.85269 (17.1273 %)
+       - search                   : 1.10659 (6.64391 %)
+-----------------------------------------------------
+ smart kinetics acceptance rate      : 0.97749 / 2251 learnings out of 100000
+ smart equilibrium acceptance rate   : 0.99488 / 512 learnings states out of 100000
+-----------------------------------------------------
+ - solve - search                 : 12.9165
+ - solve - search - store         : 12.7992
+ - solve - search - store - prop. : 10.7281
+*********************************************************************
+*********************************************************************
+
+solver                         : conv_kin & conv_eq
+-----------------------------------------------------
+ - solve                   : 242.334
+   - initialize            : 0.739998 (0.305363 %)
+   - integrate             : 225.166 (92.9153 %)
+     - chemical properties      : 59.0212 (24.3553 %)
+     - integrate_reaction_rates : 4.85421 (2.00311 %)
+     - equilibration            : 137.144 (56.5929 %)
+   - equilibrate           : 16.2052 (6.68711 %)
+-----------------------------------------------------
+*********************************************************************
+*********************************************************************
+speed up of using smart kinetics solver                     : 6.64694
+speed up ... (with ideal search)                            : 7.47514
+speed up ... (with ideal search & store)                    : 7.48102
+speed up ... (with ideal search & store & properties eval.) : 8.08378
+time RT conv.kin.& conv.eq.  : 252.065
+time RT smart.kin.& conv.eq. : 46.0123
+speedup                      : 5.4782
+*********************************************************************
+*********************************************************************
+speed up of using smart equilibrium solver                  : 0.907902
+speed up ... (with ideal search)                            : 0.918567
+speed up ... (with ideal search & store)                    : 0.918942
+speed up ... (with ideal search & store & properties eval.) : 1.22364
+speed up in equilibration    : inf
+time RT conv.kin.& conv.eq.  : 252.065
+time RT conv.kin.& smart.eq. : 277.558
+speedup                      : 0.908152
+*********************************************************************
+*********************************************************************
+speed up of using smart kinetic solver (smart equilibrium)  : 14.5496
+speed up ... (with ideal search)                            : 18.7616
+speed up ... (with ideal search & store)                    : 18.9335
+speed up ... (with ideal search & store & properties eval.) : 22.5887
+time RT conv.kin.& conv.eq.  : 252.065
+time RT smart.kin.& smart.eq. : 25.8016
+speedup                      : 9.76934
+total time                          : 602.805

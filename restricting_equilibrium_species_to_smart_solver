@@ -1,0 +1,110 @@
+//            std::cout << "dn of a size " << dn.size() << ":\n" << tr(dn) << std::endl;
+//            std::cout << "dne of a size " << dne.size() << ":\n" << tr(dne) << std::endl;
+//            getchar();
+
+
+            //n.noalias() = n0 + dn;
+
+//
+//            std::cout << "z of a size " << z.size() << ":\n" << tr(z) << std::endl;
+//            std::cout << "ze of a size " << ze.size() << ":\n" << tr(ze) << std::endl;
+//            getchar();
+//            std::cout << "n of a size " << n.size() << ":\n" << tr(n) << std::endl;
+//            std::cout << "ne of a size " << ne.size() << ":\n" << tr(ne) << std::endl;
+//            getchar();
+
+// Correct negative mole numbers
+            //for(auto i = 0; i < n.size(); ++i)
+            //    if(n[i] <= 0.0)
+            //        n[i] = 1e-12;
+
+
+          //std::cout << "u of size " << u.size() << ":\n" << tr(u) << std::endl;
+            //std::cout << "ue of a size " << ue.size() << ":\n" << tr(ue) << std::endl;
+            //getchar();
+
+            //            std::cout << "x of size " << x.size() << ":\n" << tr(x) << std::endl;
+//            std::cout << "xe of a size " << xe.size() << ":\n" << tr(xe) << std::endl;
+//            getchar();
+
+//            std::cout << "tr(Ae)*y of size " << Aey.size() << ":\n" << tr(Aey) << std::endl;
+//            std::cout << "tr(Ae)*y of size " << Aey(ies).size() << ":\n" << tr(Aey(ies)) << std::endl;
+//            getchar();
+
+
+            //r = abs(u - tr(Ae)*y - z)/RT;  // TODO: We should actually collect the entries in u and z corresponding to equilibrium species
+
+//            std::cout << "r of size " << r.size() << ":\n" << tr(r) << std::endl;
+//            std::cout << "re of a size " << re.size() << ":\n" << tr(re) << std::endl;
+//            getchar();
+
+            // Eliminate species with mole fractions below cutoff from the residual analysis
+            //for(auto i = 0; i < n.size(); ++i)
+            //    if(x[i] < options.mole_fraction_cutoff)
+            //        r[i] = 0.0; // set their residuals to zero
+
+
+            if(is_error_acceptable == false)
+            {
+                /*
+                std::cout << std::scientific;
+                // std::cout << "-----------------------------" << std::endl;
+                // std::cout << "*** Failed Smart Estimate ***" << std::endl;
+                std::cout << "-----------------------------" << std::endl;
+                std::cout << "Error = " << error << std::endl;
+                std::cout << "Triggered by species = " << system.species(ispecies).name() << std::endl;
+                std::cout << "-----------------------------" << std::endl;
+                std::cout << std::left << std::setw(25) << "Species";
+                std::cout << std::left << std::setw(25) << "r[i]";
+                std::cout << std::left << std::setw(25) << "|r[i] * dn[i]/sum(n)|";
+                std::cout << std::left << std::setw(25) << "|dn[i]|";
+                std::cout << std::left << std::setw(25) << "n[i]";
+                std::cout << std::left << std::setw(25) << "x[i]";
+                std::cout << std::left << std::setw(25) << "z[i]";
+                // std::cout << std::left << std::setw(25) << "r[i] * x[i]";
+                // std::cout << std::left << std::setw(25) << "(r[i] * n[i])/nsum";
+                std::cout << std::endl;
+
+                for(auto i = 0; i < r.size(); ++i)
+                {
+                    if(r[i] == 0.0) continue;
+                    if(i == ispecies) std::cout << "***************" << std::endl;
+                    std::cout << std::left << std::setw(25) << ((i == ispecies) ? "==> " : "") + system.species(i).name();
+                    std::cout << std::left << std::setw(25) << r[i];
+                    std::cout << std::left << std::setw(25) << r[i] * std::abs(dn[i])/sum(n);
+                    std::cout << std::left << std::setw(25) << std::abs(dn[i]);
+                    std::cout << std::left << std::setw(25) << n[i];
+                    std::cout << std::left << std::setw(25) << x[i];
+                    std::cout << std::left << std::setw(25) << z[i];
+                    // std::cout << std::left << std::setw(25) << std::abs(r[i] * x[i]);
+                    // std::cout << std::left << std::setw(25) << std::abs(r[i] * n[i])/nsum;
+                    std::cout << std::endl;
+                    if(i == ispecies) std::cout << "***************" << std::endl;
+                }
+                std::cout << "=============================" << std::endl;
+                */
+            }
+
+------------------------------------------------------------------------------------------------------------------------
+
+ //ze.noalias() = ze0 + dze * RT;
+            std::cout << "ne of a size " << ne.size() << ":\n" << tr(ne) << std::endl;
+            std::cout << "ze of a size " << ze.size() << ":\n" << tr(ze) << std::endl;
+
+            //getchar();
+
+            //std::cout << "z of a size " << z.size() << ":\n" << tr(z) << std::endl;
+
+                        //std::cout << "z of a size " << z.size() << ":\n" << tr(z) << std::endl;
+
+                        //y.noalias() = y0 + dy * RT; // This approximation increases the number of learnings bu not improves the accuracy
+                        //z.noalias() = z0 + dz * RT; //
+ std::cout << "r of a size " << r.size() << ":\n" << tr(r) << std::endl;
+            std::cout << "re of a size " << re.size() << ":\n" << tr(re) << std::endl;
+            std::cout << "re_no_quartz of a size " << re_no_quartz.size() << ":\n" << tr(re_no_quartz) << std::endl;
+            //getchar();
+
+std::cout << "error = " << error << std::endl;
+            std::cout << "error_ = " << error_ << std::endl;
+            getchar();
+

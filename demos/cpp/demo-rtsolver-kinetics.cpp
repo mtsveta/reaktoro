@@ -285,15 +285,18 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     problem_ic.setTemperature(params.T, "celsius");
     problem_ic.setPressure(params.P, "bar");
     problem_ic.add("H2O",   1.0, "kg");
+    problem_ic.add("O2",    1.0, "umol");
     problem_ic.add("NaCl",  0.7, "mol");
     problem_ic.add("CaCO3", 10,  "mol");
     problem_ic.add("SiO2",  10,  "mol");
+    problem_ic.add("MgCl2", 1e-10, "mol");
 
     // Step **: Define the boundary condition (BC)  of the reactive transport modeling problem
     EquilibriumProblem problem_bc(system);
     problem_bc.setTemperature(params.T, "celsius");
     problem_bc.setPressure(params.P, "bar");
     problem_bc.add("H2O",   1.00, "kg");
+    problem_bc.add("O2",    1.0, "umol");
     problem_bc.add("NaCl",  0.90, "mol");
     problem_bc.add("MgCl2", 0.05, "mol");
     problem_bc.add("CaCl2", 0.01, "mol");
@@ -349,6 +352,25 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     output.add("speciesMolality(CO2(aq))");
     output.add("phaseVolume(Calcite)");
     output.add("phaseVolume(Dolomite)");
+    output.add("speciesMolality(CO3--)");
+    output.add("speciesMolality(CaCl+)");
+    output.add("speciesMolality(Ca(HCO3)+)");
+    output.add("speciesMolality(MgCl+)");
+    output.add("speciesMolality(Mg(HCO3)+)");
+    output.add("speciesMolality(OH-)");
+    output.add("elementmolality(C)");
+    output.add("elementmolality(Ca)");
+    output.add("elementmolality(Cl)");
+    output.add("elementmolality(H)");
+    output.add("elementmolality(Mg)");
+    output.add("elementmolality(Na)");
+    output.add("elementmolality(O)");
+    output.add("elementmolality(Si)");
+    output.add("elementmolality(Z)");
+    output.add("speciesMolality(MgCO3(aq))");
+    output.add("speciesMolality(MgOH+)");
+    output.add("speciesAmount(Calcite)");
+    output.add("speciesAmount(Dolomite)");
     output.filename(folder + "/" + "test.txt");
 
     // Step **: Create RTProfiler to track the timing and results of reactive transport
@@ -433,7 +455,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-nsteps-" + std::to_string(params.nsteps) +
                            "-conv-kin-conv-eq";
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
-    std::string folder = "../rt-sa-5000" + test_tag;
+    std::string folder = "../rt-sa-5000-no-cvode" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "\nsolver                         : "
