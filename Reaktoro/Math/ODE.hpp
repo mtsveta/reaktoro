@@ -224,6 +224,10 @@ public:
     /// @param f The new right-hand side values as output
     auto solve(double& t, double dt, VectorRef y, MatrixRef S) -> void;
 
+    // Methods independent on CVODE
+    auto solve_implicit_1st_order(double& t, double dt, VectorRef y) -> void;
+    auto solve_implicit_1st_order(double& t, double dt, VectorRef y, MatrixRef S) -> void;
+
 private:
     struct Impl;
 

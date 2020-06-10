@@ -193,6 +193,27 @@ struct ODESolver::Impl
         N_VDestroy_Serial(abstols);
     }
 
+    auto initialize_(double tstart, VectorConstRef y) -> void
+    {
+        // Check if the ordinary differential problem has been initialized
+        Assert(problem.initialized(),
+               "Cannot proceed with ODESolver::initialize to initialize the solver.",
+               "The provided ODEProblem instance was not properly initialized.");
+
+        // Check if the dimension of 'y' matches the number of equations
+        Assert(y.size() == problem.numEquations(),
+               "Cannot proceed with ODESolver::initialize to initialize the solver.",
+               "The dimension of the vector parameter `y` does not match the number of equations.");
+
+        // The number of differential equations
+        const unsigned int num_equations = problem.numEquations();
+
+        // Allocate memory for f and J
+        f.resize(num_equations);
+        J.resize(num_equations, num_equations);
+
+    }
+
     /// Integrate the ODE performing a single step.
     auto integrate(double& t, VectorRef y) -> void
     {
@@ -306,8 +327,6 @@ struct ODESolver::Impl
         // Set the user-defined data to cvode_mem
         CheckIntegration(CVodeSetUserData(cvode_mem, &data));
 
-        //std::cout << "t      : " << t << std::endl;
-        //std::cout << "t + dt : " << t + dt << std::endl;
         // Solve the ode problem from `tstart` to `tfinal`
         // CV_NORMAL - indicates that the step is controled by `tstart` and `tfinal`
         // CVODE will trigger integration from t until t + dt
@@ -317,10 +336,142 @@ struct ODESolver::Impl
         for(unsigned int i = 0; i < data.num_equations; ++i)
             y[i] = VecEntry(this->cvode_y, i);
 
+        //std::cout << "y: " << tr(y) << std::endl;
     }
 
     /// Solve the ODE equations from a given start time to a final one.
-    auto solve(double& t, double dt, VectorRef y, MatrixRef Sk1) -> void
+    auto solve_implicit_1st_order(double& t, double dt, VectorRef y) -> void
+    {
+        // Initialize the cvode context
+        initialize_(t, y);
+
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        // Initialize identity matrix and Jacobian on the t = t^{k+1}
+        Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
+
+        // Initial vector
+        Vector yk1 = y, yk = y;
+        // Residual and increment for the Newton method
+        Vector r, dy;
+        // Final time of integration
+        double tk1 = t + dt;
+
+        double error_rel = 1e8;
+        Index i = 0;
+
+        while(error_rel > 1e-4 * options.reltol) { // reltol = 1e-10
+
+            // Evalute current value of Jacobian and right-hand side
+            problem.function(tk1, yk, f); // evaluate right-hand side at t_{k+1}
+            problem.jacobian(tk1, yk, J); // evaluate jacobian at t_{k+1}
+
+            // Calculate residual
+            r = yk1 - yk - dt * f;
+            // Find dy solving J * dy = - r
+            LU lu(I - dt * J);
+            dy = lu.solve(-r);
+
+            // Update yk1 and yk
+            y = yk1; // remember old value of yk1
+            yk1 = yk + dy; // update yk1
+            yk = y; // update yk
+
+            // Calculate the error between two
+            error_rel = dy.squaredNorm() / y.squaredNorm();
+            i++;
+            //std::cout << "iter: " << i++ << ", yk1: " << tr(yk1) << std::endl;
+            //std::cout << "error: " << error  << std::endl;
+            //getchar();
+        }
+
+        // Update final value
+        y = yk1;
+        // Update time
+        t = t + dt;
+
+    }
+
+    /// Solve the ODE equations from a given start time to a final one.
+    auto solve_implicit_1st_order(double& t, double dt, VectorRef y,  MatrixRef S) -> void
+    {
+        // Initialize the cvode context
+        initialize_(t, y);
+
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        // -------------------------------------------------------------------
+        // Reconstruct unknown y using 1st order implicit scheme
+        // -------------------------------------------------------------------
+
+        // Initialize identity matrix and Jacobian on the t = t^{k+1}
+        Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
+
+        // Initial vector
+        Vector yk1 = y, yk = y;
+        // Residual and increment for the Newton method
+        Vector r, dy;
+        // Final time of integration
+        double tk1 = t + dt;
+
+        double error_rel = 1e8;
+        Index i = 0;
+
+        while(error_rel > 1e-4 * options.reltol) {
+
+            // Evalute current value of Jacobian and right-hand side
+            problem.function(tk1, yk, f); // evaluate right-hand side at t_{k+1}
+            problem.jacobian(tk1, yk, J); // evaluate jacobian at t_{k+1}
+
+            // Calculate residual
+            r = yk1 - yk - dt * f;
+            // Find dy solving J * dy = - r
+            LU lu(I - dt * J);
+            dy = lu.solve(-r);
+
+            // Update yk1 and yk
+            y = yk1; // remember old value of yk1
+            yk1 = yk + dy; // update yk1
+            yk = y; // update yk
+
+            // Calculate the error between two
+            error_rel = dy.squaredNorm() / y.squaredNorm();
+            i++;
+            //std::cout << "iter: " << i++ << ", yk1: " << tr(yk1) << std::endl;
+            //std::cout << "error: " << error  << std::endl;
+            //getchar();
+
+            // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k(=I)
+            //S = lu.solve(S);
+
+        }
+
+        // Update final value
+        y = yk1;
+        // Update time
+        t = t + dt;
+
+        ///*
+        // -------------------------------------------------------------------
+        // Reconstruct sensitivities using implicit scheme
+        // -------------------------------------------------------------------
+
+        // Evalute current value of Jacobian and RHS
+        problem.jacobian(t, y, J); // provides evaluation of sensitivities at t = t_{k+1}
+        problem.function(t, y, f); // provides evaluation of properties and rates at t = t_{k+1}
+
+        // Perform LU decomposition for matrix  I - dt * J^{k+1}
+        LU lu(I - dt * J);
+
+        // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k(=I)
+        S = lu.solve(S);
+        //*/
+    }
+
+    /// Solve the ODE equations from a given start time to a final one.
+    auto solve(double& t, double dt, VectorRef y, MatrixRef S) -> void
     {
         // Initialize the cvode context
         initialize(t, y);
@@ -357,7 +508,7 @@ struct ODESolver::Impl
         LU lu(A);
 
         // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k(=I)
-        Sk1 = lu.solve(I);
+        S = lu.solve(I);
     }
 
     /// Solve the ODE equations from a given start time to a final one
@@ -575,6 +726,16 @@ auto ODESolver::solve(double& t, double dt, VectorRef y) -> void
 auto ODESolver::solve(double& t, double dt, VectorRef y, MatrixRef S) -> void
 {
     pimpl->solve(t, dt, y, S);
+}
+
+// Methods independent of CVODE
+
+auto ODESolver::solve_implicit_1st_order(double& t, double dt, VectorRef y) -> void {
+    pimpl->solve_implicit_1st_order(t, dt, y);
+}
+
+auto ODESolver::solve_implicit_1st_order(double& t, double dt, VectorRef y,  MatrixRef S) -> void{
+    pimpl->solve_implicit_1st_order(t, dt, y, S);
 }
 
 } // namespace Reaktoro
