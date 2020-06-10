@@ -365,8 +365,8 @@ struct ReactiveTransportSolver::Impl
                 const auto P = states[icell].pressure();
 
                 // Solve with a smart kinetic solver
-                //smart_kinetic_solver.solve(states[icell], t_start, dt, b.row(icell));
-                smart_kinetic_solver.solve(states[icell], t_start, dt, b.row(icell), steps, icell);
+                smart_kinetic_solver.solve(states[icell], t_start, dt, b.row(icell));
+                //smart_kinetic_solver.solve(states[icell], t_start, dt, b.row(icell), steps, icell);
 
                 // Update chemical properties of the field
                 //properties[icell] = smart_kinetic_solver.properties();
@@ -414,6 +414,7 @@ struct ReactiveTransportSolver::Impl
 
                 // Solve with a conventional kinetic solver
                 kinetic_solver.solve(states[icell], t_start, dt, b.row(icell));
+                //kinetic_solver.solve(states[icell], t_start, dt, b.row(icell), steps, icell);
 
                 // Update chemical properties of the field
                 //properties[icell] = kinetic_solver.properties();

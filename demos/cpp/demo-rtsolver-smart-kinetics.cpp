@@ -229,7 +229,7 @@ int main()
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
     params.smart_equilibrium_abstol = 1e-12;
-    params.smart_equilibrium_tol = 8e-1;
+    params.smart_equilibrium_tol = 5e-1;
 
     // Define parameters of the kinetics solvers
     params.smart_kinetics_reltol = 1e-1;
@@ -382,7 +382,7 @@ int main()
     /// **************************************************************************************************************///
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     /// **************************************************************************************************************///
-    /*
+    ///*
     params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conv_kin_conv_eq_total = results.kinetic_timing.solve;
@@ -400,7 +400,7 @@ int main()
     std::cout << "   - equilibrate           : " << results.kinetic_timing.equilibrate << " (" << results.kinetic_timing.equilibrate / results.kinetic_timing.solve * 100 << " %)" << std::endl;
     std::cout << "-----------------------------------------------------" << std::endl;
 
-    */
+    //*/
     // **************************************************************************************************************///
     // SPEED-UP analysis
     // **************************************************************************************************************///
@@ -637,7 +637,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     {
         // Print some progress
         //if (!(step % 1))
-        //    std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        //std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.stepKinetics(field);
@@ -743,7 +743,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                            (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                            (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    std::string tag = "../plotting-results/rt-new-kinetics";
+    std::string tag = "../plotting-results/rt";
     //std::string tag = "../plotting-results/rt-old-kinetics";
     std::string folder =
                 (params.use_smart_kinetics_solver || params.use_smart_equilibrium_solver) ?

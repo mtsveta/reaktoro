@@ -502,6 +502,7 @@ struct SmartKineticSolver::Impl
 
         // Reconstract `benk` by the conventional numerical integration
         timeit(ode.solve(t, dt, benk, benk_S), result.timing.learn_integration +=);
+        //timeit(ode.solve_implicit_1st_order(t, dt, benk, benk_S), result.timing.learn_integration +=);
         //timeit(ode.integrate(t, benk, t + dt, benk_S), result.timing.learn_integration +=); // This approach produces quite delayed estimations, figure out why?
 
         // Save the sensitivity values, the result time, and the obtain species' amount
@@ -1005,8 +1006,8 @@ struct SmartKineticSolver::Impl
         // ----------------------------------------------------------------------------------
 
         // Perform a smart estimate for the chemical state
-        timeit(estimate(state, t), result.timing.estimate =);
-        //timeit(estimate_nn_search_acceptance_based_residual(state, t), result.timing.estimate =);
+        //timeit(estimate(state, t), result.timing.estimate =);
+        timeit(estimate_nn_search_acceptance_based_residual(state, t), result.timing.estimate =);
 
 
         // Perform a learning step if the smart prediction is not satisfactory
