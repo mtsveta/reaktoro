@@ -538,7 +538,7 @@ struct SmartKineticSolver::Impl
         */
     }
 
-    auto estimate(ChemicalState& state, double& t) -> void
+    auto estimate_nn_search_acceptance_based_lna(ChemicalState& state, double& t) -> void
     {
         // Skip estimation if no previous full computation has been done
         if(tree.empty())
@@ -1006,7 +1006,7 @@ struct SmartKineticSolver::Impl
         // ----------------------------------------------------------------------------------
 
         // Perform a smart estimate for the chemical state
-        //timeit(estimate(state, t), result.timing.estimate =);
+        //timeit(estimate_nn_search_acceptance_based_lna(state, t), result.timing.estimate =);
         timeit(estimate_nn_search_acceptance_based_residual(state, t), result.timing.estimate =);
 
 
@@ -1061,6 +1061,7 @@ struct SmartKineticSolver::Impl
         }
         */
     }
+
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void
     {
 
@@ -1094,7 +1095,7 @@ struct SmartKineticSolver::Impl
         // ----------------------------------------------------------------------------------
 
         // Perform a smart estimate for the chemical state
-        //timeit(estimate(state, t), result.timing.estimate =);
+        //timeit(estimate_nn_search_acceptance_based_lna(state, t), result.timing.estimate =);
         timeit(estimate_nn_search_acceptance_based_residual(state, t), result.timing.estimate =);
 
 

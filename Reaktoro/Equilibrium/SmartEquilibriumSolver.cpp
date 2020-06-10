@@ -268,7 +268,7 @@ namespace Reaktoro {
         }
 
         /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences) v.1
-        auto estimate(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+        auto estimate_nnsearch_acceptance_based_on_residual(ChemicalState& state, double T, double P, VectorConstRef be) -> void
         {
             result.estimate.accepted = false;
 
@@ -412,7 +412,7 @@ namespace Reaktoro {
         }
 
         /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences) v.1
-        auto estimate_no_quartz(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+        auto estimate_nnsearch_acceptance_based_on_residual_no_quartz(ChemicalState& state, double T, double P, VectorConstRef be) -> void
         {
             result.estimate.accepted = false;
 
@@ -595,18 +595,14 @@ namespace Reaktoro {
             // Perform a smart estimate of the chemical state
             //timeit( estimate_nnsearch_acceptance_based_on_lna(state, T, P, be),
             //        result.timing.estimate= );
-            timeit( estimate_no_quartz(state, T, P, be),
+            //timeit( estimate_nnsearch_acceptance_based_on_residual(state, T, P, be),
+            //         result.timing.estimate= );
+            timeit(estimate_nnsearch_acceptance_based_on_residual_no_quartz(state, T, P, be),
                   result.timing.estimate= );
-            //timeit( estimate(state, T, P, be),
-            //        result.timing.estimate= );
 
             // Perform a learning step if the smart prediction is not sactisfatory
-            if(!result.estimate.accepted){
+            if(!result.estimate.accepted)
                 timeit( learn(state, T, P, be), result.timing.learn= );
-                //std::cout << "learn" << std::endl;
-            }else{
-                //std::cout << "estimate" << std::endl;
-            }
 
             toc(0, result.timing.solve);
 
@@ -624,12 +620,12 @@ namespace Reaktoro {
             result = {};
 
             // Perform a smart estimate of the chemical state
-            timeit( estimate(state, T, P, be),
+            timeit(estimate_nnsearch_acceptance_based_on_residual(state, T, P, be),
                     result.timing.estimate= );
 
             // Perform a learning step if the smart prediction is not sactisfatory
             if(!result.estimate.accepted)
-            timeit( learn(state, T, P, be), result.timing.learn= );
+                timeit( learn(state, T, P, be), result.timing.learn= );
 
             toc(SOLVE_STEP, result.timing.solve);
 
