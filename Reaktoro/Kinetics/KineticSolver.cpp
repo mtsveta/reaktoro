@@ -439,7 +439,78 @@ struct KineticSolver::Impl
 
         // Integrate the chemical kinetics ODE from `t` to `t + dt`
         timeit(ode.solve(t, dt, benk), result.timing.integrate=);
+        //timeit(ode.solve_explicit_1st_order(t, dt, benk), result.timing.integrate=);
+        //timeit(ode.solve_explicit_2nd_order(t, dt, benk), result.timing.integrate=);
+        //timeit(ode.solve_implicit_1st_order(t, dt, benk), result.timing.integrate=);
 
+        // Extract the `be` and `nk` entries of the vector `benk`
+        be = benk.head(Ee);
+        nk = benk.tail(Nk);
+
+        //std::cout << "state.setSpeciesAmounts(nk, iks)  ..." << std::endl;
+
+        // Update the composition of the kinetic species
+        state.setSpeciesAmounts(nk, iks);
+
+        // Equilibrate equilibrium species
+        tic(1);
+
+        if(options.use_smart_equilibrium_solver){
+            SmartEquilibriumResult res = {};
+            res += smart_equilibrium.solve(state, T, P, be);
+            result.smart_equilibrium += res;
+        }
+        else{
+            EquilibriumResult res = {};
+            res += equilibrium.solve(state, T, P, be);
+            result.equilibrium += res;
+        }
+
+        toc(1, result.timing.equilibrate);
+
+        toc(0, result.timing.solve);
+
+    }
+    auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void
+    {
+        // Initialize result structure
+        result = {};
+
+        tic(0);
+
+        // Extract the composition of the kinetic species from the state
+        const auto &n = state.speciesAmounts();
+        nk = n(iks);
+
+        // Assemble the vector benk = [be nk]
+        benk.resize(Ee + Nk);
+        benk.head(Ee) = b - Ak * nk;
+        benk.tail(Nk) = nk;
+
+        // Initialise the chemical kinetics solver
+        timeit(initialize(state, t, benk), result.timing.initialize=);
+
+        /*
+        if(step >= 178)
+        {
+
+            std::cout << "step " << step << ", icell " << icell << std::endl;
+            std::cout << "benk before  ..." << tr(benk) << std::endl;
+        }
+        */
+
+        // Integrate the chemical kinetics ODE from `t` to `t + dt`
+        //timeit(ode.solve(t, dt, benk), result.timing.integrate=);
+        //timeit(ode.solve_explicit_1st_order(t, dt, benk), result.timing.integrate=);
+        //timeit(ode.solve_explicit_2nd_order(t, dt, benk), result.timing.integrate=);
+        timeit(ode.solve_implicit_1st_order(t, dt, benk), result.timing.integrate=);
+
+        /*
+        if(step > 178)
+        {
+            std::cout << "benk after  ..." << tr(benk) << std::endl;
+        }
+        */
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
         nk = benk.tail(Nk);
@@ -526,6 +597,8 @@ struct KineticSolver::Impl
 
             // Check if the calculation failed, if so, use cold-start
             if (!res.optimum.succeeded) {
+                //std::cout << "t : " << t << std::endl;
+                //std::cout << "n : " << tr(state.speciesAmounts()) << std::endl;
                 state.setSpeciesAmounts(0.0);
                 timeit(res = equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration +=);
 
@@ -685,6 +758,10 @@ auto KineticSolver::step(ChemicalState& state, double t, double dt) -> double
 auto KineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
 {
     pimpl->solve(state, t, dt, b);
+}
+
+auto KineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void{
+    pimpl->solve(state, t, dt, b, step, icell);
 }
 
 auto KineticSolver::properties() const -> const ChemicalProperties&
