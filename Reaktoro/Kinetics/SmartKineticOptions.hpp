@@ -44,10 +44,18 @@ struct SmartKineticOptions
     /// The absolute tolerance for estimated species mole amounts.
     double abstol = 1e-14;
 
-    /// The small negative cutoff value for estimated species mole amounts.
+    /// The cutoff value for normalized species and element amounts.
+    /// This parameter is used to ignore certain species/elements with tiny amounts
+    /// during the error test for the equilibrium species.
+    /// The species and elements with normalized amounts,
+    /// \eq{n_{i}/\text{sum}(n)} and \eq{b_{j}/\text{sum}(b)} respectively,
+    /// below this threshold will be discarded from the error control.
     double cutoff = -1e-5;
 
-    /// The cutoff value for species mole fractions. Species with mole fractions below this value are ignored during the acceptance test.
+    /// The cutoff value for species mole fractions.
+    /// This parameter is used to ignore certain species with tiny mole fractions
+    /// during the error test. Those with mole fractions below this threshold
+    /// will be discarded from the error control.
     double mole_fraction_cutoff = 1.0e-6;
 
 
