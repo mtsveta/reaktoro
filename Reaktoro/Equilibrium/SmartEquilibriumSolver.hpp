@@ -40,6 +40,11 @@ struct SmartEquilibriumResult;
 class SmartEquilibriumSolver
 {
 public:
+
+    /// Construct an SmartEquilibriumSolver instance with given chemical system
+    [[deprecated("SmartEquilibriumSolver() is deprecated. Use constructor SmartEquilibriumSolver(const ChemicalSystem&) or SmartEquilibriumSolver(const Partition&) instead.")]]
+    SmartEquilibriumSolver();
+
     /// Construct an SmartEquilibriumSolver instance with given chemical system
     explicit SmartEquilibriumSolver(const ChemicalSystem& system);
 
