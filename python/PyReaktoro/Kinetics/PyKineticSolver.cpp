@@ -34,6 +34,8 @@ void exportKineticSolver(py::module& m)
     auto initialize1 = static_cast<void(KineticSolver::*)(ChemicalState&, double)>(&KineticSolver::initialize);
     auto initialize2 = static_cast<void(KineticSolver::*)(ChemicalState&, double, VectorConstRef)>(&KineticSolver::initialize);
 
+    auto solve1 = static_cast<void(KineticSolver::*)(ChemicalState&, double, double, VectorConstRef)>(&KineticSolver::solve);
+
     py::class_<KineticSolver>(m, "KineticSolver")
         .def(py::init<const ReactionSystem&, const Partition&>())
         .def("setOptions", &KineticSolver::setOptions)
@@ -45,7 +47,7 @@ void exportKineticSolver(py::module& m)
         .def("initialize", initialize2)
         .def("step", step1)
         .def("step", step2)
-        .def("solve", &KineticSolver::solve)
+        .def("solve", solve1)
 
         // DEPRECATED METHODS: TO BE REMOVED
         .def("setPartition", &KineticSolver::setPartition)
