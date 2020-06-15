@@ -42,7 +42,7 @@ class KineticSolver
 {
 public:
     /// Construct a default KineticSolver instance.
-    [[deprecated("KineticSolver() is deprecated. Use constructor KineticSolver(const ReactionSystem&, const Partition&) instead.")]]
+    //[[deprecated("KineticSolver() is deprecated. Use constructor KineticSolver(const ReactionSystem&, const Partition&) instead.")]]
     KineticSolver();
 
     /// Construct a KineticSolver instance
