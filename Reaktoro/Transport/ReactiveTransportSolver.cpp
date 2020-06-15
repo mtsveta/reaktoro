@@ -30,6 +30,7 @@
 #include <Reaktoro/Core/ChemicalState.hpp>
 #include <Reaktoro/Core/ChemicalSystem.hpp>
 #include <Reaktoro/Core/Partition.hpp>
+#include <Reaktoro/Core/ReactionSystem.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumResult.hpp>
 #include <Reaktoro/Equilibrium/EquilibriumSolver.hpp>
 #include <Reaktoro/Equilibrium/SmartEquilibriumResult.hpp>
@@ -99,21 +100,25 @@ struct ReactiveTransportSolver::Impl
 
     /// Construct a ReactiveTransportSolver::Impl instance with given partition of the chemical system.
     Impl(const Partition& partition)
-    : system(partition.system()), partition(partition),
-      equilibrium_solver(partition), smart_equilibrium_solver(partition)
+    : system(partition.system()),
+      partition(partition),
+      equilibrium_solver(partition),
+      smart_equilibrium_solver(partition),
+      kinetic_solver(ReactionSystem(), partition),
+      smart_kinetic_solver(ReactionSystem(), partition)
     {
         setBoundaryState(ChemicalState(system));
     }
 
-    Impl(const ChemicalSystem& system, const ReactionSystem& reactions, const Partition& partition)
-    : system(system), equilibrium_solver(system), smart_equilibrium_solver(system),
-    kinetic_solver(reactions), smart_kinetic_solver(reactions)
+    Impl(const ReactionSystem& reactions, const Partition& partition)
+    : system(partition.system()),
+      partition(partition),
+      equilibrium_solver(partition),
+      smart_equilibrium_solver(partition),
+      kinetic_solver(reactions, partition),
+      smart_kinetic_solver(reactions, partition)
     {
         setBoundaryState(ChemicalState(system));
-        kinetic_solver.setPartition(partition);
-        smart_kinetic_solver.setPartition(partition);
-        equilibrium_solver.setPartition(partition);
-        smart_equilibrium_solver.setPartition(partition);
     }
 
     /// Set the options for the reactive transport calculations.
@@ -351,13 +356,13 @@ struct ReactiveTransportSolver::Impl
         //---------------------------------------------------------------------------
         // Step 1: Perform a time step transport calculation for each fluid element
         //---------------------------------------------------------------------------
-        tic(0);
+        tic(TRANSPORT_STEP);
 
         // Collect the amounts of elements in the solid and fluid species
         for(Index icell = 0; icell < num_cells; ++icell)
         {
-            bf.row(icell) = states[icell].elementAmountsInSpecies(ifs);
-            bs.row(icell) = states[icell].elementAmountsInSpecies(iss);
+            bef.row(icell) = states[icell].elementAmountsInSpecies(ifs);
+            bes.row(icell) = states[icell].elementAmountsInSpecies(iss);
         }
 
         // Left boundary condition cell
@@ -372,22 +377,22 @@ struct ReactiveTransportSolver::Impl
         for(Index ielement = 0; ielement < num_elements; ++ielement)
         {
             // Scale BC with a porosity of the boundary cell
-            transport_solver.setBoundaryValue(phi_bc * bbc[ielement]);
-            transport_solver.step(bf.col(ielement));
+            transport_solver.setBoundaryValue(phi_bc * be_bc[ielement]);
+            transport_solver.step(bef.col(ielement));
 
             // Save the result of this element transport calculation.
             result.transport_of_element[ielement] = transport_solver.result();
         }
 
         // Sum the amounts of elements distributed among fluid and solid species
-        b.noalias() = bf + bs;
+        be.noalias() = bef + bes;
 
-        toc(0, result.timing.transport);
+        result.timing.transport = toc(TRANSPORT_STEP);
 
         //---------------------------------------------------------------------------
-        // Step 2: Perform a time step equilibrium calculation for each cell
+        // Step 2: Perform a time step kinetic calculation for each cell
         //---------------------------------------------------------------------------
-        tic(1);
+        tic(KINETIC_STEP);
 
         if(options.use_smart_kinetic_solver)
         {
@@ -402,7 +407,7 @@ struct ReactiveTransportSolver::Impl
                 const auto P = states[icell].pressure();
 
                 // Solve with a smart kinetic solver
-                smart_kinetic_solver.solve(states[icell], t_start, dt, b.row(icell));
+                smart_kinetic_solver.solve(states[icell], t_start, dt, be.row(icell));
                 //smart_kinetic_solver.solve(states[icell], t_start, dt, b.row(icell), steps, icell);
 
                 // Update chemical properties of the field
@@ -433,7 +438,7 @@ struct ReactiveTransportSolver::Impl
                 std::cout << "       - equilibration       : " << result.smart_kinetics_at_cell[icell].timing.learn_equilibration << " (" << result.smart_kinetics_at_cell[icell].timing.learn_equilibration / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
                 std::cout << "   - estimate              : " << result.smart_kinetics_at_cell[icell].timing.estimate << " (" << result.smart_kinetics_at_cell[icell].timing.estimate / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
                 std::cout << "     - estimate            : " << result.smart_kinetics_at_cell[icell].timing.estimate_search << " (" << result.smart_kinetics_at_cell[icell].timing.estimate_search / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "     - acceptance          : " << result.smart_kinetics_at_cell[icell].timing.estimate_acceptance << " (" << result.smart_kinetics_at_cell[icell].timing.estimate_acceptance / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
+                std::cout << "     - acceptance          : " << result.smart_kinetics_at_cell[icell].timing.estimate_error_control << " (" << result.smart_kinetics_at_cell[icell].timing.estimate_error_control / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
                 */
             }
         }
@@ -450,7 +455,7 @@ struct ReactiveTransportSolver::Impl
                 const auto P = states[icell].pressure();
 
                 // Solve with a conventional kinetic solver
-                kinetic_solver.solve(states[icell], t_start, dt, b.row(icell));
+                kinetic_solver.solve(states[icell], t_start, dt, be.row(icell));
                 //kinetic_solver.solve(states[icell], t_start, dt, b.row(icell), steps, icell);
 
                 // Update chemical properties of the field
@@ -478,8 +483,7 @@ struct ReactiveTransportSolver::Impl
             }
         }
 
-        toc(1, result.timing.kinetics);
-        //getchar();
+        result.timing.kinetics = toc(KINETIC_STEP);
 
         /*
          * // TODO: remove, left from debugging
@@ -513,7 +517,7 @@ struct ReactiveTransportSolver::Impl
                     kin_learn += res.smart_kinetics_at_cell.at(i).timing.learn;
                     kin_estimate += res.smart_kinetics_at_cell.at(i).timing.estimate;
                     kin_estimate_search += res.smart_kinetics_at_cell.at(i).timing.estimate_search;
-                    kin_estimate_acceptance += res.smart_kinetics_at_cell.at(i).timing.estimate_acceptance;
+                    kin_estimate_acceptance += res.smart_kinetics_at_cell.at(i).timing.estimate_error_control;
 
                 }else{
                     initialize += res.kinetics_at_cell.at(i).timing.initialize;
@@ -650,8 +654,8 @@ ReactiveTransportSolver::ReactiveTransportSolver(const Partition& partition)
 {
 }
 
-ReactiveTransportSolver::ReactiveTransportSolver(const ChemicalSystem& system, const ReactionSystem& reactions, const Partition& partition)
-: pimpl(new Impl(system, reactions, partition))
+ReactiveTransportSolver::ReactiveTransportSolver(const ReactionSystem& reactions, const Partition& partition)
+: pimpl(new Impl(reactions, partition))
 {
 }
 

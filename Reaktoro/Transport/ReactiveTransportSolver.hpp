@@ -48,7 +48,7 @@ public:
     explicit ReactiveTransportSolver(const Partition& partition);
 
     /// Construct a ReactiveTransportSolver instance when system, reactions, and partition are provided.
-    ReactiveTransportSolver(const ChemicalSystem& system, const ReactionSystem& reactions, const Partition& partition);
+    ReactiveTransportSolver(const ReactionSystem& reactions, const Partition& partition);
 
     /// Construct a copy of a ReactiveTransportSolver instance.
     ReactiveTransportSolver(const ReactiveTransportSolver& other);
