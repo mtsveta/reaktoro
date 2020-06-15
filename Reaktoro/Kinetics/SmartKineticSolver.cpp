@@ -163,13 +163,77 @@ struct SmartKineticSolver::Impl
     /// The sensitivity matrix of combined vector of elemental molar abundance and composition of kinetic species [be nk]
     Matrix benk_S;
 
-    Impl()
-    {}
-
-    Impl(const ReactionSystem& reactions)
-    : reactions(reactions), system(reactions.system()), equilibrium(system), smart_equilibrium(system)
+    Impl(const ReactionSystem& reactions, const Partition& partition)
+    : reactions(reactions),
+      system(partition.system()),
+      partition(partition),
+      equilibrium(partition),
+      smart_equilibrium(partition)
     {
-        setPartition(Partition(system));
+        // Set the indices of the equilibrium and kinetic species
+        ies = partition.indicesEquilibriumSpecies();
+        iks = partition.indicesKineticSpecies();
+
+        // Set the indices of the equilibrium and kinetic elements
+        iee = partition.indicesEquilibriumElements();
+        ike = partition.indicesKineticElements();
+
+        // Set the number of equilibrium and kinetic species
+        Ne = ies.size();
+        Nk = iks.size();
+
+        // Set the number of equilibrium and kinetic elements
+        Ee = iee.size();
+
+        // Initialise the formula matrix of the equilibrium partition
+        Ae = partition.formulaMatrixEquilibriumPartition();
+
+        // Initialise the formula matrix of the kinetic partition
+        // Ak_tmp is of the size (Indices of elements that are included in kinetic species) x Nk
+        Matrix Ak_tmp = partition.formulaMatrixKineticPartition();
+        if(Nk)
+        {
+            // Initialize formula matrix of the kinetic partition
+            // Ak is of the size N x Nk
+            Ak = Matrix::Zero(system.numElements(), Nk);
+
+            for(Index i = 0; i < ike.size(); ++i)
+            {
+                // Copy the rows of Ak_tmp to the positions of the kinetic elements
+                Ak.row(ike[i]) << Ak_tmp.row(i);
+            }
+        }
+
+        // Initialise the stoichiometric matrices w.r.t. the equilibrium and kinetic species
+        Se = cols(reactions.stoichiometricMatrix(), ies);
+        Sk = cols(reactions.stoichiometricMatrix(), iks);
+
+        // Initialise the coefficient matrix `A` of the kinetic rates
+        A.resize(Ee + Nk, reactions.numReactions());
+        A.topRows(Ee) = Ae * tr(Se);
+        A.bottomRows(Nk) = tr(Sk);
+
+        // Auxiliary identity matrix
+        const Matrix I = identity(Ne + Nk, Ne + Nk);
+
+        // Auxiliary selected equilibrium and kinetic rows of the identity matrix
+        const Matrix Ie = rows(I, ies);
+        const Matrix Ik = rows(I, iks);
+
+        // Initialise the coefficient matrix `B` of the source rates
+        B = zeros(Ee + Nk, system.numSpecies());
+        B.topRows(Ee) = Ae * Ie;
+        B.bottomRows(Nk) = Ik;
+
+        // Allocate memory for the partial derivatives of the reaction rates `r` w.r.t. to `u = [be nk]`
+        drdu.resize(reactions.numReactions(), Ee + Nk);
+
+        // Allocate memory for the partial derivatives of the source rates `q` w.r.t. to `u = [be nk]`
+        dqdu.resize(system.numSpecies(), Ee + Nk);
+
+        // Allocate the memory for the sensitivity matrix
+        benk_S.resize(Ee + Nk, Ee + Nk);
+
     }
 
     /*
@@ -274,81 +338,6 @@ struct SmartKineticSolver::Impl
         // Set options for the equilibrium calculations
         equilibrium.setOptions(options.equilibrium);
         smart_equilibrium.setOptions(options.smart_equilibrium);
-
-    }
-
-    auto setPartition(const Partition& partition_) -> void
-    {
-        // Initialise the partition member
-        partition = partition_;
-
-        // Set the partition of the equilibrium solver
-        smart_equilibrium.setPartition(partition);
-        equilibrium.setPartition(partition);
-
-        // Set the indices of the equilibrium and kinetic species
-        ies = partition.indicesEquilibriumSpecies();
-        iks = partition.indicesKineticSpecies();
-
-        // Set the indices of the equilibrium and kinetic elements
-        iee = partition.indicesEquilibriumElements();
-        ike = partition.indicesKineticElements();
-
-        // Set the number of equilibrium and kinetic species
-        Ne = ies.size();
-        Nk = iks.size();
-
-        // Set the number of equilibrium and kinetic elements
-        Ee = iee.size();
-
-        // Initialise the formula matrix of the equilibrium partition
-        Ae = partition.formulaMatrixEquilibriumPartition();
-
-        // Initialise the formula matrix of the kinetic partition
-        // Ak_tmp is of the size (Indices of elements that are included in kinetic species) x Nk
-        Matrix Ak_tmp = partition.formulaMatrixKineticPartition();
-        if(Nk)
-        {
-            // Initialize formula matrix of the kinetic partition
-            // Ak is of the size N x Nk
-            Ak = Matrix::Zero(system.numElements(), Nk);
-
-            for(Index i = 0; i < ike.size(); ++i)
-            {
-                // Copy the rows of Ak_tmp to the positions of the kinetic elements
-                Ak.row(ike[i]) << Ak_tmp.row(i);
-            }
-        }
-
-        // Initialise the stoichiometric matrices w.r.t. the equilibrium and kinetic species
-        Se = cols(reactions.stoichiometricMatrix(), ies);
-        Sk = cols(reactions.stoichiometricMatrix(), iks);
-
-        // Initialise the coefficient matrix `A` of the kinetic rates
-        A.resize(Ee + Nk, reactions.numReactions());
-        A.topRows(Ee) = Ae * tr(Se);
-        A.bottomRows(Nk) = tr(Sk);
-
-        // Auxiliary identity matrix
-        const Matrix I = identity(Ne + Nk, Ne + Nk);
-
-        // Auxiliary selected equilibrium and kinetic rows of the identity matrix
-        const Matrix Ie = rows(I, ies);
-        const Matrix Ik = rows(I, iks);
-
-        // Initialise the coefficient matrix `B` of the source rates
-        B = zeros(Ee + Nk, system.numSpecies());
-        B.topRows(Ee) = Ae * Ie;
-        B.bottomRows(Nk) = Ik;
-
-        // Allocate memory for the partial derivatives of the reaction rates `r` w.r.t. to `u = [be nk]`
-        drdu.resize(reactions.numReactions(), Ee + Nk);
-
-        // Allocate memory for the partial derivatives of the source rates `q` w.r.t. to `u = [be nk]`
-        dqdu.resize(system.numSpecies(), Ee + Nk);
-
-        // Allocate the memory for the sensitivity matrix
-        benk_S.resize(Ee + Nk, Ee + Nk);
 
     }
 
@@ -500,10 +489,22 @@ struct SmartKineticSolver::Impl
         kin_state.u0 = benk;
         kin_state.t0 = t;
 
+        //---------------------------------------------------------------------
+        // CONVENTIONAL TIME-INTEGRATION DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(INTEGRATE_STEP);
         // Reconstract `benk` by the conventional numerical integration
-        timeit(ode.solve(t, dt, benk, benk_S), result.timing.learn_integration +=);
-        //timeit(ode.solve_implicit_1st_order(t, dt, benk, benk_S), result.timing.learn_integration +=);
-        //timeit(ode.integrate(t, benk, t + dt, benk_S), result.timing.learn_integration +=); // This approach produces quite delayed estimations, figure out why?
+        ode.solve(t, dt, benk, benk_S);
+        //ode.solve_implicit_1st_order(t, dt, benk, benk_S);
+        //ode.integrate(t, benk, t + dt, benk_S); // TODO: produces a delayed estimations, why?
+        result.timing.learn_integration += toc(INTEGRATE_STEP);
+
+
+        //---------------------------------------------------------------------
+        // STORAGE STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+
+        tic(STORAGE_STEP);
 
         // Save the sensitivity values, the result time, and the obtain species' amount
         kin_state.t = t;
@@ -515,7 +516,10 @@ struct SmartKineticSolver::Impl
         nk = benk.tail(Nk);
         state.setSpeciesAmounts(nk, iks);
 
+        // TODO: must properties, sensitivities, and rates be evaluated after learning process or were they evaluated
+        // TODO: inside the kinetic integration step
         // Evaluate chemical properties, reaction rate, and sensitivities (not needed, sinse it is evaluated in ode.solve())
+        //
         /*
         timeit(properties = state.properties() , result.timing.learn_chemical_properties +=);
         timeit(r = reactions.rates(properties), result.timing.learn_reaction_rates+=);
@@ -523,7 +527,9 @@ struct SmartKineticSolver::Impl
         */
 
         // Save the kinetic state to the tree of learned states
-        timeit(tree.emplace_back(SmartKineticNode{kin_state, state, properties, sensitivity, rates}), result.timing.learn_storage+=);
+        tree.emplace_back(SmartKineticNode{kin_state, state, properties, sensitivity, rates});
+
+        result.timing.learn_storage += toc(STORAGE_STEP);
 
         /*
         // TODO: remove, left from debugging
@@ -563,20 +569,20 @@ struct SmartKineticSolver::Impl
             return (benk0_a - benk0).squaredNorm() < (benk0_b - benk0).squaredNorm();  // TODO: We need to extend this later with T and P contributions too
         };
 
-        //---------------------------------------------------------------------------------------
-        // Step 1: Search for the reference element (closest to the new state input conditions)
-        //---------------------------------------------------------------------------------------
-        tic(0);
+        //---------------------------------------------------------------------
+        // SEARCH STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
+        tic(SEARCH_STEP);
 
         // Find the reference element (nearest to the new state benk)
         auto it = std::min_element(tree.begin(), tree.end(), distancefn);
 
-        toc(0, result.timing.estimate_search);
+        result.timing.estimate_search = toc(SEARCH_STEP);
 
-        //----------------------------------------------------------------------------
-        // Step 2: Calculate predicted state with a first-order Taylor approximation
-        //----------------------------------------------------------------------------
-        tic(1);
+        //---------------------------------------------------------------------
+        // TAYLOR PREDICTION STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
+        tic(TAYLOR_STEP);
 
         // Fetch the data stored in the reference element
         const auto& benk0_ref = it->state.u0;
@@ -600,12 +606,12 @@ struct SmartKineticSolver::Impl
         Vector benk_new;
         benk_new.noalias() = benk_ref + dndn0_ref * (benk0 - benk0_ref);
 
-        toc(1, result.timing.estimate_mat_vec_mul);
+        result.timing.estimate_taylor =  toc(TAYLOR_STEP);
 
-        //----------------------------------------------
-        // Step 3: Checking the acceptance criterion
-        //----------------------------------------------
-        tic(2);
+        //---------------------------------------------------------------------
+        // ERROR CONTROL STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
+        tic(ERROR_CONTROL_STEP);
 
         // Fetch the be and nk unknowns from vector benk = [be; nk]
         VectorConstRef be_new = benk_new.head(Ee);
@@ -746,7 +752,7 @@ struct SmartKineticSolver::Impl
         // Update properties by the reference one
         // properties = properties_ref;
 
-        toc(2, result.timing.estimate_acceptance);
+        result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
 
         // Increase the count of successfully used (for estimation) element
         it->usage_count++;
@@ -780,19 +786,19 @@ struct SmartKineticSolver::Impl
         auto kinetics_cutoff = options.cutoff;
         auto fraction_tol = kinetics_abstol * 1e-2; // TODO: is it important to multiply by 1e-2
 
-        //---------------------------------------------------------------------------------------
-        // Step 1: Search for the reference element (closest to the new state input conditions)
-        //---------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------
+        // SEARCH STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
         tic(SEARCH_STEP);
 
         // Find the reference element (nearest to the new state benk)
         auto it = std::min_element(tree.begin(), tree.end(), distancefn);
 
-        toc(SEARCH_STEP, result.timing.estimate_search);
+        result.timing.estimate_search = toc(SEARCH_STEP);
 
-        //----------------------------------------------------------------------------
-        // Step 2: Calculate predicted state with a first-order Taylor approximation
-        //----------------------------------------------------------------------------
+        //---------------------------------------------------------------------
+        // TAYLOR PREDICTION STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
         tic(TAYLOR_STEP);
 
         // Fetch the data stored in the reference element
@@ -815,7 +821,7 @@ struct SmartKineticSolver::Impl
         Vector benk_new;
         benk_new.noalias() = benk_ref + dndn0_ref * (benk0 - benk0_ref);
 
-        toc(TAYLOR_STEP, result.timing.estimate_mat_vec_mul);
+        result.timing.estimate_taylor = toc(TAYLOR_STEP);
 
         //----------------------------------------------
         // Step 3: Checking the acceptance criterion
@@ -835,8 +841,8 @@ struct SmartKineticSolver::Impl
         // Get properties save in the chemical state
         const auto& T_ref = state_ref.temperature();
         const auto& P_ref = state_ref.pressure();
-        const auto& y_ref = state_ref.elementDualPotentials();
-        const auto& z_ref = state_ref.speciesDualPotentials();
+        const auto& y_ref = state_ref.equilibrium().elementChemicalPotentials();
+        const auto& z_ref = state_ref.equilibrium().speciesStabilities();
         const auto u_ref = prop_ref.chemicalPotentials();
         const auto x_ref = prop_ref.moleFractions();
 
@@ -876,7 +882,7 @@ struct SmartKineticSolver::Impl
 
         // If cutoff test didn't pass, estimation has failded
         if(equilibrium_neg_amount_check == false){
-            toc(ERROR_CONTROL_STEP, result.timing.estimate_mat_vec_mul);
+            result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
             return;
         }
 
@@ -919,9 +925,9 @@ struct SmartKineticSolver::Impl
         Index ispecies;
         const double error = re.maxCoeff(&ispecies);
         const double error_no_quartz = re_no_quartz.maxCoeff(&ispecies);
-        bool is_error_acceptable = error_no_quartz <= options.smart_equilibrium.tol;
+        bool is_error_acceptable = error_no_quartz <= options.smart_equilibrium.reltol;
         if(is_error_acceptable == false) {
-            toc(ERROR_CONTROL_STEP, result.timing.estimate_mat_vec_mul);
+            result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
             return;
         }
         /// -------------------------------------------------------------------------------------------------------------
@@ -949,16 +955,11 @@ struct SmartKineticSolver::Impl
             if(std::abs(drates.array()[i]) > options.abstol + options.reltol * std::abs(rates_ref.val.array()[i])){
                 //if(std::abs(drates.array()[i] / rates_ref.val.array()[i]) > options.reltol){
                 is_kinetics_rate_error_acceptable = false;
-                toc(ERROR_CONTROL_STEP, result.timing.estimate_mat_vec_mul);
+                result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
                 return;
             }
         }
-        toc(ERROR_CONTROL_STEP, result.timing.estimate_mat_vec_mul);
-
-        //----------------------------------------------
-        // Step 3: Checking the acceptance criterion
-        //----------------------------------------------
-        tic(ERROR_ACCEPTANCE_STEP);
+        result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
 
         // Set the estimate accepted status to true
         result.estimate.accepted = true;
@@ -971,21 +972,19 @@ struct SmartKineticSolver::Impl
         // Update the solution of kinetic problem by new estimated value
         benk = benk_new;
 
-        toc(ERROR_ACCEPTANCE_STEP, result.timing.estimate_acceptance);
-
     }
 
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
     {
-
         // Reset the result of the last smart equilibrium calculation
         result = {};
 
         tic(SOLVE_STEP);
 
-        // ----------------------------------------------------------------------------------
-        // Initialize kinetic problem
-        // ----------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // INITIALIZE OF THE VARIABLES DURING THE KINETICS SOLVE STEP
+        //------------------------------------------------------------------------------------------
+        tic(INITIALIZE_STEP);
 
         // Extract the composition of the kinetic species from the state
         const auto &n = state.speciesAmounts();
@@ -998,21 +997,31 @@ struct SmartKineticSolver::Impl
         benk.head(Ee) = be;
         benk.tail(Nk) = nk;
 
-        // Initialise the chemical kinetics solver
-        timeit(initialize(state, t, benk), result.timing.initialize=);
 
-        // ----------------------------------------------------------------------------------
-        // Smartly solve kinetic species
-        // ----------------------------------------------------------------------------------
+        // Initialise the chemical kinetics solver
+        initialize(state, t, benk);
+
+        result.timing.initialize=toc(INITIALIZE_STEP);
+
+        //-----------------------------------------------------------------------------------------------
+        // ESTIMATE ELEMENTS AND KINETICS' SPECIES STORED IN 'BENK' DURING THE SMART-KINETICS SOLVE STEP
+        //-----------------------------------------------------------------------------------------------
+        tic(ESTIMATE_STEP);
 
         // Perform a smart estimate for the chemical state
         //timeit(estimate_nn_search_acceptance_based_lna(state, t), result.timing.estimate =);
-        timeit(estimate_nn_search_acceptance_based_residual(state, t), result.timing.estimate =);
+        estimate_nn_search_acceptance_based_residual(state, t);
 
+        result.timing.estimate = toc(ESTIMATE_STEP);
+
+        //-----------------------------------------------------------------------------------------------
+        // INTEGRATE ELEMENTS AND KINETICS' SPECIES STORED IN 'BENK' DURING THE SMART-KINETICS SOLVE STEP
+        //-----------------------------------------------------------------------------------------------
+        tic(LEARN_STEP);
 
         // Perform a learning step if the smart prediction is not satisfactory
         if(!result.estimate.accepted)
-            timeit(learn(state, t, dt), result.timing.learn =);
+            learn(state, t, dt);
 
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
@@ -1020,6 +1029,8 @@ struct SmartKineticSolver::Impl
 
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
+
+        result.timing.learn = toc(LEARN_STEP);
 
         // ----------------------------------------------------------------------------------
         // Equilibrate equilibrium species
@@ -1037,9 +1048,9 @@ struct SmartKineticSolver::Impl
             result.equilibrium += res;
         }
 
-        toc(EQUILIBRATE_STEP, result.timing.equilibrate);
+        result.timing.equilibrate = toc(EQUILIBRATE_STEP);
 
-        toc(SOLVE_STEP, result.timing.solve);
+        result.timing.solve = toc(SOLVE_STEP);
 
         /*
         std::cout << "smart equilibrium accepted? " << result.smart_equilibrium.estimate.accepted << ", index of ref elem in equilibrium " << result.smart_equilibrium.estimate.reference_state_index << std::endl; // << " out " << smart_equilibrium.tree().size()
@@ -1072,9 +1083,10 @@ struct SmartKineticSolver::Impl
 
         tic(SOLVE_STEP);
 
-        // ----------------------------------------------------------------------------------
-        // Initialize kinetic problem
-        // ----------------------------------------------------------------------------------
+        //------------------------------------------------------------------------------------------
+        // INITIALIZE OF THE VARIABLES DURING THE KINETICS SOLVE STEP
+        //------------------------------------------------------------------------------------------
+        tic(INITIALIZE_STEP);
 
         // Extract the composition of the kinetic species from the state
         const auto &n = state.speciesAmounts();
@@ -1087,21 +1099,31 @@ struct SmartKineticSolver::Impl
         benk.head(Ee) = be;
         benk.tail(Nk) = nk;
 
-        // Initialise the chemical kinetics solver
-        timeit(initialize(state, t, benk), result.timing.initialize=);
 
-        // ----------------------------------------------------------------------------------
-        // Smartly solve kinetic species
-        // ----------------------------------------------------------------------------------
+        // Initialise the chemical kinetics solver
+        initialize(state, t, benk);
+
+        result.timing.initialize=toc(INITIALIZE_STEP);
+
+        //-----------------------------------------------------------------------------------------------
+        // ESTIMATE ELEMENTS AND KINETICS' SPECIES STORED IN 'BENK' DURING THE SMART-KINETICS SOLVE STEP
+        //-----------------------------------------------------------------------------------------------
+        tic(ESTIMATE_STEP);
 
         // Perform a smart estimate for the chemical state
         //timeit(estimate_nn_search_acceptance_based_lna(state, t), result.timing.estimate =);
-        timeit(estimate_nn_search_acceptance_based_residual(state, t), result.timing.estimate =);
+        estimate_nn_search_acceptance_based_residual(state, t);
 
+        result.timing.estimate = toc(ESTIMATE_STEP);
+
+        //-----------------------------------------------------------------------------------------------
+        // INTEGRATE ELEMENTS AND KINETICS' SPECIES STORED IN 'BENK' DURING THE SMART-KINETICS SOLVE STEP
+        //-----------------------------------------------------------------------------------------------
+        tic(LEARN_STEP);
 
         // Perform a learning step if the smart prediction is not satisfactory
         if(!result.estimate.accepted)
-        timeit(learn(state, t, dt), result.timing.learn =);
+            learn(state, t, dt);
 
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
@@ -1109,6 +1131,8 @@ struct SmartKineticSolver::Impl
 
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
+
+        result.timing.learn = toc(LEARN_STEP);
 
         // ----------------------------------------------------------------------------------
         // Equilibrate equilibrium species
@@ -1126,29 +1150,9 @@ struct SmartKineticSolver::Impl
             result.equilibrium += res;
         }
 
-        toc(EQUILIBRATE_STEP, result.timing.equilibrate);
+        result.timing.equilibrate = toc(EQUILIBRATE_STEP);
 
-        toc(SOLVE_STEP, result.timing.solve);
-
-        /*
-        std::cout << "smart equilibrium accepted? " << result.smart_equilibrium.estimate.accepted << ", index of ref elem in equilibrium " << result.smart_equilibrium.estimate.reference_state_index << std::endl; // << " out " << smart_equilibrium.tree().size()
-        std::cout << "smart kinetics accepted   ? " << result.estimate.accepted << ", index of ref elem in kinetics " << result.estimate.reference_state_index << std::endl; // << " out of " << tree.size() <<
-        getchar();
-        */
-        // If tree is of a certain size, do the cleanup
-        /*
-        if (tree.size() == 400){
-            auto it = tree.begin();
-            auto counter = 0;
-            for (auto it = tree.begin(); it!=tree.end();) {
-                if (!it->usage_count) {
-                    it = tree.erase(it); // return the iterator pointing on the elemnt after the removed one
-                }
-                else
-                    it++; // increase the iterator
-            }
-        }
-        */
+        result.timing.solve = toc(SOLVE_STEP);
     }
 
     auto function(ChemicalState& state, double t, VectorConstRef u, VectorRef res) -> int
@@ -1314,16 +1318,28 @@ struct SmartKineticSolver::Impl
 };
 
 SmartKineticSolver::SmartKineticSolver()
-: pimpl(new Impl())
-{}
+{
+    RuntimeError("Cannot proceed with SmartKineticSolver().",
+                 "SmartKineticSolver() constructor is deprecated. "
+                 "Use constructor SmartKineticSolver(const ReactionSystem&, const Partition&) instead.");
+}
 
 SmartKineticSolver::SmartKineticSolver(const SmartKineticSolver& other)
 : pimpl(new Impl(*other.pimpl))
 {}
 
 SmartKineticSolver::SmartKineticSolver(const ReactionSystem& reactions)
-        : pimpl(new Impl(reactions))
+{
+    RuntimeError("Cannot proceed with SmartKineticSolver(const ReactionSystem&).",
+                 "SmartKineticSolver(const ReactionSystem&) constructor is deprecated. "
+                 "Use constructor SmartKineticSolver(const ReactionSystem&, const Partition&) instead.");
+}
+
+
+SmartKineticSolver::SmartKineticSolver(const ReactionSystem& reactions, const Partition& partition)
+: pimpl(new Impl(reactions, partition))
 {}
+
 
 SmartKineticSolver::~SmartKineticSolver()
 {}
@@ -1341,7 +1357,10 @@ auto SmartKineticSolver::setOptions(const SmartKineticOptions& options) -> void
 
 auto SmartKineticSolver::setPartition(const Partition& partition) -> void
 {
-    pimpl->setPartition(partition);
+    RuntimeError("Cannot proceed with SmartKineticSolver::setPartition.",
+                 "SmartKineticSolver::setPartition is deprecated. "
+                 "Use constructor SmartKinetic"
+                 "Solver(const Partition&) instead.");
 }
 
 auto SmartKineticSolver::addSource(const ChemicalState& state, double volumerate, std::string units) -> void

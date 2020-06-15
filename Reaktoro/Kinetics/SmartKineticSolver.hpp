@@ -42,10 +42,15 @@ class SmartKineticSolver
 {
 public:
     /// Construct a default SmartKineticSolver instance.
+    [[deprecated("SmartKineticSolver() is deprecated. Use constructor SmartKineticSolver(const ReactionSystem&, const Partition&) instead.")]]
     SmartKineticSolver();
 
     /// Construct a SmartKineticSolver instance.
+    [[deprecated("SmartKineticSolver(const ReactionSystem&) is deprecated. Use constructor SmartKineticSolver(const ReactionSystem&, const Partition&) instead.")]]
     explicit SmartKineticSolver(const ReactionSystem& reactions);
+
+    /// Construct a SmartKineticSolver instance.
+    explicit SmartKineticSolver(const ReactionSystem& reactions, const Partition& partition);
 
     /// Construct a copy of a SmartKineticSolver instance.
     SmartKineticSolver(const SmartKineticSolver& other);
@@ -61,6 +66,7 @@ public:
 
     /// Set the partition of the chemical system.
     /// Use this method to specify the equilibrium, kinetic, and inert species.
+    [[deprecated("SmartKineticSolver::setPartition is deprecated. Use constructor SmartKineticSolver(const ReactionSystem&, const Partition&) instead.")]]
     auto setPartition(const Partition& partition) -> void;
 
     /// Add a source to the chemical kinetics problem.
