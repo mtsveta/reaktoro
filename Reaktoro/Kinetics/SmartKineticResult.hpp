@@ -65,10 +65,10 @@ struct SmartKineticTiming {
     double estimate_search = 0.0;
 
     /// The time spent for the matrix-vector multiplication during a smart estimation.
-    double estimate_mat_vec_mul = 0.0;
+    double estimate_taylor = 0.0;
 
     /// The time spent for the acceptance test during a smart estimation.
-    double estimate_acceptance = 0.0;
+    double estimate_error_control = 0.0;
 
     /// Self addition assignment to accumulate kinetic timing.
     auto operator+=(const SmartKineticTiming& other) -> SmartKineticTiming&;

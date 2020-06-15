@@ -14,7 +14,8 @@ auto SmartKineticTiming::operator+=(const SmartKineticTiming &other) -> SmartKin
 
     estimate += other.estimate;
     estimate_search += other.estimate_search;
-    estimate_acceptance += other.estimate_acceptance;
+    estimate_error_control += other.estimate_error_control;
+    estimate_taylor += other.estimate_taylor;
 
     learn += other.learn;
     learn_storage += other.learn_storage;
