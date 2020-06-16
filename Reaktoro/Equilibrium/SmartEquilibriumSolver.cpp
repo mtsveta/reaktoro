@@ -369,6 +369,7 @@ struct SmartEquilibriumSolver::Impl
         result.timing.learn_storage = toc(STORAGE_STEP);
 
     }
+
     /// Learn how to perform a full equilibrium calculation (with tracking)
     auto learn(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
@@ -786,9 +787,13 @@ struct SmartEquilibriumSolver::Impl
 
                 result.timing.estimate_taylor = toc(TAYLOR_STEP);
 
-                // Perform 'negativity test' for the minimum element of the n(imajor)
-                const auto eps_n = options.amount_fraction_cutoff * sum(ne);
-                if(min(ne(imajor)) < -eps_n)
+                // Check if all projected species amounts are positive
+                const double ne_min = min(ne);
+                const double ne_sum = sum(ne);
+                const auto eps_n = options.amount_fraction_cutoff * ne_sum;
+                //std::cout << " ne_sum " << ne_sum << std::endl;
+                //std::cout << " eps_n " << eps_n << std::endl;
+                if(ne_min <= -eps_n)
                     continue;
 
                 result.timing.estimate_search = toc(SEARCH_STEP);
@@ -803,9 +808,8 @@ struct SmartEquilibriumSolver::Impl
                 }
 
                 // Update the amounts of elements for the equilibrium species
-                n(ies) = ne;
                 state = node.state;
-                state.setSpeciesAmounts(n);
+                state.setSpeciesAmounts(ne, ies);
 
                 // Update the chemical properties of the system
                 properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
@@ -1099,6 +1103,7 @@ struct SmartEquilibriumSolver::Impl
         return solve(state, T, P, be);
     }
 
+    /// Solve the equilibrium problem with given state, and input temperature, pressure, and element amounts
     auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult
     {
         tic(SOLVE_STEP);
@@ -1151,10 +1156,10 @@ struct SmartEquilibriumSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate of the chemical state
-        //estimate(state, T, P, be);
+        estimate(state, T, P, be);
         //estimate_nnsearch_acceptance_based_on_lna(state, T, P, be);
-        estimate_nnsearch_acceptance_based_on_potential(state, T, P, be);
         //estimate_nnsearch_acceptance_based_on_potential(state, T, P, be);
+        //estimate_priority_based_acceptance_potential(state, T, P, be);
 
         result.timing.estimate=toc(ESTIMATE_STEP);
 
@@ -1165,8 +1170,9 @@ struct SmartEquilibriumSolver::Impl
 
         // Perform a learning step if the smart prediction is not sactisfatory
         if(!result.estimate.accepted){
-            learn_nnsearch(state, T, P, be);
-            //learn(state, T, P, be);
+            //learn_nnsearch(state, T, P, be);
+            //learn_priority_based_acceptance_potential(state, T, P, be);
+            learn(state, T, P, be);
         }
         //std::cout << "accepted? " << result.estimate.accepted << std::endl;
         //getchar();
