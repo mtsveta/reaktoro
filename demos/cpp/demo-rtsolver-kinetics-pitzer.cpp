@@ -236,7 +236,6 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Step **: Define smart chemical equilibrium solver options
     SmartEquilibriumOptions smart_equilibrium_options;
     smart_equilibrium_options.reltol = params.smart_equilibrium_reltol;
-    smart_equilibrium_options.abstol = params.smart_equilibrium_abstol;
 
     // Step **: Define chemical kinetic solver options
     KineticOptions kinetic_options;
@@ -360,7 +359,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     double t = 0.0;
     int step = 0;
 
-    tic(0);
+    tic(TRANSPORT);
 
     // Reactive transport simulations in the cycle
     while (step < params.nsteps)
@@ -380,10 +379,10 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         step += 1;
     }
 
-    if(params.use_smart_kinetics_solver && params.use_smart_equilibrium_solver) toc(0, results.time_reactive_transport_smart_kin_smart_eq );
-    if(!params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) toc(0, results.time_reactive_transport_conv_kin_conv_eq );
-    if(!params.use_smart_kinetics_solver && params.use_smart_equilibrium_solver) toc(0, results.time_reactive_transport_conv_kin_smart_eq );
-    if(params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) toc(0, results.time_reactive_transport_smart_kin_conv_eq );
+    if(params.use_smart_kinetics_solver && params.use_smart_equilibrium_solver) results.time_reactive_transport_smart_kin_smart_eq = toc(TRANSPORT);
+    if(!params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) results.time_reactive_transport_conv_kin_conv_eq = toc(TRANSPORT);
+    if(!params.use_smart_kinetics_solver && params.use_smart_equilibrium_solver) results.time_reactive_transport_conv_kin_smart_eq = toc(TRANSPORT);
+    if(params.use_smart_kinetics_solver && !params.use_smart_equilibrium_solver) results.time_reactive_transport_smart_kin_conv_eq = toc(TRANSPORT);
 
     // Step **: Collect the analytics related to reactive transport performance
     auto analysis = profiler.analysis();

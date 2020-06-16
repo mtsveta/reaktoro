@@ -121,7 +121,7 @@ int main()
     params.P = 1.01325;                      // the pressure (in units of bar)
 
     // Define parameters of the equilibrium solvers
-    params.smart_equlibrium_reltol = 0.1;
+    params.smart_equlibrium_reltol = 0.01;
     //params.activity_model = "hkf";
     //params.activity_model = "pitzer";
     params.activity_model = "dk";
@@ -433,9 +433,9 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  "-" + params.activity_model +
                                  "-smart";
 
-    //std::string folder = "results-scavenging-clustering-primary-species";
+    std::string folder = "results-scavenging-clustering-primary-species";
     //std::string folder = "results-scavenging-nn-search-acceptance-based-on-potentials";
-    std::string folder = "results-scavenging-priority-based-acceptance-potential";
+    //std::string folder = "results-scavenging-priority-based-acceptance-potential";
 
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :
