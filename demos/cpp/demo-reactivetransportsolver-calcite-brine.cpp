@@ -34,28 +34,26 @@ using namespace Reaktoro;
 struct Params
 {
     // Discretisation params
-    int ncells; // the number of cells in the spacial discretization
-    int nsteps; // the number of steps in the reactive transport simulation
-    double xl; // the x-coordinates of the left boundaries
-    double xr; // the x-coordinates of the right boundaries
-    double dx; // the space step (in units of m)
-    double dt; // the time step (in units of s)
+    int ncells = 0; // the number of cells in the spacial discretization
+    int nsteps = 0; // the number of steps in the reactive transport simulation
+    double xl = 0; // the x-coordinates of the left boundaries
+    double xr = 0; // the x-coordinates of the right boundaries
+    double dx = 0; // the space step (in units of m)
+    double dt = 0; // the time step (in units of s)
 
     // Physical params
-    double D; // the diffusion coefficient (in units of m2/s)
-    double v; // the Darcy velocity (in units of m/s)
-    double T; // the temperature (in units of degC)
-    double P; // the pressure (in units of bar)
+    double D = 0; // the diffusion coefficient (in units of m2/s)
+    double v = 0; // the Darcy velocity (in units of m/s)
+    double T = 0; // the temperature (in units of degC)
+    double P = 0; // the pressure (in units of bar)
 
     // Solver params
-    bool use_smart_eqilibirum_solver;
-    bool track_statistics;
-    double smart_equlibrium_reltol;
+    bool use_smart_eqilibirum_solver = false;
+    double smart_equlibrium_reltol = 0.0;
+    double amount_fraction_cutoff = 0.0;
+    double mole_fraction_cutoff = 0.0;
 
-    double amount_fraction_cutoff;
-    double mole_fraction_cutoff;
-
-    std::string activity_model;
+    std::string activity_model = "";
 
 };
 
@@ -102,13 +100,10 @@ int main()
     Time start = time();
 
     // Step 1: Initialise auxiliary time-related constants
-    int second = 1;
     int minute = 60;
     int hour = 60 * minute;
     int day = 24 * hour;
     int week = 7 * day;
-    int month = 30 * day;
-    int year = 365 * day;
 
     // Step 2: Define parameters for the reactive transport simulation
     Params params;
@@ -122,7 +117,7 @@ int main()
     ///*
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
-    params.nsteps = 50; // the number of steps in the reactive transport simulation
+    params.nsteps = 10000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -133,7 +128,7 @@ int main()
     params.P = 100;                      // the pressure (in units of bar)
 
     // Define parameters of the equilibrium solvers
-    params.smart_equlibrium_reltol = 0.001;
+    params.smart_equlibrium_reltol = 0.004;
     params.activity_model = "hkf-full";
     //params.activity_model = "hkf-selected-species";
     //params.activity_model = "pitzer-full";
@@ -171,9 +166,6 @@ int main()
               << results.conventional_total / results.smart_total_ideal_search << std::endl;
     std::cout << "speed up (with ideal search & store): "
               << results.conventional_total / results.smart_total_ideal_search_store << std::endl << std::endl;
-    std::cout << " smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " / "
-              << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells *params.nsteps
-              << " fully evaluated GEMS out of " << params.ncells * params.nsteps  << std::endl;
 
     std::cout << "time_reactive_transport_conventional: " << results.time_reactive_transport_conventional << std::endl;
     std::cout << "time_reactive_transport_smart       : " << results.time_reactive_transport_smart << std::endl;
@@ -365,8 +357,8 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
         step += 1;
     }
 
-    if(params.use_smart_eqilibirum_solver)
-        rtsolver.outputClusterInfo();
+    //if(params.use_smart_eqilibirum_solver)
+    //    rtsolver.outputClusterInfo();
 
     if(params.use_smart_eqilibirum_solver)
         results.time_reactive_transport_smart = toc(REACTIVE_TRANSPORT_STEPS);
@@ -385,9 +377,12 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
         results.smart_equilibrium_timing = analysis.smart_equilibrium.timing;
         results.smart_equilibrium_acceptance_rate = analysis.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
 
-        std::cout << "smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " / "
-                  << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells *params.nsteps
-                  << " fully evaluated GEMS out of " << params.ncells * params.nsteps  << std::endl;
+        std::cout << " smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " ( "
+                  << results.smart_equilibrium_acceptance_rate * 100 << " % ) / "
+                  << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells * params.nsteps
+                  << " fully evaluated GEMS out of " << params.ncells * params.nsteps
+                  << " ( " << (1 - results.smart_equilibrium_acceptance_rate) * 100 << "% )" << std::endl;
+
 
     }
     else results.equilibrium_timing = analysis.equilibrium.timing;
@@ -428,14 +423,18 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  "-" + params.activity_model +
                                  "-smart";
 
-    std::string folder = "results-custering-primary-species-paper";
+    //std::string folder = "results-priority-based-acceptance-potential";
+    //std::string folder = "results-nn-search-acceptance-based-on-residual";
+    //std::string folder = "results-nn-search-acceptance-based-on-lna";
+    std::string folder = "results-clustering-primary-species-paper";
+
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :
              folder + test_tag;
 
-    if (stat(folder.c_str(), &status) == -1) mkdir(folder.c_str());
+    if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
-    std::cout << "\nsolver                         : " << (params.use_smart_eqilibirum_solver == true ? "smart" : "conventional") << std::endl;
+    std::cout << "\nsolver                         : " << (params.use_smart_eqilibirum_solver ? "smart" : "conventional") << std::endl;
 
     return folder;
 }

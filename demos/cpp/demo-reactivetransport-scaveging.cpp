@@ -34,28 +34,26 @@ using namespace Reaktoro;
 struct Params
 {
     // Discretisation params
-    int ncells; // the number of cells in the spacial discretization
-    int nsteps; // the number of steps in the reactive transport simulation
-    double xl; // the x-coordinates of the left boundaries
-    double xr; // the x-coordinates of the right boundaries
-    double dx; // the space step (in units of m)
-    double dt; // the time step (in units of s)
+    int ncells = 0; // the number of cells in the spacial discretization
+    int nsteps = 0; // the number of steps in the reactive transport simulation
+    double xl = 0; // the x-coordinates of the left boundaries
+    double xr = 0; // the x-coordinates of the right boundaries
+    double dx = 0; // the space step (in units of m)
+    double dt = 0; // the time step (in units of s)
 
     // Physical params
-    double D; // the diffusion coefficient (in units of m2/s)
-    double v; // the Darcy velocity (in units of m/s)
-    double T; // the temperature (in units of degC)
-    double P; // the pressure (in units of bar)
+    double D = 0; // the diffusion coefficient (in units of m2/s)
+    double v = 0; // the Darcy velocity (in units of m/s)
+    double T = 0; // the temperature (in units of degC)
+    double P = 0; // the pressure (in units of bar)
 
     // Solver params
-    bool use_smart_eqilibirum_solver;
-    bool track_statistics;
-    double smart_equlibrium_reltol;
+    bool use_smart_eqilibirum_solver = false;
+    double smart_equlibrium_reltol = 0.0;
+    double amount_fraction_cutoff = 0.0;
+    double mole_fraction_cutoff = 0.0;
 
-    double amount_fraction_cutoff;
-    double mole_fraction_cutoff;
-
-    std::string activity_model;
+    std::string activity_model = "";
 
 };
 
@@ -101,13 +99,9 @@ int main()
     Time start = time();
 
     // Step 1: Initialise auxiliary time-related constants
-    int second = 1;
     int minute = 60;
     int hour = 60 * minute;
     int day = 24 * hour;
-    int week = 7 * day;
-    int month = 30 * day;
-    int year = 365 * day;
 
     // Step 2: Define parameters for the reactive transport simulation
     Params params;
@@ -127,10 +121,10 @@ int main()
     params.P = 1.01325;                      // the pressure (in units of bar)
 
     // Define parameters of the equilibrium solvers
-    params.smart_equlibrium_reltol = 0.001;
+    params.smart_equlibrium_reltol = 0.1;
     //params.activity_model = "hkf";
-    params.activity_model = "pitzer";
-    //params.activity_model = "dk";
+    //params.activity_model = "pitzer";
+    params.activity_model = "dk";
 
     params.amount_fraction_cutoff = 1e-14;
     params.mole_fraction_cutoff = 1e-14;
@@ -143,7 +137,7 @@ int main()
 
     // Execute reactive transport with different solvers
     params.use_smart_eqilibirum_solver = true; runReactiveTransport(params, results);
-    //params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
+    params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;
     results.smart_total = results.smart_equilibrium_timing.solve;
@@ -395,10 +389,11 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
         results.smart_equilibrium_timing = analysis.smart_equilibrium.timing;
         results.smart_equilibrium_acceptance_rate = analysis.smart_equilibrium.smart_equilibrium_estimate_acceptance_rate;
 
-        std::cout << "smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " / "
+        std::cout << "smart equilibrium acceptance rate   : " << results.smart_equilibrium_acceptance_rate << " ( "
+                  << results.smart_equilibrium_acceptance_rate * 100 << " % ) / "
                   << (1 - results.smart_equilibrium_acceptance_rate) * params.ncells *params.nsteps
-                  << " fully evaluated GEMS out of " << params.ncells * params.nsteps  << std::endl;
-
+                  << " fully evaluated GEMS out of " << params.ncells * params.nsteps
+                  << " ( " << (1 - results.smart_equilibrium_acceptance_rate) * 100 << "% )" << std::endl;
     }
     else results.equilibrium_timing = analysis.equilibrium.timing;
 }
@@ -438,14 +433,17 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  "-" + params.activity_model +
                                  "-smart";
 
-    std::string folder = "results-scaveging-custering-primary-species";
+    //std::string folder = "results-scavenging-clustering-primary-species";
+    //std::string folder = "results-scavenging-nn-search-acceptance-based-on-potentials";
+    std::string folder = "results-scavenging-priority-based-acceptance-potential";
+
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :
              folder + test_tag;
 
-    if (stat(folder.c_str(), &status) == -1) mkdir(folder.c_str());
+    if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
-    std::cout << "\nsolver                         : " << (params.use_smart_eqilibirum_solver == true ? "smart" : "conventional") << std::endl;
+    std::cout << "\nsolver                         : " << (params.use_smart_eqilibirum_solver ? "smart" : "conventional") << std::endl;
 
     return folder;
 }

@@ -93,13 +93,13 @@ struct ReactiveTransportSolver::Impl
     std::string folder;
 
     /// Construct a ReactiveTransportSolver::Impl instance with given chemical system.
-    Impl(const ChemicalSystem& system)
+    explicit Impl(const ChemicalSystem& system)
     : Impl(Partition(system))
     {
     }
 
     /// Construct a ReactiveTransportSolver::Impl instance with given partition of the chemical system.
-    Impl(const Partition& partition)
+    explicit Impl(const Partition& partition)
     : system(partition.system()),
       partition(partition),
       equilibrium_solver(partition),
@@ -277,9 +277,8 @@ struct ReactiveTransportSolver::Impl
                 const auto P = field[icell].pressure();
 
                 // Solve with a smart equilibrium solver
-                smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell));
-                //smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell), steps, icell);
-                //smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell), steps, icell);
+                //smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell));
+                smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell), steps, icell);
 
                 // Update chemical properties of the field
                 properties[icell] = smart_equilibrium_solver.properties();
@@ -664,9 +663,7 @@ ReactiveTransportSolver::ReactiveTransportSolver(const ReactiveTransportSolver& 
 {
 }
 
-ReactiveTransportSolver::~ReactiveTransportSolver()
-{
-}
+ReactiveTransportSolver::~ReactiveTransportSolver() = default;
 
 auto ReactiveTransportSolver::operator=(ReactiveTransportSolver other) -> ReactiveTransportSolver&
 {
