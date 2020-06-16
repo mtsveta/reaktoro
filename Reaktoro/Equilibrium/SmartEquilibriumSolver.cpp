@@ -438,8 +438,7 @@ struct SmartEquilibriumSolver::Impl
         state.equilibrium().setIndicesEquilibriumSpecies(ips, Np);
 
         // The indices of the primary species at the calculated equilibrium state
-        // TODO: is this operation needed? Can't we access primary indices as const auto& iprimary = ips.head(Np);
-        const auto& iprimary = state.equilibrium().indicesPrimarySpecies();
+        VectorXiConstRef iprimary = ips.head(Np);
 
         // The chemical potentials at the calculated equilibrium state
         u = properties.chemicalPotentials();
@@ -506,7 +505,6 @@ struct SmartEquilibriumSolver::Impl
         result.estimate.accepted = false;
 
         // Skip estimation if no cluster exists yet
-        //std::cout << "is cluster empty: " << database.clusters.empty() << std::endl;
         if(database.clusters.empty())
             return;
 
@@ -639,8 +637,6 @@ struct SmartEquilibriumSolver::Impl
 
                     // Perform Taylor extrapolation
                     //ne.noalias() = ne0 + dnedbe0 * (be - be0);
-
-                    // Perform Taylor extrapolation
                     ne.noalias() = ne0 + dnedbe0 * (be - be0) + dnedbPe0 * (P - P0) + dnedbTe0 * (T - T0);
 
                     // Check if all projected species amounts are positive
@@ -1272,6 +1268,13 @@ auto SmartEquilibriumSolver::operator=(SmartEquilibriumSolver other) -> SmartEqu
 
 SmartEquilibriumSolver::~SmartEquilibriumSolver() = default;
 
+auto SmartEquilibriumSolver::setPartition(const Partition& partition) -> void
+{
+    RuntimeError("Cannot proceed with EquilibriumSolver::setPartition.",
+                 "EquilibriumSolver::setPartition is deprecated. "
+                 "Use constructor EquilibriumSolver(const Partition&) instead.");
+}
+
 auto SmartEquilibriumSolver::setOptions(const SmartEquilibriumOptions& options) -> void
 {
     pimpl->setOptions(options);
@@ -1280,11 +1283,6 @@ auto SmartEquilibriumSolver::setOptions(const SmartEquilibriumOptions& options) 
 auto SmartEquilibriumSolver::solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult
 {
     return pimpl->solve(state, T, P, be);
-}
-
-auto SmartEquilibriumSolver::solve(ChemicalState& state, double T, double P, VectorConstRef be, Index istep, Index icell) -> SmartEquilibriumResult
-{
-    return pimpl->solve(state, T, P, be, istep, icell);
 }
 
 auto SmartEquilibriumSolver::solve(ChemicalState& state, const EquilibriumProblem& problem) -> SmartEquilibriumResult

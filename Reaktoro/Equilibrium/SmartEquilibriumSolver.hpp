@@ -60,6 +60,10 @@ public:
     /// Destroy this SmartEquilibriumSolver instance.
     virtual ~SmartEquilibriumSolver();
 
+    /// Set the partition of the chemical system
+    [[deprecated("EquilibriumSolver::setPartition is deprecated. Use constructor EquilibriumSolver(const Partition&) instead.")]]
+    auto setPartition(const Partition& partition) -> void;
+
     /// Set the options for the equilibrium calculation.
     auto setOptions(const SmartEquilibriumOptions& options) -> void;
 
@@ -69,7 +73,6 @@ public:
     /// @param P The pressure (in units of Pa)
     /// @param be The amounts of the elements in the equilibrium partition
     auto solve(ChemicalState& state, double T, double P, VectorConstRef be) -> SmartEquilibriumResult;
-    auto solve(ChemicalState& state, double T, double P, VectorConstRef be, Index istep, Index icell) -> SmartEquilibriumResult;
 
     /// Solve a chemical equilibrium problem.
     /// @param state[in,out] The initial guess and the final state of the equilibrium calculation
