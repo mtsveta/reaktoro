@@ -191,7 +191,7 @@ int main()
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
     //*/
-    params.nsteps = 1000; // the number of steps in the reactive transport simulation
+    params.nsteps = 10000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -385,7 +385,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     while (step < params.nsteps)
     {
         // Print some progress
-        std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        // std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.stepKinetics(field);
@@ -454,7 +454,8 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-nsteps-" + std::to_string(params.nsteps) +
                            "-conv-kin-conv-eq";
     //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
-    std::string folder = "../rt-sa-5000-no-cvode" + test_tag;
+    //std::string folder = "../rt-sa-5000-no-cvode" + test_tag;
+    std::string folder = "../rt-sa-5000" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "\nsolver                         : "
@@ -475,10 +476,5 @@ auto outputConsole(const Params& params) -> void {
     std::cout << "CFD     : " << params.v * params.dt / params.dx << std::endl;
     std::cout << "T       : " << params.T << std::endl;
     std::cout << "P       : " << params.P << std::endl;
-    //std::cout << "equilibrium reltol   : " << params.smart_equilibrium_reltol << std::endl;
-    //std::cout << "equilibrium abstol   : " << params.smart_equilibrium_abstol << std::endl;
-    //std::cout << "kinetics reltol      : " << params.smart_kinetics_reltol << std::endl;
-    //std::cout << "kinetics abstol      : " << params.smart_kinetics_abstol << std::endl;
-
 }
 
