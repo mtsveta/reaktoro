@@ -829,9 +829,6 @@ struct SmartEquilibriumSolver::Impl
         // Skip estimation if no previous full computation has been done
         if(tree.empty())
             return;
-        // Relative and absolute tolerance parameters
-        const auto reltol = options.reltol;
-        const auto abstol = 1e-2;
 
         //---------------------------------------------------------------------
         // SEARCH STEP DURING THE ESTIMATE PROCESS
@@ -887,6 +884,7 @@ struct SmartEquilibriumSolver::Impl
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_STEP);
 
+        // Fetch mole fractions
         Vector xe = properties0.moleFractions().val(ies);
 
         // Perform the check for the negative amounts
@@ -900,10 +898,12 @@ struct SmartEquilibriumSolver::Impl
             if(xe[i] < options.mole_fraction_cutoff)
                 continue;
 
+            // Absolute tolerance parameters
+            const auto abstol = 1e-2;
             // Perform the variational check
-            if(std::abs(dlnae[i]) > abstol + reltol * std::abs(lnae0[i])) {
+            if(std::abs(dlnae[i]) > abstol + options.reltol * std::abs(lnae0[i])) {
                 variation_check = false;    // variation test failed
-                result.estimate.failed_with_species = system.species(i).name();
+                result.estimate.failed_with_species = system.species(ies[i]).name();
                 result.estimate.failed_with_amount = ne[i];
                 result.estimate.failed_with_chemical_potential = lna0[i] + dlnae[i]; // TODO: change to the chemical potential
 
