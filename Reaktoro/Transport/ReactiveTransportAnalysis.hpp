@@ -159,14 +159,7 @@ struct ReactiveTransportAnalysis
         /// The time spent (in s) in each time step for error control operations during smart equilibrium estimation operations.
         std::vector<double> smart_equilibrium_error_control;
 
-        /// The time spent (in s) in each time step for matrix-vector multiplication as part of estimating in smart chemical equilibrium calculations.
-        std::vector<double> smart_equilibrium_mat_vec_mul;
-
-        // The time spent (in s) in each time step for acceptance operations during smart chemical equilibrium calculations.
-        std::vector<double> smart_equilibrium_acceptance;
-
-        /// The time spent (in s) in each time step for smart chemical equilibrium estimation calculations.
-        // The time spent (in s) in each time step for Taylor extrapolation during smart equilibrium estimation operations.
+        /// The time spent (in s) in each time step for Taylor extrapolation during smart equilibrium estimation operations.
         std::vector<double> smart_equilibrium_taylor;
 
         /// The time spent (in s) in each time step for updating the priority related info during smart equilibrium estimation operations.

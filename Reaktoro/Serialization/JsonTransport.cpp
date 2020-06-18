@@ -75,21 +75,21 @@ void to_json(json& j, const ReactiveTransportAnalysis& obj) {
     j["computing_costs_per_time_step"]["kinetics"] = obj.computing_costs_per_time_step.kinetics;
 
     j["computing_costs_per_time_step"]["smart_kinetics"] = obj.computing_costs_per_time_step.smart_kinetics;
+    j["computing_costs_per_time_step"]["smart_kinetics_with_ideal_search"] = obj.computing_costs_per_time_step.smart_kinetics_with_ideal_search;
+
+    j["computing_costs_per_time_step"]["smart_kinetics_estimate"] = obj.computing_costs_per_time_step.smart_kinetics_estimate;
+    j["computing_costs_per_time_step"]["smart_kinetics_search"] = obj.computing_costs_per_time_step.smart_kinetics_search;
+    j["computing_costs_per_time_step"]["smart_kinetics_error_control"] = obj.computing_costs_per_time_step.smart_kinetics_error_control;
+    j["computing_costs_per_time_step"]["smart_kinetics_taylor"] = obj.computing_costs_per_time_step.smart_kinetics_taylor;
+
     j["computing_costs_per_time_step"]["smart_kinetics_learn"] = obj.computing_costs_per_time_step.smart_kinetics_learn;
     j["computing_costs_per_time_step"]["smart_kinetics_chemical_properties"] = obj.computing_costs_per_time_step.smart_kinetics_chemical_properties;
     j["computing_costs_per_time_step"]["smart_kinetics_equilibration"] = obj.computing_costs_per_time_step.smart_kinetics_equilibration;
-    j["computing_costs_per_time_step"]["smart_kinetics_estimate"] = obj.computing_costs_per_time_step.smart_kinetics_estimate;
-    j["computing_costs_per_time_step"]["smart_kinetics_nearest_neighbor_search"] = obj.computing_costs_per_time_step.smart_kinetics_search;
-    j["computing_costs_per_time_step"]["smart_kinetics_acceptance"] = obj.computing_costs_per_time_step.smart_kinetics_error_control;
-    j["computing_costs_per_time_step"]["smart_kinetics_mat_vec_mul"] = obj.computing_costs_per_time_step.smart_kinetics_taylor;
 
     j["computing_costs_per_time_step"]["smart_equilibrium"] = obj.computing_costs_per_time_step.smart_equilibrium;
     j["computing_costs_per_time_step"]["smart_equilibrium_with_ideal_search"] = obj.computing_costs_per_time_step.smart_equilibrium_with_ideal_search;
 
     j["computing_costs_per_time_step"]["smart_equilibrium_estimate"] = obj.computing_costs_per_time_step.smart_equilibrium_estimate;
-    j["computing_costs_per_time_step"]["smart_equilibrium_accept"] = obj.computing_costs_per_time_step.smart_equilibrium_acceptance;
-    j["computing_costs_per_time_step"]["smart_equilibrium_acceptance"] = obj.computing_costs_per_time_step.smart_equilibrium_acceptance;
-    j["computing_costs_per_time_step"]["smart_equilibrium_mat_vec_mul"] = obj.computing_costs_per_time_step.smart_equilibrium_mat_vec_mul;
     j["computing_costs_per_time_step"]["smart_equilibrium_search"] = obj.computing_costs_per_time_step.smart_equilibrium_search;
     j["computing_costs_per_time_step"]["smart_equilibrium_error_control"] = obj.computing_costs_per_time_step.smart_equilibrium_error_control;
     j["computing_costs_per_time_step"]["smart_equilibrium_taylor"] = obj.computing_costs_per_time_step.smart_equilibrium_taylor;
@@ -131,8 +131,9 @@ void from_json(const json& j, ReactiveTransportAnalysis& obj) {
 
     j.at("computing_costs_per_time_step").at("smart_kinetics").get_to(obj.computing_costs_per_time_step.smart_kinetics);
     j.at("computing_costs_per_time_step").at("smart_kinetics_estimate").get_to(obj.computing_costs_per_time_step.smart_kinetics_estimate);
-    j.at("computing_costs_per_time_step").at("smart_kinetics_nearest_neighbor_search").get_to(obj.computing_costs_per_time_step.smart_kinetics_search);
-    j.at("computing_costs_per_time_step").at("smart_kinetics_acceptance").get_to(obj.computing_costs_per_time_step.smart_kinetics_error_control);
+    j.at("computing_costs_per_time_step").at("smart_kinetics_search").get_to(obj.computing_costs_per_time_step.smart_kinetics_search);
+    j.at("computing_costs_per_time_step").at("smart_kinetics_error_taylor").get_to(obj.computing_costs_per_time_step.smart_kinetics_taylor);
+    j.at("computing_costs_per_time_step").at("smart_kinetics_error_control").get_to(obj.computing_costs_per_time_step.smart_kinetics_error_control);
     j.at("computing_costs_per_time_step").at("smart_kinetics_learn").get_to(obj.computing_costs_per_time_step.smart_kinetics_learn);
     j.at("computing_costs_per_time_step").at("smart_kinetics_chemical_properties").get_to(obj.computing_costs_per_time_step.smart_kinetics_chemical_properties);
     j.at("computing_costs_per_time_step").at("smart_kinetics_equilibration").get_to(obj.computing_costs_per_time_step.smart_kinetics_equilibration);
@@ -141,7 +142,6 @@ void from_json(const json& j, ReactiveTransportAnalysis& obj) {
     j.at("computing_costs_per_time_step").at("smart_equilibrium_with_ideal_search").get_to(obj.computing_costs_per_time_step.smart_equilibrium_with_ideal_search);
 
     j.at("computing_costs_per_time_step").at("smart_equilibrium_estimate").get_to(obj.computing_costs_per_time_step.smart_equilibrium_estimate);
-    j.at("computing_costs_per_time_step").at("smart_equilibrium_accept").get_to(obj.computing_costs_per_time_step.smart_equilibrium_acceptance);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_search").get_to(obj.computing_costs_per_time_step.smart_equilibrium_search);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_error_control").get_to(obj.computing_costs_per_time_step.smart_equilibrium_error_control);
     j.at("computing_costs_per_time_step").at("smart_equilibrium_error_taylor").get_to(obj.computing_costs_per_time_step.smart_equilibrium_taylor);

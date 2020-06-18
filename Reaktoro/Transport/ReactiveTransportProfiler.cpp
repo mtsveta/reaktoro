@@ -31,7 +31,7 @@ template<typename ResultType>
 auto accumulateTimingsFromResults(const std::vector<ResultType>& results)
 {
     using TimingType = decltype(results.front().timing);
-    TimingType accumulated_timing = TimingType{};
+    TimingType accumulated_timing = {};
     if(results.empty()) return accumulated_timing;
     for(const auto& result : results)
         accumulated_timing += result.timing;
@@ -116,9 +116,6 @@ struct ReactiveTransportProfiler::Impl
 
         info.smart_equilibrium_estimate.resize(num_time_steps);
         info.smart_equilibrium_search.resize(num_time_steps);
-        info.smart_equilibrium_acceptance.resize(num_time_steps);
-        info.smart_equilibrium_mat_vec_mul.resize(num_time_steps);
-        info.smart_equilibrium_search.resize(num_time_steps);
         info.smart_equilibrium_error_control.resize(num_time_steps);
         info.smart_equilibrium_taylor.resize(num_time_steps);
         info.smart_equilibrium_database_priority_update.resize(num_time_steps);
@@ -137,13 +134,15 @@ struct ReactiveTransportProfiler::Impl
 
         info.smart_kinetics.resize(num_time_steps);
         info.smart_kinetics_with_ideal_search.resize(num_time_steps);
-        info.smart_kinetics_learn.resize(num_time_steps);
-        info.smart_kinetics_chemical_properties.resize(num_time_steps);
-        info.smart_kinetics_equilibration.resize(num_time_steps);
+
         info.smart_kinetics_estimate.resize(num_time_steps);
         info.smart_kinetics_search.resize(num_time_steps);
         info.smart_kinetics_error_control.resize(num_time_steps);
         info.smart_kinetics_taylor.resize(num_time_steps);
+
+        info.smart_kinetics_learn.resize(num_time_steps);
+        info.smart_kinetics_chemical_properties.resize(num_time_steps);
+        info.smart_kinetics_equilibration.resize(num_time_steps);
 
         for(Index i = 0; i < num_time_steps; ++i)
         {
@@ -172,13 +171,15 @@ struct ReactiveTransportProfiler::Impl
 
             info.smart_kinetics[i] = timing_smart_kinetics_at_step[i].solve;
             info.smart_kinetics_with_ideal_search[i] = info.smart_kinetics[i] - timing_smart_kinetics_at_step[i].estimate_search;
-            info.smart_kinetics_learn[i] = timing_smart_kinetics_at_step[i].learn;
-            info.smart_kinetics_chemical_properties[i] = timing_smart_kinetics_at_step[i].learn_chemical_properties;
-            info.smart_kinetics_equilibration[i] = timing_smart_kinetics_at_step[i].learn_equilibration;
+
             info.smart_kinetics_estimate[i] = timing_smart_kinetics_at_step[i].estimate;
             info.smart_kinetics_search[i] = timing_smart_kinetics_at_step[i].estimate_search;
             info.smart_kinetics_error_control[i] = timing_smart_kinetics_at_step[i].estimate_error_control;
             info.smart_kinetics_taylor[i] = timing_smart_kinetics_at_step[i].estimate_taylor;
+
+            info.smart_kinetics_learn[i] = timing_smart_kinetics_at_step[i].learn;
+            info.smart_kinetics_chemical_properties[i] = timing_smart_kinetics_at_step[i].learn_chemical_properties;
+            info.smart_kinetics_equilibration[i] = timing_smart_kinetics_at_step[i].learn_equilibration;
         }
 
         return info;

@@ -77,7 +77,6 @@ void to_json(json& j, const SmartEquilibriumTiming& obj) {
     j["estimate_database_priority_update"] = obj.estimate_database_priority_update;
 }
 
-
 void from_json(const json& j, SmartEquilibriumTiming& obj) {
     j.at("solve").get_to(obj.solve);
     j.at("learn").get_to(obj.learn);
