@@ -172,14 +172,10 @@ struct SmartEquilibriumSolver::Impl
 
     std::deque<Index> ranking;
 
-    //----------------------------------------------------------------------------------
-    // TODO: move these vars into their corresponding fuctions
-    /// The vector of amounts of equilibrium species
-
-    /// The indices of the equilibrium and kinetic species
-    Indices ies, iks;
-
-    //----------------------------------------------------------------------------------
+    /// The indices of the equilibrium species
+    Indices ies;
+    /// The indices of the equilibrium elements
+    Indices iee;
 
     struct TreeNode
     {
@@ -203,26 +199,8 @@ struct SmartEquilibriumSolver::Impl
 
         // Initialize indices of the equilibrium and kinetic species
         ies = partition.indicesEquilibriumSpecies();
-        iks = partition.indicesKineticSpecies();
+        iee = partition.indicesEquilibriumElements();
 
-        /*
-        Indices iis = partition.indicesInertSpecies();
-
-        std::cout << "ies: ";
-        for (auto item : ies)
-            std::cout << item << ", ";
-        std::cout << std::endl;
-
-        std::cout << "iks: ";
-        for (auto item : iks)
-            std::cout << item << ", ";
-        std::cout << std::endl;
-
-        std::cout << "iis: ";
-        for (auto item : iis)
-            std::cout << item << ", ";
-        std::cout << std::endl;
-        */
     }
 
     /// Set the options for the equilibrium calculation.
@@ -266,14 +244,6 @@ struct SmartEquilibriumSolver::Impl
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_MATRICES);
 
-        // The indices of the equilibrium species and elements
-        const auto& ies = partition.indicesEquilibriumSpecies();
-        const auto& iee = partition.indicesEquilibriumElements();
-
-        // The number of equilibrium species and elements
-        const auto& Ne = partition.numEquilibriumSpecies();
-        const auto& Ee = partition.numEquilibriumElements();
-
         // The amounts of the species at the calculated equilibrium state
         n = state.speciesAmounts();
 
@@ -289,7 +259,6 @@ struct SmartEquilibriumSolver::Impl
         const auto& dudn = u.ddn;
 
         const Matrix dudb = dudn * dndb;
-
 
         // Define the canonicalizer based on formular matrix A and priority weights set by the species amounts
         const auto& A = system.formulaMatrix();
@@ -321,8 +290,7 @@ struct SmartEquilibriumSolver::Impl
         tic(STORAGE_STEP);
 
         // Store the computed solution into the knowledge tree
-        timeit( tree.push_back({be, state, properties, solver.sensitivity(), Mb, imajor}),
-                result.timing.learn_storage= );
+        tree.push_back({be, state, properties, solver.sensitivity(), Mb, imajor});
 
         // Update the priority queue
         // ----------------------------------------------
@@ -690,7 +658,7 @@ struct SmartEquilibriumSolver::Impl
 
     }
 
-     /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
     auto estimate_priority_based_acceptance_potential(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
         result.estimate.accepted = false;
@@ -787,8 +755,7 @@ struct SmartEquilibriumSolver::Impl
                 const double ne_min = min(ne);
                 const double ne_sum = sum(ne);
                 const auto eps_n = options.amount_fraction_cutoff * ne_sum;
-                //std::cout << " ne_sum " << ne_sum << std::endl;
-                //std::cout << " eps_n " << eps_n << std::endl;
+
                 if(ne_min <= -eps_n)
                     continue;
 
@@ -797,9 +764,7 @@ struct SmartEquilibriumSolver::Impl
                 ranking[*inode] += 1;
 
                 auto comp = [&](Index l, Index r) { return ranking[l] > ranking[r]; };
-                //std::sort(priority.begin(), priority.end(), comp);
-                //std::stable_sort(priority.begin(), inode + 1, comp);
-                if ( !((inode == priority.begin()) || (ranking[*inode_prev] >= ranking[*inode])) ) {
+                if( !((inode == priority.begin()) || (ranking[*inode_prev] >= ranking[*inode])) ) {
                     std::stable_sort(priority.begin(), inode + 1, comp);
                 }
 
@@ -871,9 +836,7 @@ struct SmartEquilibriumSolver::Impl
 
         /// Auxiliary vectors delta(n) and delta(lna) in estimate function version v0
         Vector dne, dlnae;
-
-        // Calculate perturbation of equilibrium species ne
-        dne.noalias() = sensitivity0.dndb(ies, Eigen::all) * (be - be0); // delta(ne) = dne/db * (b - b0)
+        dne.noalias() = sensitivity0.dndb(ies, iee) * (be - be0); // delta(ne) = dne/db * (b - b0)
         ne.noalias() = ne0 + dne;                                                   // n = n0 + delta(n)
         dlnae.noalias() = dlnae_dne * dne;                                          // delta(ln(a)) = d(lna)/dn * delta(n)
 
@@ -928,13 +891,10 @@ struct SmartEquilibriumSolver::Impl
         // Set the estimate accepted status to true
         result.estimate.accepted = true;
 
-        // Remember index of reference element used
-        result.estimate.reference_state_index = std::distance(tree.begin(), it);
-
     }
 
     /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences) v.1
-    auto estimate_nnsearch_acceptance_based_on_potential(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+    auto estimate_nnsearch_acceptance_based_on_residual(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
         result.estimate.accepted = false;
 
@@ -947,15 +907,6 @@ struct SmartEquilibriumSolver::Impl
         //---------------------------------------------------------------------
         tic(SEARCH_STEP);
 
-        // Comparison function based on the Euclidean distance (scaled)
-        auto distancefn_scaled = [&](const TreeNode& a, const TreeNode& b)
-        {
-            Vector be_a = a.be/sum(a.be);
-            Vector be_b = b.be/sum(b.be);
-            Vector be_x = be/sum(be);
-
-            return (be_a - be_x).squaredNorm() < (be_b - be_x).squaredNorm();  // TODO: We need to extend this later with T and P contributions too (Allan, 26.06.2019)
-        };
         // Comparison function based on the Euclidean distance
         auto distancefn = [&](const TreeNode& a, const TreeNode& b)
         {
@@ -988,34 +939,19 @@ struct SmartEquilibriumSolver::Impl
 
         // Amounts of species related to equilibrium and kinetics species
         const auto& ne0 = n0(ies);
-        const auto& ze0 = z0(ies);
-        const auto& ue0 = u0.val(ies);
-        const auto& xe0 = x0.val(ies);
 
         // Constant to scale the residual of the equilibrium species
         const auto RT = universalGasConstant*T0;
 
-        /// Auxiliary vectors
-        Vector y, z, x, r, u;
-        Vector dn, dy, dz;
+        /// Auxiliary vectors restricted to the equilibrium species
+        Vector ye, ze, xe, ue, re;
+        Vector dne;
 
-        // Calculate perturbation of n
-        dn.noalias() = sensitivity0.dndb * (be - be0);
-        dy.noalias() = sensitivity0.dydb * (be - be0);
-        dz.noalias() = sensitivity0.dzdb * (be - be0);
+        dne.noalias() = sensitivity0.dndb(ies, iee) * (be - be0);
 
-        /// Auxiliary vectors resricted to the equilibrium species
-        Vector ne, ze, xe, ue, re;
-        Vector dne, dze;
-
-        dne.noalias() = sensitivity0.dndb(ies, Eigen::all) * (be - be0);
-        dze.noalias() = sensitivity0.dzdb(ies, Eigen::all) * (be - be0);
-
-        y.noalias() = y0;
-        z.noalias() = z0;
-
+        ye.noalias() = y0(iee);
         ne.noalias() = ne0 + dne;
-        ze.noalias() = ze0;
+        ze.noalias() = z0(ies);
 
         result.timing.estimate_taylor = toc(TAYLOR_STEP);
 
@@ -1028,48 +964,41 @@ struct SmartEquilibriumSolver::Impl
         bool neg_amount_check = ne.minCoeff() > options.cutoff;
 
         // If cutoff test didn't pass, estimation has failded
-        if(!neg_amount_check)
+        if(!neg_amount_check){
+            result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
             return;
-
-        for(auto i = 0; i < ne.size(); ++i)
-            if(ne[i] <= 0.0)
-                ne[i] = options.learning.epsilon;
-
-        // Recompute dn
-        dne = ne - ne0;
-
-        // Calculate due
-        Vector due = u0.ddn(ies, ies) * dne;
-
-        // Calculate u(bar) = u(ref) + dudT(ref)*dT + dudP(ref)*dP + dudn(ref)*dn
-        ue = ue0 + due;
-
-        // Calculate x(bar) = x(ref) + dxdn(ref)*dn
-        xe = xe0 + x0.ddn(ies, ies) * dne;
-
-        bool variation_check = true;
-        for(Index i = 0; i < ne.size(); ++i)
-        {
-            // If the fraction is too small, skip the variational check
-            if(xe[i] < options.mole_fraction_cutoff)
-                continue;
-            // Perform the variational check
-            if(std::abs(due(i, 0) / ue0(i, 0)) > options.reltol) {
-                variation_check = false;    // variation test failed
-                result.estimate.failed_with_species = system.species(i).name();
-                result.estimate.failed_with_amount = ne[i];
-                break;
-            }
         }
 
+        // Calculate u(bar) = u(ref) + dudT(ref)*dT + dudP(ref)*dP + dudn(ref)*dn
+        ue = u0.val(ies) + u0.ddn(ies, ies) * dne;
+
+        // Calculate x(bar) = x(ref) + dxdn(ref)*dn + dxdP(ref)*dP + dxdn(ref)*dn
+        xe = x0.val(ies) + x0.ddn(ies, ies) * dne;
+
+        MatrixConstRef Ae = partition.formulaMatrixEquilibriumPartition();
+
+        // Calculate the equilibrium residuals of the equilibrium species
+        re = abs(ue - tr(Ae)*ye - ze)/RT;  // TODO: We should actually collect the entries in u and z corresponding to equilibrium species
+
+        // Eliminate species with mole fractions below cutoff from the residual analysis
+        for(auto i = 0; i < ne.size(); ++i)
+            if(xe[i] < options.mole_fraction_cutoff)
+                re[i] = 0.0; // set their residuals to zero
+
+        // Estimate the residual error of the trial Taylor approximation for the equilibrium species
+        Index ispecies;
+        const double error = re.maxCoeff(&ispecies);
+        bool equilibrium_variation_check = error <= options.reltol;
+
         result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
+
+         // Check if smart estimation failed with respect to variation of chemical potentials or amounts
+        if(!equilibrium_variation_check)
+            return;
 
         // Update three properties of the chemical state (for better initial guess of the GEM problem)
         state.setSpeciesAmounts(ne, ies);
 
-        // Check if smart estimation failed with respect to variation of chemical potentials or amounts
-        if(!variation_check)
-            return;
 
         // Set the estimate accepted status to true
         result.estimate.accepted = true;
@@ -1116,7 +1045,9 @@ struct SmartEquilibriumSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate of the chemical state
-        estimate(state, T, P, be);
+        //estimate(state, T, P, be);
+        //estimate_nnsearch_acceptance_based_on_lna(state, T, P, be);
+        estimate_nnsearch_acceptance_based_on_residual(state, T, P, be);
 
         result.timing.estimate=toc(ESTIMATE_STEP);
 
@@ -1126,8 +1057,10 @@ struct SmartEquilibriumSolver::Impl
         tic(LEARN_STEP);
 
         // Perform a learning step if the smart prediction is not sactisfatory
-        if(!result.estimate.accepted)
-            learn(state, T, P, be);
+        if(!result.estimate.accepted){
+            //learn(state, T, P, be);
+            learn_nnsearch(state, T, P, be);
+        }
 
         result.timing.learn = toc(LEARN_STEP);
 
