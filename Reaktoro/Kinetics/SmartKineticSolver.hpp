@@ -73,7 +73,7 @@ public:
     /// @param state The chemical state representing the source.
     /// @param volumerate The volumetric rate of the source.
     /// @param units The units of the volumetric rate (compatible with m3/s).
-    auto addSource(const ChemicalState& state, double volumerate, std::string units) -> void;
+    auto addSource(const ChemicalState& state, double volumerate, const std::string& units) -> void;
 
     /// Add a phase sink to the chemical kinetics problem.
     /// This method allows the chemical kinetics problem to account for
@@ -81,21 +81,21 @@ public:
     /// @param phase The name of the phase.
     /// @param volumerate The volumetric rate of the phase removal.
     /// @param units The units of the volumetric rate (compatible with m3/s).
-    auto addPhaseSink(std::string phase, double volumerate, std::string units) -> void;
+    auto addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void;
 
     /// Add a fluid sink to the chemical kinetics problem.
     /// This method allows the chemical kinetics problem to account for
     /// the sink (i.e., the removal) of fluid from the system.
     /// @param volumerate The volumetric rate of the fluid removal.
     /// @param units The units of the volumetric rate (compatible with m3/s).
-    auto addFluidSink(double volumerate, std::string units) -> void;
+    auto addFluidSink(double volumerate, const std::string& units) -> void;
 
     /// Add a solid sink to the chemical kinetics problem.
     /// This method allows the chemical kinetics problem to account for
     /// the sink (i.e., the removal) of solid from the system.
     /// @param volumerate The volumetric rate of the solid removal.
     /// @param units The units of the volumetric rate (compatible with m3/s).
-    auto addSolidSink(double volumerate, std::string units) -> void;
+    auto addSolidSink(double volumerate, const std::string& units) -> void;
 
     /// Initialize the chemical kinetics solver before integration.
     /// This method should be invoked whenever the user intends to make a call to `KineticsSolver::step`.

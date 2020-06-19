@@ -39,10 +39,13 @@ struct SmartKineticOptions
     KineticOptions learning;
 
     /// The relative tolerance for estimated species mole amounts.
-    double reltol = 1.0;
+    double reltol = 1e-1;
 
     /// The absolute tolerance for estimated species mole amounts.
     double abstol = 1e-14;
+
+    /// The absolute tolerance for estimated species mole amounts.
+    double tol = 1e-1;
 
     /// The cutoff value for normalized species and element amounts.
     /// This parameter is used to ignore certain species/elements with tiny amounts
