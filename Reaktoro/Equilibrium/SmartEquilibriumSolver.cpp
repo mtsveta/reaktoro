@@ -250,19 +250,14 @@ struct SmartEquilibriumSolver::Impl
         // The amounts of the equilibrium species amounts at the calculated equilibrium state
         ne = n(ies);
 
-        const auto RT = universalGasConstant * T;
-        const auto u = properties.chemicalPotentials();
         const auto& x = properties.moleFractions();
         Vector xe = x.val(ies);
 
-        const auto& dndb = solver.sensitivity().dndb;
-        const auto& dudn = u.ddn;
-
-        const Matrix dudb = dudn * dndb;
-
         // Define the canonicalizer based on formular matrix A and priority weights set by the species amounts
         const auto& A = system.formulaMatrix();
-        Canonicalizer canonicalizer(A);
+        const auto& Ae = partition.formulaMatrixEquilibriumPartition();
+
+        Canonicalizer canonicalizer(Ae);
         canonicalizer.updateWithPriorityWeights(ne);
 
         // Set tolerances for species' elements and fractions
@@ -272,8 +267,15 @@ struct SmartEquilibriumSolver::Impl
         // Get indices of major species 'imajor'
         auto imajorminor = canonicalizer.Q();
         const auto nummajor = std::partition(imajorminor.begin(), imajorminor.end(),
-                                             [&](Index i) { return ne[i] >= eps_n && xe[i] >= eps_x; }) - imajorminor.begin();
+                                             [&](Index i) { return ne[i] >= eps_n && xe[i] >= eps_x; })
+                              - imajorminor.begin();
         const auto imajor = imajorminor.head(nummajor);
+
+        // Fetch chemical potentials and their derivatives
+        const auto u = properties.chemicalPotentials();
+        const auto& dndb = solver.sensitivity().dndb;
+        const auto& dudn = u.ddn;
+        const Matrix dudb = dudn * dndb;
 
         // Calculate matrix Mb for the error control based on the potentials
         const Vector um = u.val(imajor);
@@ -290,7 +292,7 @@ struct SmartEquilibriumSolver::Impl
         tic(STORAGE_STEP);
 
         // Store the computed solution into the knowledge tree
-        tree.push_back({be, state, properties, solver.sensitivity(), Mb, imajor});
+        tree.push_back({be, state, properties, solver.sensitivity(), Mbe, imajor});
 
         // Update the priority queue
         // ----------------------------------------------
@@ -670,9 +672,9 @@ struct SmartEquilibriumSolver::Impl
         // Relative and absolute tolerance parameters
         const auto reltol = options.reltol;
 
-        //---------------------------------------------------------------------------------------
-        // Step 1: Search for the reference element (closest to the new state input conditions)
-        //---------------------------------------------------------------------------------------
+        //---------------------------------------------------------------------
+        // SEARCH STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
         tic(SEARCH_STEP);
 
         Vector rs;
@@ -716,35 +718,35 @@ struct SmartEquilibriumSolver::Impl
             const auto& node = tree[*inode];
             const auto& imajor = node.imajor;
 
+            //---------------------------------------------------------------------
+            // ERROR CONTROL STEP DURING THE LEARNING PROCESS
+            //---------------------------------------------------------------------
             tic(ERROR_CONTROL_STEP);
 
             const auto [success, error, ispecies] = pass_error_test(node);
 
-            result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
-
             if(success)
             {
-                tic(TAYLOR_STEP);
+                result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
 
-                const auto& ies = partition.indicesEquilibriumSpecies();
-                const auto& iee = partition.indicesEquilibriumElements();
+                //---------------------------------------------------------------------
+                // TAYLOR EXTRAPOLATION STEP DURING THE LEARNING PROCESS
+                //---------------------------------------------------------------------
+                tic(TAYLOR_STEP);
 
                 const auto& be0 = node.be;
                 const auto& P0 = node.state.pressure();
                 const auto& T0 = node.state.temperature();
                 const auto& n0 = node.state.speciesAmounts();
-                const auto& y0 = node.state.equilibrium().elementChemicalPotentials();
-                const auto& z0 = node.state.equilibrium().speciesStabilities();
                 const auto& dndb0 = node.sensitivity.dndb;
                 const auto& dndP0 = node.sensitivity.dndP;
                 const auto& dndT0 = node.sensitivity.dndT;
 
-
                 // Fetch reference values restricted to equilibrium species only
+                const auto& ne0 = n0(ies);
                 const auto& dnedbe0 = dndb0(ies, iee);
                 const auto& dnedbPe0 = dndP0(ies);
                 const auto& dnedbTe0 = dndT0(ies);
-                const auto& ne0 = n0(ies);
 
                 // Perform Taylor extrapolation
                 ne.noalias() = ne0 + dnedbe0 * (be - be0) + dnedbPe0 * (P - P0) + dnedbTe0 * (T - T0);
@@ -761,15 +763,25 @@ struct SmartEquilibriumSolver::Impl
 
                 result.timing.estimate_search = toc(SEARCH_STEP);
 
+                //-----------------------------------------------------------------------
+                // DATABASE PRIORITY AND RANKING UPDATE STEP DURING THE ESTIMATE PROCESS
+                //-----------------------------------------------------------------------
+                tic(PRIORITY_UPDATE_STEP);
+
+                // Increase ranking of of the used node
                 ranking[*inode] += 1;
 
+                // Make sure the indicies in the priority are ordered such that:
+                // rank[priority[i-1]] > rank[priority[i]]
                 auto comp = [&](Index l, Index r) { return ranking[l] > ranking[r]; };
                 if( !((inode == priority.begin()) || (ranking[*inode_prev] >= ranking[*inode])) ) {
                     std::stable_sort(priority.begin(), inode + 1, comp);
                 }
 
+                result.timing.estimate_database_priority_update = toc(PRIORITY_UPDATE_STEP);
+
                 // Update the amounts of elements for the equilibrium species
-                state = node.state;
+                //state = node.state; // this line was removed because it was destroying kinetics simulations
                 state.setSpeciesAmounts(ne, ies);
 
                 // Update the chemical properties of the system
@@ -1047,7 +1059,9 @@ struct SmartEquilibriumSolver::Impl
         // Perform a smart estimate of the chemical state
         //estimate(state, T, P, be);
         //estimate_nnsearch_acceptance_based_on_lna(state, T, P, be);
-        estimate_nnsearch_acceptance_based_on_residual(state, T, P, be);
+        //estimate_nnsearch_acceptance_based_on_residual(state, T, P, be);
+        estimate_priority_based_acceptance_potential(state, T, P, be);
+        //result.estimate.accepted = false;
 
         result.timing.estimate=toc(ESTIMATE_STEP);
 
@@ -1059,7 +1073,8 @@ struct SmartEquilibriumSolver::Impl
         // Perform a learning step if the smart prediction is not sactisfatory
         if(!result.estimate.accepted){
             //learn(state, T, P, be);
-            learn_nnsearch(state, T, P, be);
+            //learn_nnsearch(state, T, P, be);
+            learn_priority_based_acceptance_potential(state, T, P, be);
         }
 
         result.timing.learn = toc(LEARN_STEP);
