@@ -301,7 +301,7 @@ struct ODESolver::Impl
 
             // Set the value of the current jacobian
             problem.jacobian(t, y, J);
-            if(t = tfinal) problem.function(t, y, f);
+            if(t == tfinal) problem.function(t, y, f);
 
             // Initialize system matrix A = I - dt * J^{k+1}
             Matrix A;
@@ -315,6 +315,7 @@ struct ODESolver::Impl
         }
     }
 
+    /*
     /// Solve the ODE equations from a given start time to a final one.
     auto solve(double& t, double dt, VectorRef y) -> void
     {
@@ -338,6 +339,39 @@ struct ODESolver::Impl
 
         //std::cout << "y: " << tr(y) << std::endl;
     }
+    */
+    ///*
+    /// Solve the ODE equations from a given start time to a final one.
+    auto solve(double& t, double dt, VectorRef y) -> void
+    {
+        // Initialize the cvode context
+        initialize(t, y);
+
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        // Set the user-defined data to cvode_mem
+        CheckIntegration(CVodeSetUserData(cvode_mem, &data));
+
+        double t_start = t;
+        // Solve the ode problem from `tstart` to `tfinal`
+        // CV_NORMAL - indicates that the step is controled by `tstart` and `tfinal`
+        // CVODE will trigger integration from t until t + dt
+        auto res = CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL);
+
+        // If CVODE was not successful, run the 1st order implicit scheme
+        if(res != CV_SUCCESS){
+            // Apply 1st order implicit scheme
+            solve_implicit_1st_order(t_start, dt, y);
+        }else{
+            // Transfer the result from cvode_y to y
+            for(unsigned int i = 0; i < data.num_equations; ++i)
+                y[i] = VecEntry(this->cvode_y, i);
+        }
+
+        //std::cout << "y: " << tr(y) << std::endl;
+    }
+    //*/
 
     /// Solve the ODE equations from a given start time to a final one.
     auto solve_implicit_1st_order(double& t, double dt, VectorRef y) -> void
@@ -353,12 +387,16 @@ struct ODESolver::Impl
 
         // Initial vector
         Vector yk1 = y, yk = y;
+        Vector yk_alpha;
+        Vector fk_alpha = Vector::Zero(yk.size());
         // Residual and increment for the Newton method
         Vector r, dy;
         // Final time of integration
         double tk1 = t + dt;
 
         double error_rel = 1e8;
+        double alpha = 1.0;
+        double beta = 0.1;
         Index i = 0;
 
         while(error_rel > 1e-4 * options.reltol) { // reltol = 1e-10
@@ -373,9 +411,18 @@ struct ODESolver::Impl
             LU lu(I - dt * J);
             dy = lu.solve(-r);
 
+            yk_alpha = yk + alpha * dy;
+            problem.function(tk1, yk_alpha, fk_alpha);
+
+            /*
+            while (fk_alpha.squaredNorm() <= (f + alpha* tr(J)*dy).squaredNorm()) {
+                alpha /= 2;
+            }
+            */
+            alpha = 1;//(yk1 - yk).cwiseProduct(dy) % dy;
             // Update yk1 and yk
             y = yk1; // remember old value of yk1
-            yk1 = yk + dy; // update yk1
+            yk1 = yk + alpha * dy; // update yk1
             yk = y; // update yk
 
             // Calculate the error between two
@@ -458,9 +505,9 @@ struct ODESolver::Impl
         // Reconstruct sensitivities using implicit scheme
         // -------------------------------------------------------------------
 
-        // Evalute current value of Jacobian and RHS
-        problem.jacobian(t, y, J); // provides evaluation of sensitivities at t = t_{k+1}
+        // Evaluate current value of Jacobian and RHS
         problem.function(t, y, f); // provides evaluation of properties and rates at t = t_{k+1}
+        problem.jacobian(t, y, J); // provides evaluation of sensitivities at t = t_{k+1}
 
         // Perform LU decomposition for matrix  I - dt * J^{k+1}
         LU lu(I - dt * J);
@@ -470,6 +517,7 @@ struct ODESolver::Impl
         //*/
     }
 
+    /*
     /// Solve the ODE equations from a given start time to a final one.
     auto solve(double& t, double dt, VectorRef y, MatrixRef S) -> void
     {
@@ -497,20 +545,66 @@ struct ODESolver::Impl
         // Initialize identity matrix and Jacobian on the t = t^{k+1}
         Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
 
-        // Evalute current value of Jacobian and RHS
-        problem.jacobian(t, y, J); // provides evaluation of sensitivities at t = t_{k+1}
+        // Evaluate current value of Jacobian and RHS
         problem.function(t, y, f); // provides evaluation of properties and rates at t = t_{k+1}
+        problem.jacobian(t, y, J); // provides evaluation of sensitivities at t = t_{k+1}
 
-        // Initialize system matrix A = I - dt * J^{k+1}
-        Matrix A = I - dt * J;
-
-        // Perform LU decomposition for matrix A
-        LU lu(A);
+        // Perform LU decomposition for matrix A = I - dt
+        LU lu(I - dt * J);
 
         // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k(=I)
-        S = lu.solve(I);
+        //S = lu.solve(I);
+        S = lu.solve(S);
     }
+    */
+    ///*
+    /// Solve the ODE equations from a given start time to a final one.
+    auto solve(double& t, double dt, VectorRef y, MatrixRef S) -> void
+    {
+        // Initialize the cvode context
+        initialize(t, y);
 
+        // Initialize the ODE data
+        ODEData data(problem, y, f, J);
+
+        // Set the user-defined data to cvode_mem
+        CheckIntegration(CVodeSetUserData(cvode_mem, &data));
+
+        double t_start = t;
+        // Solve the ode problem from `tstart` to `tfinal`
+        // CV_NORMAL - indicates that the step is controled by `tstart` and `tfinal`
+        // CVODE will trigger integration from t until t + dt
+        auto res = CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL);
+
+
+        // If CVODE was not successful, run the 1st order implicit scheme
+        if(res != CV_SUCCESS){
+            // Apply 1st order implicit scheme
+            solve_implicit_1st_order(t_start, dt, y);
+        }else{
+            // Transfer the result from cvode_y to y
+            for(unsigned int i = 0; i < data.num_equations; ++i)
+                y[i] = VecEntry(this->cvode_y, i);
+        }
+
+        // Reconstruct sensitivities using implicit scheme
+        // -------------------------------------------------------------------
+
+        // Initialize identity matrix and Jacobian on the t = t^{k+1}
+        Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
+
+        // Evaluate current value of Jacobian and RHS
+        problem.function(t, y, f); // provides evaluation of properties and rates at t = t_{k+1}
+        problem.jacobian(t, y, J); // provides evaluation of sensitivities at t = t_{k+1}
+
+        // Perform LU decomposition for matrix A = I - dt
+        LU lu(I - dt * J);
+
+        // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k(=I)
+        //S = lu.solve(I);
+        S = lu.solve(S);
+    }
+    //*/
     /// Solve the ODE equations from a given start time to a final one
     /// with 2d order Taylor expantion scheme
     // TODO: test it instead of using CVODE

@@ -237,7 +237,7 @@ struct KineticSolver::Impl
         options = options_;
     }
 
-    auto addSource(ChemicalState state, double volumerate, std::string units) -> void
+    auto addSource(ChemicalState state, double volumerate, const std::string& units) -> void
     {
         const Index num_species = system.numSpecies();
         const double volume = units::convert(volumerate, units, "m3/s");
@@ -255,7 +255,7 @@ struct KineticSolver::Impl
         };
     }
 
-    auto addPhaseSink(std::string phase, double volumerate, std::string units) -> void
+    auto addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
     {
         const double volume = units::convert(volumerate, units, "m3/s");
         const Index iphase = system.indexPhaseWithError(phase);
@@ -278,7 +278,7 @@ struct KineticSolver::Impl
         };
     }
 
-    auto addFluidSink(double volumerate, std::string units) -> void
+    auto addFluidSink(double volumerate, const std::string& units) -> void
     {
         const double volume = units::convert(volumerate, units, "m3/s");
         const Indices& isolid_species = partition.indicesSolidSpecies();
@@ -298,7 +298,7 @@ struct KineticSolver::Impl
         };
     }
 
-    auto addSolidSink(double volumerate, std::string units) -> void
+    auto addSolidSink(double volumerate, const std::string& units) -> void
     {
         const double volume = units::convert(volumerate, units, "m3/s");
         const Indices& ifluid_species = partition.indicesFluidSpecies();
@@ -508,7 +508,7 @@ struct KineticSolver::Impl
         tic(INITIALIZE_STEP);
 
         // Initialise the chemical kinetics solver
-        timeit(initialize(state, t, benk), result.timing.initialize=);
+        initialize(state, t, benk);
 
         result.timing.initialize=toc(INITIALIZE_STEP);
 
@@ -619,8 +619,8 @@ struct KineticSolver::Impl
 
             }
             if (!res.optimum.succeeded) {
-                std::cout << "t : " << t << std::endl;
-                std::cout << "n : " << tr(state.speciesAmounts()) << std::endl;
+                //std::cout << "t : " << t << std::endl;
+                //std::cout << "n : " << tr(state.speciesAmounts()) << std::endl;
                 //std::cout << "n : " << state.speciesAmount("H+") << std::endl;
                 //std::cout << "error : " << res.optimum.error << std::endl;
                 //std::cout << "iterations : " << res.optimum.iterations << std::endl;
@@ -743,22 +743,22 @@ auto KineticSolver::setPartition(const Partition& partition) -> void
         "Use constructor KineticSolver(const ReactionSystem&, const Partition&) instead.");
 }
 
-auto KineticSolver::addSource(const ChemicalState& state, double volumerate, std::string units) -> void
+auto KineticSolver::addSource(const ChemicalState& state, double volumerate, const std::string& units) -> void
 {
     pimpl->addSource(state, volumerate, units);
 }
 
-auto KineticSolver::addPhaseSink(std::string phase, double volumerate, std::string units) -> void
+auto KineticSolver::addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
 {
     pimpl->addPhaseSink(phase, volumerate, units);
 }
 
-auto KineticSolver::addFluidSink(double volumerate, std::string units) -> void
+auto KineticSolver::addFluidSink(double volumerate, const std::string& units) -> void
 {
     pimpl->addFluidSink(volumerate, units);
 }
 
-auto KineticSolver::addSolidSink(double volumerate, std::string units) -> void
+auto KineticSolver::addSolidSink(double volumerate, const std::string& units) -> void
 {
     pimpl->addSolidSink(volumerate, units);
 }

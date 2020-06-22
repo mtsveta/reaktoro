@@ -52,6 +52,9 @@ struct SmartKineticTiming {
     /// The time spent for computing the sensitivities of the system during a smart learning.
     double learn_sensitivity = 0.0;
 
+    /// The time spent for computing neccesary error matrices a smart learning.
+    double learn_error_control_matrices = 0.0;
+
     /// The time spent for equilibration of the system during a smart learning.
     double learn_equilibration = 0.0;
 

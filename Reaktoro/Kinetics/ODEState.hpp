@@ -19,7 +19,7 @@
 
 namespace Reaktoro {
 
-struct KineticState
+struct ODEState
 {
 
     /// Start time of the integration

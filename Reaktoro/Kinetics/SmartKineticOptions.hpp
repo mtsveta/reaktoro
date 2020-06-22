@@ -61,6 +61,8 @@ struct SmartKineticOptions
     /// will be discarded from the error control.
     double mole_fraction_cutoff = 1.0e-6;
 
+    double amount_fraction_cutoff = 1.0e-14;
+
 
 };
 
