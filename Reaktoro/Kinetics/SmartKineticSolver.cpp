@@ -94,6 +94,9 @@ struct SmartKineticSolver::Impl
     /// The ODE solver instance
     ODESolver ode;
 
+    /// The canonicalizer used to determine primary and secondary species
+    Canonicalizer canonicalizer;
+
     /// The indices of the equilibrium and kinetic species
     Indices ies, iks;
 
@@ -182,6 +185,9 @@ struct SmartKineticSolver::Impl
 
         // Initialise the formula matrix of the equilibrium partition
         Ae = partition.formulaMatrixEquilibriumPartition();
+
+        // Initialize the canonicalizer with the formula matrix Ae of the equilibrium species
+        canonicalizer.compute(Ae);
 
         // Initialise the formula matrix of the kinetic partition
         // Ak_tmp is of the size (Indices of elements that are included in kinetic species) x Nk
@@ -633,8 +639,8 @@ struct SmartKineticSolver::Impl
         const Matrix dudb = dudn * dndb;
 
         // Define the canonicalizer based on formular matrix A and priority weights set by the species amounts
-        const auto& Ae = system.formulaMatrix();
-        Canonicalizer canonicalizer(Ae);
+        //const auto& Ae = system.formulaMatrix();
+        //Canonicalizer canonicalizer(Ae);
         canonicalizer.updateWithPriorityWeights(ne);
 
         // Set tolerances for species' elements and fractions
@@ -675,6 +681,457 @@ struct SmartKineticSolver::Impl
         result.timing.learn_storage += toc(STORAGE_STEP);
     }
 
+    /// Learn how to perform a full equilibrium calculation (with tracking)
+    auto learn_priority_based_acceptance_primary_potential(ChemicalState& state, double t, double dt) -> void
+    {
+        SmartKineticResult res = {};
+
+        // Initialize sensitivity matrix by the identity matrix
+        benk_S.setIdentity();
+
+        // Initialize the kinetics state with the data at times t0 and t0
+        ODEState ode_state;
+        ode_state.u0 = benk;
+        ode_state.t0 = t;
+
+        //---------------------------------------------------------------------
+        // CONVENTIONAL TIME-INTEGRATION DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(INTEGRATE_STEP);
+        // Calculate `benk` by the conventional numerical integration
+        ode.solve(t, dt, benk, benk_S);
+
+        //ode.solve_implicit_1st_order(t, dt, benk, benk_S);
+        //ode.integrate(t, benk, t + dt, benk_S); // TODO: produces a delayed estimations, why?
+        result.timing.learn_integration += toc(INTEGRATE_STEP);
+
+        // Save the sensitivity values, the result time, and the obtain species' amount
+        ode_state.t = t;
+        ode_state.u = benk;
+        ode_state.dudu0 = benk_S;
+
+        // Update the composition of the amounts of equilibrium elements and kinetic species
+        be = benk.head(Ee);
+        nk = benk.tail(Nk);
+        state.setSpeciesAmounts(nk, iks);
+
+        //equilibrium.solve(state, T, P, be);
+
+        // TODO: must properties, sensitivities, and rates be evaluated after learning process or were they evaluated
+        // TODO: inside the kinetic integration step
+        // Evaluate chemical properties, reaction rate, and sensitivities (not needed, sinse it is evaluated in ode.solve())
+        //
+        ///*
+        //---------------------------------------------------------------------
+        // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(CHEMICAL_PROPERTIES_STEP);
+        properties = state.properties();
+        result.timing.learn_chemical_properties += toc(CHEMICAL_PROPERTIES_STEP);
+        //---------------------------------------------------------------------
+        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(CHEMICAL_RATES_STEP);
+        rates = reactions.rates(properties);
+        result.timing.learn_reaction_rates += toc(CHEMICAL_RATES_STEP);
+        //---------------------------------------------------------------------
+        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(SENSITIVITY_STEP);
+        sensitivity = equilibrium.sensitivity();
+        result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
+        //*/
+
+        //---------------------------------------------------------------------
+        // ERROR CONTROL MATRICES ASSEMBLING STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(ERROR_CONTROL_MATRICES);
+
+        // The amounts of the species at the calculated equilibrium state
+        VectorConstRef n = state.speciesAmounts();
+        // The amounts of the equilibrium species amounts at the calculated equilibrium state
+        ne = n(ies);
+
+        // Update the canonical form of formula matrix Ae so that we can identify primary species
+        canonicalizer.updateWithPriorityWeights(ne);
+
+        // The order of the equilibrium species as (primary, secondary)
+        const auto& iorder = canonicalizer.Q();
+
+        // Assemble the vector of indices of equilibrium species as (primary, secondary)
+        VectorXi ips(ies.size());
+        for(auto i = 0; i < ips.size(); ++i)  // TODO: type Indices should be alias to VectorXi, to avoid such kind of codes
+            ips[i] = ies[iorder[i]];
+
+        // The number of primary species among the equilibrium species (Np <= Ne)
+        const auto& Np = canonicalizer.numBasicVariables();
+
+        // Store the indices of primary and secondary species in state
+        state.equilibrium().setIndicesEquilibriumSpecies(ips, Np);
+
+        // The indices of the primary species at the calculated equilibrium state
+        VectorXiConstRef iprimary = ips.head(Np);
+
+        // The chemical potentials at the calculated equilibrium state
+        const auto u = properties.chemicalPotentials();
+
+        // Auxiliary references to the derivatives dn/db and du/dn
+        const auto& dndb = equilibrium.sensitivity().dndb;
+        const auto& dudn = u.ddn;
+
+        // Compute the matrix du/db = du/dn * dn/db
+        const Matrix dudb = dudn * dndb;
+
+        // The vector u(iprimary) with chemical potentials of primary species
+        const Vector up = u.val(iprimary);
+
+        // The matrix du(iprimary)/dbe with derivatives of chemical potentials (primary species only)
+        const auto dupdbe = dudb(iprimary, iee);
+
+        // Compute matrix Mbe = 1/up * dup/db
+        const Matrix Mbe = diag(inv(up)) * dupdbe;
+
+        result.timing.learn_error_control_matrices = toc(ERROR_CONTROL_MATRICES);
+
+        //---------------------------------------------------------------------
+        // STORAGE STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(STORAGE_STEP);
+
+        // Save the kinetic state to the tree of learned states
+        tree.emplace_back(SmartKineticNode{ode_state, state, properties, sensitivity, rates, Mbe, iprimary});
+
+        // Update the priority queue
+        // ----------------------------------------------
+        // Add new element in the priority queue
+        kinetics_priority.push_back(kinetics_priority.size());
+        // Set its rank to zero
+        kinetics_ranking.push_back(0);
+
+        result.timing.learn_storage += toc(STORAGE_STEP);
+    }
+
+    /*
+    /// Learn how to perform a full equilibrium calculation (with tracking)
+    auto learn(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+    {
+        //---------------------------------------------------------------------
+        // GIBBS ENERGY MINIMIZATION CALCULATION DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(EQUILIBRIUM_STEP);
+
+        // Perform a full chemical equilibrium calculation
+        result.learning.gibbs_energy_minimization = solver.solve(state, T, P, be);
+
+        result.timing.learn_gibbs_energy_minimization = toc(EQUILIBRIUM_STEP);
+
+        //---------------------------------------------------------------------
+        // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(CHEMICAL_PROPERTIES_STEP);
+
+        properties = solver.properties();
+
+        result.timing.learn_chemical_properties = toc(CHEMICAL_PROPERTIES_STEP);
+
+        //---------------------------------------------------------------------
+        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(SENSITIVITY_STEP);
+
+        const auto& sensitivity = solver.sensitivity();
+
+        result.timing.learn_sensitivity_matrix = toc(SENSITIVITY_STEP);
+
+        //---------------------------------------------------------------------
+        // ERROR CONTROL MATRICES ASSEMBLING STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(ERROR_CONTROL_MATRICES);
+
+        // The indices of the equilibrium species and elements
+        const auto& ies = partition.indicesEquilibriumSpecies();
+        const auto& iee = partition.indicesEquilibriumElements();
+
+        // The number of equilibrium species and elements
+        const auto& Ne = partition.numEquilibriumSpecies();
+        const auto& Ee = partition.numEquilibriumElements();
+
+        // The amounts of the species at the calculated equilibrium state
+        n = state.speciesAmounts();
+
+        // The amounts of the equilibrium species amounts at the calculated equilibrium state
+        ne = n(ies);
+
+        // Update the canonical form of formula matrix Ae so that we can identify primary species
+        canonicalizer.updateWithPriorityWeights(ne);
+
+        // The order of the equilibrium species as (primary, secondary)
+        const auto& iorder = canonicalizer.Q();
+
+        // Assemble the vector of indices of equilibrium species as (primary, secondary)
+        VectorXi ips(ies.size());
+        for(auto i = 0; i < ips.size(); ++i)  // TODO: type Indices should be alias to VectorXi, to avoid such kind of codes
+            ips[i] = ies[iorder[i]];
+
+        // The number of primary species among the equilibrium species (Np <= Ne)
+        const auto& Np = canonicalizer.numBasicVariables();
+
+        // Store the indices of primary and secondary species in state
+        state.equilibrium().setIndicesEquilibriumSpecies(ips, Np);
+
+        // The indices of the primary species at the calculated equilibrium state
+        VectorXiConstRef iprimary = ips.head(Np);
+
+        // The chemical potentials at the calculated equilibrium state
+        u = properties.chemicalPotentials();
+
+        // Auxiliary references to the derivatives dn/db and du/dn
+        const auto& dndb = solver.sensitivity().dndb;
+        const auto& dudn = u.ddn;
+
+        // Compute the matrix du/db = du/dn * dn/db
+        dudb = dudn * dndb;
+
+        // The vector u(iprimary) with chemical potentials of primary species
+        up.noalias() = u.val(iprimary);
+
+        // The matrix du(iprimary)/dbe with derivatives of chemical potentials (primary species only)
+        const auto dupdbe = dudb(iprimary, iee);
+
+        // Compute matrix Mbe = 1/up * dup/db
+        Mbe.noalias() = diag(inv(up)) * dupdbe;
+
+        result.timing.learn_error_control_matrices = toc(ERROR_CONTROL_MATRICES);
+
+        //---------------------------------------------------------------------
+        // STORAGE STEP DURING THE LEARNING PROCESS
+        //---------------------------------------------------------------------
+        tic(STORAGE_STEP);
+
+        // Generate the hash number for the indices of primary species in the state
+        const auto label = detail::hash(iprimary);
+
+        // Find the index of the cluster that has same primary species
+        auto iter = std::find_if(database.clusters.begin(), database.clusters.end(),
+                                 [&](const Cluster& cluster) { return cluster.label == label; });
+
+        // If cluster is found, store the new record in it, otherwise, create a new cluster
+        if(iter < database.clusters.end())
+        {
+            auto& cluster = *iter;
+            cluster.records.push_back({T, P, be, state, properties, sensitivity, Mbe});
+            cluster.priority.extend();
+        }
+        else
+        {
+            // Create a new cluster
+            Cluster cluster;
+            cluster.iprimary = iprimary;
+            cluster.label = label;
+            cluster.records.push_back({T, P, be, state, properties, sensitivity, Mbe});
+            cluster.priority.extend();
+
+            // Append the new cluster in the database
+            database.clusters.push_back(cluster);
+            database.connectivity.extend();
+            database.priority.extend();
+        }
+
+        result.timing.learn_storage = toc(STORAGE_STEP);
+    }
+
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    auto estimate(ChemicalState& state, double T, double P, VectorConstRef be) -> void
+    {
+        // Set the estimate status to false at the beginning
+        result.estimate.accepted = false;
+
+        // Skip estimation if no cluster exists yet
+        if(database.clusters.empty())
+            return;
+
+        // Auxiliary relative and absolute tolerance parameters
+        const auto reltol = options.reltol;
+
+        // The threshold used to determine elements with insignificant amounts
+        const auto eps_b = options.amount_fraction_cutoff * sum(be);
+
+        // The current set of primary species in the chemical state
+        const auto& iprimary = state.equilibrium().indicesPrimarySpecies();
+
+        Vector dbe;
+
+        // The function that checks if a record in the database pass the error test.
+        // It returns (`success`, `error`, `iprimaryspecies`), where
+        // * `success` is true if error test succeeds, false otherwise.
+        // * `error` is the first error value violating the tolerance
+        // * `iprimaryspecies` is the index of the primary species that fails the error test
+        auto pass_error_test = [&be, &dbe, &reltol, &eps_b](const Record& record) -> std::tuple<bool, double, Index>
+        {
+            using std::abs;
+            using std::max;
+            const auto& state0 = record.state;
+            const auto& be0 = record.be;
+            const auto& Mbe0 = record.Mbe;
+            const auto& isue0 = state0.equilibrium().indicesStrictlyUnstableElements();
+
+            dbe.noalias() = be - be0;
+
+            // Check if state0 has strictly unstable elements (i.e. elements with zero amounts)
+            // which cannot be used for Taylor estimation if positive amounts for those elements are given.
+            if((dbe(isue0).array() > eps_b).any())
+            {
+                assert((be0(isue0).array() < eps_b).any()); // ensure this condition is never broken (effective during debug only)
+                return { false, 9999, -1 };
+            }
+
+            double error = 0.0;
+            const auto size = Mbe0.rows();
+            for(auto i = 1; i <= size; ++i) {
+                error = max(error, abs(Mbe0.row(size - i) * dbe)); // start checking primary species with least amount first
+                if(error >= reltol)
+                    return { false, error, size - i };
+            }
+
+            return { true, error, -1 };
+        };
+
+        // Generate the hash number for the indices of primary species in the state
+        const auto label = detail::hash(iprimary);
+
+        // The function that identifies the starting cluster index
+        auto index_starting_cluster = [&]() -> Index
+        {
+            // If no primary species, then return number of clusters to trigger use of total usage counts of clusters
+            if(iprimary.size() == 0)
+                return database.clusters.size();
+
+            // Find the index of the cluster with the same set of primary species (search those with highest count first)
+            for(auto icluster : database.priority.order())
+                if(database.clusters[icluster].label == label)
+                    return icluster;
+
+            // In no cluster with the same set of primary species if found, then return number of clusters
+            return database.clusters.size();
+        };
+
+        // The index of the starting cluster
+        const auto icluster = index_starting_cluster();
+
+        // The ordering of the clusters to look for (starting with icluster)
+        const auto& clusters_ordering = database.connectivity.order(icluster);
+
+        //---------------------------------------------------------------------
+        // SEARCH STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
+        tic(SEARCH_STEP);
+
+        // Iterate over all clusters (starting with icluster)
+        for(auto jcluster : clusters_ordering)
+        {
+            // Fetch records from the cluster and the order they have to be processed in
+            const auto& records = database.clusters[jcluster].records;
+            const auto& records_ordering = database.clusters[jcluster].priority.order();
+
+            // Iterate over all records in current cluster (using the  order based on the priorities)
+            for(auto irecord : records_ordering)
+            {
+                const auto& record = records[irecord];
+
+                //---------------------------------------------------------------------
+                // ERROR CONTROL STEP DURING THE ESTIMATE PROCESS
+                //---------------------------------------------------------------------
+                tic(ERROR_CONTROL_STEP);
+
+                // Check if the current record passes the error test
+                const auto [success, error, iprimaryspecies] = pass_error_test(record);
+
+                result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
+
+                if(success)
+                {
+                    //---------------------------------------------------------------------
+                    // TAYLOR PREDICTION STEP DURING THE ESTIMATE PROCESS
+                    //---------------------------------------------------------------------
+                    tic(TAYLOR_STEP);
+
+                    const auto& ies = partition.indicesEquilibriumSpecies();
+                    const auto& iee = partition.indicesEquilibriumElements();
+
+                    // Fetch reference values
+                    const auto& be0 = record.be;
+                    const auto& n0 = record.state.speciesAmounts();
+                    const auto& P0 = record.state.pressure();
+                    const auto& T0 = record.state.temperature();
+                    const auto& y0 = record.state.equilibrium().elementChemicalPotentials();
+                    const auto& z0 = record.state.equilibrium().speciesStabilities();
+                    const auto& ips0 = record.state.equilibrium().indicesEquilibriumSpecies();
+                    const auto& Np0 = record.state.equilibrium().numPrimarySpecies();
+                    const auto& dndb0 = record.sensitivity.dndb;
+                    const auto& dndP0 = record.sensitivity.dndP;
+                    const auto& dndT0 = record.sensitivity.dndT;
+
+                    // Fetch reference values restricted to equilibrium species only
+                    const auto& dnedbe0 = dndb0(ies, iee);
+                    const auto& dnedbPe0 = dndP0(ies);
+                    const auto& dnedbTe0 = dndT0(ies);
+                    const auto& ne0 = n0(ies);
+
+                    // Perform Taylor extrapolation
+                    //ne.noalias() = ne0 + dnedbe0 * (be - be0);
+                    ne.noalias() = ne0 + dnedbe0 * (be - be0) + dnedbPe0 * (P - P0) + dnedbTe0 * (T - T0);
+
+                    // Check if all projected species amounts are positive
+                    const double ne_min = min(ne);
+                    const double ne_sum = sum(ne);
+                    const auto eps_n = options.amount_fraction_cutoff * ne_sum;
+                    if(ne_min <= -eps_n)
+                        continue;
+
+                    result.timing.estimate_search = toc(SEARCH_STEP);
+
+                    // After the search is finished successfully
+                    //---------------------------------------------------------------------
+
+                    // Update the amounts of elements for the equilibrium species
+                    n(ies) = ne;
+
+                    // Update the chemical state result with estimated amounts
+                    state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
+                    state.setSpeciesAmounts(n);
+
+                    // Update the chemical properties of the system
+                    properties = record.properties;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+
+                    result.timing.estimate_taylor = toc(TAYLOR_STEP);
+
+                    //---------------------------------------------------------------------
+                    // DATABASE PRIORITY UPDATE STEP DURING THE ESTIMATE PROCESS
+                    //---------------------------------------------------------------------
+                    tic(PRIORITY_UPDATE_STEP);
+
+                    // Increment priority of the current record (irecord) in the current cluster (jcluster)
+                    database.clusters[jcluster].priority.increment(irecord);
+
+                    // Increment priority of the current cluster (jcluster) with respect to starting cluster (icluster)
+                    database.connectivity.increment(icluster, jcluster);
+
+                    // Increment priority of the current cluster (jcluster)
+                    database.priority.increment(jcluster);
+
+                    result.timing.estimate_database_priority_update = toc(PRIORITY_UPDATE_STEP);
+
+                    result.estimate.accepted = true;
+
+                    return;
+                }
+            }
+        }
+
+        result.estimate.accepted = false;
+
+    }
+    */
     auto estimate_nn_search_acceptance_based_lna(ChemicalState& state, double& t) -> void
     {
         // Skip estimation if no previous full computation has been done
@@ -1156,15 +1613,8 @@ struct SmartKineticSolver::Impl
         //---------------------------------------------------------------------
         tic(SEARCH_STEP);
 
-        Vector rs;
-        // Amounts of species
-        Vector n, ns;
-        // Variations of the potentials and species
-        Vector du, dus, dns;
         // Variations of the elements
         Vector dbe;
-        // Species' fractions
-        Vector x;
 
         // Check if an entry in the database pass the error test.
         // It returns (`success`, `error`, `ispecies`), where
@@ -1190,14 +1640,14 @@ struct SmartKineticSolver::Impl
                     return {false, error, imajor_ref[i] };
             }
 
-            return { true, error, n.size() };
+            return { true, error, -1 };
         };
 
         auto inode_prev = kinetics_priority.begin();
         for(auto inode=kinetics_priority.begin(); inode != kinetics_priority.end(); ++inode)
         {
             const auto& node = tree[*inode];
-            const auto& imajor = node.imajor;
+            //const auto& imajor = node.imajor;
 
             //---------------------------------------------------------------------
             // SEARCH CONTROL DURING THE ESTIMATE PROCESS
@@ -1206,6 +1656,238 @@ struct SmartKineticSolver::Impl
 
             const auto [success, error, ispecies] = pass_equilibrium_potential_error_test(node);
             //std::cout << "success = " << success << std::endl;
+
+            if(success)
+            {
+                result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
+
+                //---------------------------------------------------------------------
+                // TAYLOR DURING THE ESTIMATE PROCESS
+                //---------------------------------------------------------------------
+                tic(TAYLOR_STEP);
+
+                // Fetch the data stored in the reference element
+                const auto& benk0_ref = node.ode_state.u0;
+                const auto& benk_ref = node.ode_state.u;
+                const auto& dndn0_ref = node.ode_state.dudu0;
+
+                // Algorithm:
+                // the reference state : u, u0, S = du/du0, t, f = du/dt
+                // new initial values  : u0_new
+                // the predicted state : u_new = u + S * (u0_new - u0)
+
+                // Clarification:
+                // benk0 is new initial condition (u0_tilde)
+                // it.state.u0    is the initial condition of reference vector (u0)
+                // it.state.u    is already calculated by integration vector  (u)
+                // it.state.dudu0 is the sensitivity w.r.t. the initial condition (S)
+
+                // Perform smart estimation of benk
+                Vector benk_new;
+                benk_new.noalias() = benk_ref + dndn0_ref * (benk0 - benk0_ref);
+
+                result.timing.estimate_taylor = toc(TAYLOR_STEP);
+
+                //---------------------------------------------------------------------
+                // ERROR CONTROL THE ESTIMATE PROCESS
+                //---------------------------------------------------------------------
+                tic(ERROR_CONTROL_STEP);
+
+                // Fetch the be and nk unknowns from vector benk = [be; nk]
+                VectorConstRef be_new = benk_new.head(Ee);
+                VectorConstRef nk_new = benk_new.tail(Nk);
+
+                // -------------------------------------------------------------------------------------------------------------
+                // Check the variations of equilibrium species
+                // -------------------------------------------------------------------------------------------------------------
+
+                auto pass_negative_equilibirum_species_amounts_error_test = [&](const auto& node) -> std::tuple<bool, VectorConstRef>
+                {
+
+                    // Fetch properties of the reference state
+                    const auto& state_ref = node.chemical_state;
+                    const auto& sensitivity_ref = node.sensitivity;
+
+                    const auto& N = ies.size() + iks.size();
+                    const auto& be_ref = benk_ref.head(Ee);
+                    const auto& n_ref = state_ref.speciesAmounts();
+                    const auto& ne_ref = n_ref(ies);
+
+                    // Define vectors of equilibrium species ne, delta(ne), delta(lnae)
+                    VectorConstRef dne = sensitivity_ref.dndb(ies, iee) * (be_new - be_ref); // delta(ne) = dn/db * (be - be0)
+                    ne.noalias() = ne_ref + dne;                                                                  // ne = ne_ref + delta(ne)
+
+
+                    // Check if all projected species amounts are positive
+                    const double ne_min = min(ne);
+                    const double ne_sum = sum(ne);
+                    const auto eps_n = options.amount_fraction_cutoff * ne_sum;
+
+                    return {ne_min > -eps_n, dne};
+
+                    // Negative cutoff check for the equilibrium
+                    // ---------------------------------------------------
+                    //return {ne.minCoeff() > 1e-2 * options.cutoff, dne};
+                };
+
+                auto [is_negequilibrium_test_passed, dne] = pass_negative_equilibirum_species_amounts_error_test(node);
+                //std::cout << "is_negequilibrium_test_passed = " << is_negequilibrium_test_passed << std::endl;
+                //getchar();
+                if(!is_negequilibrium_test_passed)
+                    continue;
+
+                // -------------------------------------------------------------------------------------------------------------
+                // Check the variations of kinetic species
+                // -------------------------------------------------------------------------------------------------------------
+
+                auto pass_kinetic_rate_variation_error_test = [&](const auto& node, VectorConstRef dne) -> bool
+                {
+
+                    const auto& rates_ref = node.rates;
+                    const auto& nk_ref = benk_ref.tail(Nk);
+                    const auto& properties_ref = node.properties;
+
+                    // Initialize delta_n = [dne; delta_nk]
+                    Vector dnk;
+                    dnk.noalias() = nk_new - nk_ref;
+                    Vector dn;
+                    dn.resize(Nk + Ne);
+                    dn(ies) << dne;
+                    dn(iks) << dnk;
+
+                    // Initialize reaction rates
+                    Vector drates = rates_ref.ddn * dn;
+                    rates.val = rates_ref.val + drates;
+
+                    // Fetch mole fractions
+                    const auto& x_ref = properties_ref.moleFractions().val;
+                    VectorConstRef xk_ref = x_ref(iks);
+                    // TODO: loop for more then one kinetic species
+                    bool kinetics_r_variation_check = true;
+                    for(Index i = 0; i < xk_ref.size(); ++i){
+                        // If the fraction is too small, skip the variational check
+                        if(xk_ref[i] < options.mole_fraction_cutoff)
+                            continue;
+                        if(std::abs(drates.array()[i]) > options.abstol + options.reltol * std::abs(rates_ref.val.array()[i])){
+                            return false;
+                        }
+                    }
+                    return true;
+                };
+
+                const auto is_kin_rate_variation_test_passed = pass_kinetic_rate_variation_error_test(node, dne);
+                //std::cout << "is_kin_rate_variation_test_passed = " << is_kin_rate_variation_test_passed << std::endl;
+                //getchar();
+                if(!is_kin_rate_variation_test_passed)
+                    continue;
+
+                result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
+
+                result.timing.estimate_search = toc(SEARCH_STEP);
+                // -------------------------------------------------------------------------------------------------------------
+                // Update the ranking and priority
+                // -------------------------------------------------------------------------------------------------------------
+
+                kinetics_ranking[*inode] += 1;
+
+                auto comp = [&](Index l, Index r) { return kinetics_ranking[l] > kinetics_ranking[r]; };
+                if( !((inode == kinetics_priority.begin()) || (kinetics_ranking[*inode_prev] >= kinetics_ranking[*inode])) ) {
+                    std::stable_sort(kinetics_priority.begin(), inode + 1, comp);
+                }
+
+                // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
+                for(unsigned int i = 0; i < benk_new.size(); ++i) if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
+
+                // -------------------------------------------------------------------------------------------------------------
+                // Update the solution of kinetic problem by new estimated value
+                // -------------------------------------------------------------------------------------------------------------
+                //state = node.chemical_state;
+                benk = benk_new;
+
+                // Update the chemical properties of the system
+                properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+                result.estimate.accepted = true;
+
+                return;
+            }
+            else {
+                inode_prev = inode;
+                continue;
+            }
+        }
+
+        result.estimate.accepted = false;
+
+    }
+
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    auto estimate_priority_based_acceptance_primary_potential(ChemicalState& state, double& t) -> void
+    {
+        result.estimate.accepted = false;
+
+        // Skip estimation if no previous full computation has been done
+        if(tree.empty())
+            return;
+
+        // Relative and absolute tolerance parameters
+        const auto reltol = options.tol;
+
+        // Define initial state of the problem
+        Vector benk0 = benk;
+        // Define initial state of the problem
+        Vector be = benk.head(Ee);
+        Vector nk = benk.tail(Nk);
+
+        //---------------------------------------------------------------------
+        // SEARCH STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
+        tic(SEARCH_STEP);
+
+        // The threshold used to determine elements with insignificant amounts
+        const auto eps_b = options.amount_fraction_cutoff * sum(be);
+
+        Vector dbe;
+
+        // The function that checks if a record in the database pass the error test.
+        // It returns (`success`, `error`, `iprimaryspecies`), where
+        // * `success` is true if error test succeeds, false otherwise.
+        // * `error` is the first error value violating the tolerance
+        // * `iprimaryspecies` is the index of the primary species that fails the error test
+        auto pass_equilibrium_potential_error_test = [&](const SmartKineticNode& node) -> std::tuple<bool, double, Index>
+        {
+            using std::abs;
+            using std::max;
+            const auto& state_ref = node.chemical_state;
+            const auto& benk_ref = node.ode_state.u;
+            const auto& be_ref = benk_ref.head(Ee);
+            const auto& Mbe0 = node.Mb;
+            const auto& isue_ref = state_ref.equilibrium().indicesStrictlyUnstableElements();
+
+            dbe.noalias() = be - be_ref;
+
+            double error = 0.0;
+            const auto size = Mbe0.rows();
+            for(auto i = 1; i <= size; ++i) {
+                error = max(error, abs(Mbe0.row(size - i) * dbe)); // start checking primary species with least amount first
+                if(error >= reltol)
+                    return { false, error, size - i };
+            }
+
+            return { true, error, -1 };
+        };
+
+        auto inode_prev = kinetics_priority.begin();
+        for(auto inode=kinetics_priority.begin(); inode != kinetics_priority.end(); ++inode)
+        {
+            const auto& node = tree[*inode];
+            //const auto& imajor = node.imajor;
+
+            //---------------------------------------------------------------------
+            // SEARCH CONTROL DURING THE ESTIMATE PROCESS
+            //---------------------------------------------------------------------
+            tic(ERROR_CONTROL_STEP);
+
+            const auto [success, error, ispecies] = pass_equilibrium_potential_error_test(node);
 
             if(success)
             {
@@ -1407,8 +2089,8 @@ struct SmartKineticSolver::Impl
         // Perform a smart estimate for the chemical state
         //estimate_nn_search_acceptance_based_lna(state, t);
         //estimate_nn_search_acceptance_based_residual(state, t);
-        //estimate_nn_search_acceptance_based_potentials(state, t);
         estimate_priority_based_acceptance_potential(state, t);
+        //estimate_priority_based_acceptance_primary_potential(state, t);
 
         result.timing.estimate = toc(ESTIMATE_STEP);
 
@@ -1515,6 +2197,7 @@ struct SmartKineticSolver::Impl
         //estimate_nn_search_acceptance_based_residual(state, t);
         //estimate_nn_search_acceptance_based_potentials(state, t);
         estimate_priority_based_acceptance_potential(state, t);
+        //estimate_priority_based_acceptance_primary_potential(state, t);
         //std::cout << "result.estimate.accepted = " << result.estimate.accepted << std::endl;
         //getchar();
 
@@ -1529,6 +2212,7 @@ struct SmartKineticSolver::Impl
         if(!result.estimate.accepted){
             //learn_nn_search(state, t, dt);
             learn_priority_based_acceptance_potential(state, t, dt);
+            //learn_priority_based_acceptance_primary_potential(state, t, dt);
         }
 
         // Extract the `be` and `nk` entries of the vector `benk`
