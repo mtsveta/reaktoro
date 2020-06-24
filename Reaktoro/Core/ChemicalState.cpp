@@ -724,9 +724,9 @@ struct EquilibriumProperties::Impl
 
     /// Construct a default EquilibriumProperties::Impl instance
     Impl(const ChemicalSystem& system)
-    : u(system.numSpecies()),
-      y(system.numElements()),
-      z(system.numSpecies())
+    : u(zeros(system.numSpecies())),
+      y(zeros(system.numElements())),
+      z(zeros(system.numSpecies()))
     {}
 };
 
