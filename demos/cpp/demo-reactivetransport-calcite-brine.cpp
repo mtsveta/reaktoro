@@ -117,7 +117,9 @@ int main()
     ///*
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
+    //params.nsteps = 1000; // the number of steps in the reactive transport simulation
     params.nsteps = 10000; // the number of steps in the reactive transport simulation
+    //params.nsteps = 100; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -128,7 +130,11 @@ int main()
     params.P = 100;                      // the pressure (in units of bar)
 
     // Define parameters of the equilibrium solvers
-    params.smart_equlibrium_reltol = 0.004;
+    //params.smart_equlibrium_reltol = 8e-1;
+    //params.smart_equlibrium_reltol = 1e-1;
+    params.smart_equlibrium_reltol = 1e-3;  // priority-based search with potential
+    //params.smart_equlibrium_reltol = 1e-3;  // priority-based search with potential
+
     params.activity_model = "hkf-full";
     //params.activity_model = "hkf-selected-species";
     //params.activity_model = "pitzer-full";
@@ -147,7 +153,7 @@ int main()
 
     // Execute reactive transport with different solvers
     params.use_smart_eqilibirum_solver = true; runReactiveTransport(params, results);
-    params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_eqilibirum_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;
     results.smart_total = results.smart_equilibrium_timing.solve;
@@ -229,9 +235,9 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
                 .setChemicalModelDebyeHuckel()
                 .setActivityModelDrummondCO2();
     }
-    editor.addMineralPhase("Quartz");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Dolomite");
+    editor.addMineralPhase("Quartz");
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
@@ -423,10 +429,15 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  "-" + params.activity_model +
                                  "-smart";
 
-    //std::string folder = "results-priority-based-acceptance-potential";
+    //std::string folder = "results-clustering-primary-species-no-state-copying";
+    //std::string folder = "results-clustering-primary-species";
+    //std::string folder = "results-priority-based-acceptance-potential-no-Ae-no-state-copying";
+    //std::string folder = "results-priority-based-acceptance-potential-no-Ae";
+    std::string folder = "results-priority-based-acceptance-primary-potential";
     //std::string folder = "results-nn-search-acceptance-based-on-residual";
+    //std::string folder = "results-nn-search-acceptance-based-on-corrected-residual";
     //std::string folder = "results-nn-search-acceptance-based-on-lna";
-    std::string folder = "results-clustering-primary-species-paper";
+    //std::string folder = "results-clustering-primary-species-paper";
 
     folder = (params.use_smart_eqilibirum_solver) ?
              folder + smart_test_tag :

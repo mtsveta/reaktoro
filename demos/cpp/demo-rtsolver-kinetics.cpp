@@ -34,30 +34,40 @@ using namespace Reaktoro;
 struct Params
 {
     // Discretization params
-    int ncells; // the number of cells in the spacial discretization
-    int nsteps; // the number of steps in the reactive transport simulation
-    double xl; // the x-coordinates of the left boundaries
-    double xr; // the x-coordinates of the right boundaries
-    double dx; // the space step (in units of m)
-    double dt; // the time step (in units of s)
+    int ncells = 0; // the number of cells in the spacial discretization
+    int nsteps = 0; // the number of steps in the reactive transport simulation
+    double xl = 0.0; // the x-coordinates of the left boundaries
+    double xr = 0.0; // the x-coordinates of the right boundaries
+    double dx = 0.0; // the space step (in units of m)
+    double dt = 0.0; // the time step (in units of s)
 
     // Physical params
-    double D; // the diffusion coefficient (in units of m2/s)
-    double v; // the Darcy velocity (in units of m/s)
-    double T; // the temperature (in units of degC)
-    double P; // the pressure (in units of bar)
+    double D = 0.0; // the diffusion coefficient (in units of m2/s)
+    double v = 0.0; // the Darcy velocity (in units of m/s)
+    double T = 0.0; // the temperature (in units of degC)
+    double P = 0.0; // the pressure (in units of bar)
 
     // Kinetic and equilibrium solvers' parameters
-    bool use_smart_equilibrium_solver;
-    bool use_smart_kinetics_solver;
+    bool use_smart_equilibrium_solver = false;
+    bool use_smart_kinetics_solver = false;
 
-    double smart_equilibrium_reltol;
-    double smart_equilibrium_abstol;
+    double smart_equilibrium_reltol = 0.0;
+    double smart_equilibrium_abstol = 0.0;
+    double smart_equilibrium_cutoff = 0.0;
+    double smart_equilibrium_tol = 0.0;
 
-    double smart_kinetics_reltol;
-    double smart_kinetics_abstol;
+    double smart_kinetics_reltol = 0.0;
+    double smart_kinetics_abstol = 0.0;
+    double smart_kinetics_tol = 0.0;
+
+    bool output_results = true;
+
+    GibbsHessian hessian = GibbsHessian::Exact;
+
+    std::string activity_model = "";
 
 };
+
 
 struct RTKineticsResults
 {
@@ -208,7 +218,9 @@ int main()
     // Define parameters of the kinetics solvers
     params.smart_kinetics_reltol = 1e-1;
     params.smart_kinetics_abstol = 1e-2;
+    params.smart_kinetics_tol = 5e-1; // for the residual check
 
+    params.activity_model = "pitzer-full";
     // Output
     outputConsole(params);
 
@@ -247,14 +259,45 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     SmartKineticOptions smart_kinetic_options;
     smart_kinetic_options.reltol = params.smart_kinetics_reltol;
     smart_kinetic_options.abstol = params.smart_kinetics_abstol;
+    smart_kinetic_options.tol = params.smart_kinetics_tol;
     smart_kinetic_options.learning = kinetic_options;
     smart_kinetic_options.learning.equilibrium = equilibrium_options;
 
     // Step **: Construct the chemical system with its phases and species (using ChemicalEditor)
     ChemicalEditor editor;
 
-    // Step **: Add aqueous phase, default chemical model (HKF extended Debye-Hückel model)
-    editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C");
+    if(params.activity_model == "hkf-full"){
+        // HKF full system
+        editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C");
+    }
+    else if(params.activity_model == "hkf-selected-species"){
+        // HKF selected species
+        editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3-- CaCl+ Ca(HCO3)+ MgCl+ Mg(HCO3)+");
+    }
+    else if(params.activity_model == "pitzer-full"){
+        // Pitzer full system
+        editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
+                .setChemicalModelPitzerHMW()
+                .setActivityModelDrummondCO2();
+    }
+    else if(params.activity_model == "pitzer-selected-species"){
+        // Pitzer selected species
+        editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3-- CaCl+ Ca(HCO3)+ MgCl+ Mg(HCO3)+")
+                .setChemicalModelPitzerHMW()
+                .setActivityModelDrummondCO2();
+    }
+    else if(params.activity_model == "dk-full"){
+        // Debye-Huckel full system
+        editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
+                .setChemicalModelDebyeHuckel()
+                .setActivityModelDrummondCO2();
+    }
+    else if(params.activity_model == "dk-selected-species"){
+        // Debye-Huckel selected species
+        editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3-- CaCl+ Ca(HCO3)+ MgCl+ Mg(HCO3)+")
+                .setChemicalModelDebyeHuckel()
+                .setActivityModelDrummondCO2();
+    }
     // Step **: Add mineral phase
     editor.addMineralPhase("Quartz");
     editor.addMineralPhase("Calcite");
@@ -385,7 +428,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     while (step < params.nsteps)
     {
         // Print some progress
-        // std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.stepKinetics(field);
@@ -452,10 +495,11 @@ auto makeResultsFolder(const Params& params) -> std::string
     std::string test_tag = "-dt-" + dt_stream.str() +
                            "-ncells-" + std::to_string(params.ncells) +
                            "-nsteps-" + std::to_string(params.nsteps) +
+                           "-activity-model-" + params.activity_model +
                            "-conv-kin-conv-eq";
-    //std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
+    std::string folder = "../rt-sa-5000-postequilibrate-1e-10" + test_tag;
     //std::string folder = "../rt-sa-5000-no-cvode" + test_tag;
-    std::string folder = "../rt-sa-5000" + test_tag;
+    //std::string folder = "../rt-sa-5000" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
 
     std::cout << "\nsolver                         : "
@@ -476,5 +520,6 @@ auto outputConsole(const Params& params) -> void {
     std::cout << "CFD     : " << params.v * params.dt / params.dx << std::endl;
     std::cout << "T       : " << params.T << std::endl;
     std::cout << "P       : " << params.P << std::endl;
+    std::cout << "activity model : " << params.activity_model << std::endl;
 }
 
