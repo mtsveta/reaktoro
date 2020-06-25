@@ -709,12 +709,9 @@ struct SmartEquilibriumSolver::Impl
                     // After the search is finished successfully
                     //---------------------------------------------------------------------
 
-                    // Update the amounts of elements for the equilibrium species
-                    n(ies) = ne;
-
                     // Update the chemical state result with estimated amounts
-                    state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
-                    state.setSpeciesAmounts(n);
+                    //state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
+                    state.setSpeciesAmounts(ne, ies);
 
                     // Update the chemical properties of the system
                     properties = record.properties;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
@@ -1282,11 +1279,11 @@ struct SmartEquilibriumSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate of the chemical state
-        //estimate(state, T, P, be);
+        estimate(state, T, P, be);
         //estimate_nnsearch_acceptance_based_on_lna(state, T, P, be);
         //estimate_nnsearch_acceptance_based_on_residual(state, T, P, be);
         //estimate_priority_based_acceptance_potential(state, T, P, be);
-        estimate_priority_based_acceptance_primary_potential(state, T, P, be);
+        //estimate_priority_based_acceptance_primary_potential(state, T, P, be);
         //result.estimate.accepted = false;
 
         result.timing.estimate=toc(ESTIMATE_STEP);
@@ -1298,9 +1295,9 @@ struct SmartEquilibriumSolver::Impl
 
         // Perform a learning step if the smart prediction is not sactisfatory
         if(!result.estimate.accepted){
-            //learn(state, T, P, be);
+            learn(state, T, P, be);
             //learn_nnsearch(state, T, P, be);
-            learn_priority_based_acceptance_potential(state, T, P, be);
+            //learn_priority_based_acceptance_potential(state, T, P, be);
             //learn_priority_based_acceptance_primary_potential(state, T, P, be);
         }
 

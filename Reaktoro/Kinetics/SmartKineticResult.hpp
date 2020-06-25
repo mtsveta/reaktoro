@@ -73,6 +73,9 @@ struct SmartKineticTiming {
     /// The time spent for the acceptance test during a smart estimation.
     double estimate_error_control = 0.0;
 
+    /// The time spent for updating the priority database during a smart estimation.
+    double estimate_database_priority_update = 0.0;
+
     /// Self addition assignment to accumulate kinetic timing.
     auto operator+=(const SmartKineticTiming& other) -> SmartKineticTiming&;
 
