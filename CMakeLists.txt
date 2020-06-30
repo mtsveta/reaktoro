@@ -9,6 +9,8 @@ include(CCache)
 
 # Set the name of the project
 project(Reaktoro VERSION 1.0.6 LANGUAGES CXX)
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Check if a conda environment is active
 include(CondaAware)
