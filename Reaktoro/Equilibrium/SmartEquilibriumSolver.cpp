@@ -197,6 +197,10 @@ struct SmartEquilibriumSolver::Impl
         // Perform a full chemical equilibrium calculation
         result.learning.gibbs_energy_minimization = solver.solve(state, T, P, be);
 
+        // Check that the EquilibriumSolver converged
+        if(!result.learning.gibbs_energy_minimization.optimum.succeeded)
+           return;
+
         result.timing.learning_gibbs_energy_minimization = toc(EQUILIBRIUM_STEP);
 
         //---------------------------------------------------------------------
