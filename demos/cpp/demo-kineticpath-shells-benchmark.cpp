@@ -73,10 +73,10 @@ int main()
 
     // Kaolinite: Al2Si2O5(OH)4
     editor.addMineralReaction("Kaolinite")
-    .setEquation("Kaolinite + 4*H+ = 3*H2O(l) + 2*HSiO3- + 2*Al+++")
-    .addMechanism("logk = -13.18 mol/(m2*s); Ea = 22.2 kJ/mol")
-    .addMechanism("logk = -11.31 mol/(m2*s); Ea = 65.9 kJ/mol; a[H+] = 0.777")
-    .setSpecificSurfaceArea(10, "cm2/g");
+        .setEquation("Kaolinite + 4*H+ = 3*H2O(l) + 2*HSiO3- + 2*Al+++")
+        .addMechanism("logk = -13.18 mol/(m2*s); Ea = 22.2 kJ/mol")
+        .addMechanism("logk = -11.31 mol/(m2*s); Ea = 65.9 kJ/mol; a[H+] = 0.777")
+        .setSpecificSurfaceArea(10, "cm2/g");
 
     ChemicalSystem system(editor);
     ReactionSystem reactions(editor);
