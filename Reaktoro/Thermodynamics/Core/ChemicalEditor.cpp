@@ -25,7 +25,6 @@
 #include <Reaktoro/Common/InterpolationUtils.hpp>
 #include <Reaktoro/Common/NamingUtils.hpp>
 #include <Reaktoro/Common/StringList.hpp>
-#include <Reaktoro/Common/StringUtils.hpp>
 #include <Reaktoro/Common/Units.hpp>
 #include <Reaktoro/Core/ChemicalSystem.hpp>
 #include <Reaktoro/Core/Phase.hpp>
@@ -36,7 +35,6 @@
 #include <Reaktoro/Thermodynamics/Core/Thermo.hpp>
 #include <Reaktoro/Thermodynamics/Mixtures/AqueousMixture.hpp>
 #include <Reaktoro/Thermodynamics/Mixtures/GaseousMixture.hpp>
-#include <Reaktoro/Thermodynamics/Mixtures/LiquidMixture.hpp>
 #include <Reaktoro/Thermodynamics/Mixtures/MineralMixture.hpp>
 #include <Reaktoro/Thermodynamics/Phases/AqueousPhase.hpp>
 #include <Reaktoro/Thermodynamics/Phases/GaseousPhase.hpp>
@@ -56,7 +54,7 @@ auto collectElementsInCompounds(const std::vector<std::string>& compounds) -> st
 {
     std::set<std::string> elemset;
     for(const auto& compound : compounds)
-        for(auto pair : elements(compound))
+        for(const auto& pair : elements(compound))
             elemset.insert(pair.first);
     return {elemset.begin(), elemset.end()};
 }
@@ -159,14 +157,14 @@ public:
         for(auto& x : pressures)    x = x * 1.0e+5;
     }
 
-    auto setTemperatures(std::vector<double> values, std::string units) -> void
+    auto setTemperatures(const std::vector<double>& values, const std::string& units) -> void
     {
         temperatures = values;
         for(auto& x : temperatures)
             x = units::convert(x, units, "kelvin");
     }
 
-    auto setPressures(std::vector<double> values, std::string units) -> void
+    auto setPressures(const std::vector<double>& values, const std::string& units) -> void
     {
         pressures = values;
         for(auto& x : pressures)
@@ -185,16 +183,16 @@ public:
         auto liquid_species = database.liquidSpeciesWithElements(elements);
         auto mineral_species = database.mineralSpeciesWithElements(elements);
 
-    	if(aqueous_species.size())
+    	if(!aqueous_species.empty())
             addPhase(AqueousPhase(AqueousMixture(aqueous_species)));
 
-        if (gaseous_species.size())
+        if (!gaseous_species.empty())
             addPhase(GaseousPhase(GaseousMixture(gaseous_species)));
 
-        if (liquid_species.size())
+        if (!liquid_species.empty())
             addPhase(LiquidPhase(LiquidMixture(liquid_species)));
 
-        for(auto mineral : mineral_species)
+        for(const auto& mineral : mineral_species)
             addPhase(MineralPhase(MineralMixture(mineral)));
     }
 
@@ -352,7 +350,7 @@ public:
         return mineral_reactions.back();
     }
 
-    auto addMineralReaction(std::string mineral) -> MineralReaction&
+    auto addMineralReaction(const std::string& mineral) -> MineralReaction&
     {
         return addMineralReaction(MineralReaction(mineral));
     }
@@ -519,12 +517,12 @@ auto ChemicalEditor::operator=(const ChemicalEditor& other) -> ChemicalEditor&
     return *this;
 }
 
-auto ChemicalEditor::setTemperatures(std::vector<double> values, std::string units) -> void
+auto ChemicalEditor::setTemperatures(const std::vector<double>& values, const std::string& units) -> void
 {
     pimpl->setTemperatures(values, units);
 }
 
-auto ChemicalEditor::setPressures(std::vector<double> values, std::string units) -> void
+auto ChemicalEditor::setPressures(const std::vector<double>& values, const std::string& units) -> void
 {
     pimpl->setPressures(values, units);
 }
@@ -624,7 +622,7 @@ auto ChemicalEditor::addMineralReaction(const MineralReaction& reaction) -> Mine
     return pimpl->addMineralReaction(reaction);
 }
 
-auto ChemicalEditor::addMineralReaction(std::string mineral) -> MineralReaction&
+auto ChemicalEditor::addMineralReaction(const std::string& mineral) -> MineralReaction&
 {
     return pimpl->addMineralReaction(mineral);
 }
