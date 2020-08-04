@@ -255,7 +255,7 @@ struct KineticSolver::Impl
         };
     }
 
-    auto addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
+    auto addPhaseSink(const std::string& phase, double volumerate, const std::string& units) -> void
     {
         const double volume = units::convert(volumerate, units, "m3/s");
         const Index iphase = system.indexPhaseWithError(phase);
@@ -403,10 +403,14 @@ struct KineticSolver::Impl
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
 
+
         // Update the composition of the equilibrium species
         if(options.use_smart_equilibrium_solver) smart_equilibrium.solve(state, T, P, be);
-        else equilibrium.solve(state, T, P, be);
-
+        else{
+            EquilibriumResult res;
+            res = equilibrium.solve(state, T, P, be);
+            std::cout << "# iter. : " << res.optimum.iterations << ", time    : " << res.optimum.time << std::endl;
+        }
         return t;
     }
 
@@ -748,7 +752,7 @@ auto KineticSolver::addSource(const ChemicalState& state, double volumerate, con
     pimpl->addSource(state, volumerate, units);
 }
 
-auto KineticSolver::addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
+auto KineticSolver::addPhaseSink(const std::string& phase, double volumerate, const std::string& units) -> void
 {
     pimpl->addPhaseSink(phase, volumerate, units);
 }

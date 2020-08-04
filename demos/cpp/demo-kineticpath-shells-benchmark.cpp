@@ -1,7 +1,5 @@
 // Reaktoro is a unified framework for modeling chemically reactive systems.
 //
-// Copyright (C) 2014-2018 Allan Leal
-//
 // This library is free software; you can redistribute it and/or
 // modify it under the terms of the GNU Lesser General Public
 // License as published by the Free Software Foundation; either
@@ -20,11 +18,10 @@ using namespace Reaktoro;
 
 int main()
 {
+    double t0 = 0;
+    double t1 = 0.1; // in minutes
 
-    int t0 = 0;
-    int t1 = 10; // in minutes
-
-    std::string result_filename = "kinetics-benchmark-tfinal-" + std::to_string(t1) + ".txt";
+    std::string result_filename = "kinetics-benchmark-6-kin-0-eq-tfinal-" + std::to_string(t1) + ".txt";
 
     Database database("supcrt07.xml");
 
@@ -101,8 +98,6 @@ int main()
     problem.pH(7.0);
 
     ChemicalState state0 = equilibrate(problem);
-    //state0.output("shell-kinetics-benckmark-initial.txt");
-    //std::cout << "state0 = " << state0 << std::endl;
 
     state0.setSpeciesMass("Calcite", 100.0869 * 10, "g"); //  molar mass of CaCO3 = 100.0869 g/mol
     state0.setSpeciesMass("Quartz", 60.08 * 10, "g"); // molar mass of SiO2 = 60.08 g/mol
@@ -131,5 +126,11 @@ int main()
     output.add("speciesMolality(Kaolinite units=molal)", "Kaolinite [mol]");
     output.add("pH");
 
-    path.solve(state0, t0, t1, "minute");
+    tic(KINETIC_PATH);
+
+    path.solve(state0, t0, t1, "second");
+
+    auto kinetic_path_time = toc(KINETIC_PATH);
+    std::cout << "total kinetic path time = " << kinetic_path_time << " s" << std::endl;
+
 }
