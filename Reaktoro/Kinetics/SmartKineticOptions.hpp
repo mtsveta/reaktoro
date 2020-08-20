@@ -63,7 +63,8 @@ struct SmartKineticOptions
 
     double amount_fraction_cutoff = 1.0e-14;
 
-
+    /// Smart method
+    std::string smart_method = "kin-clustering-eq-clustering";
 };
 
 } // namespace Reaktoro
