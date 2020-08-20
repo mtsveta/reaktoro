@@ -40,6 +40,7 @@ using namespace std::placeholders;
 #include <Reaktoro/Kinetics/SmartKineticOptions.hpp>
 #include <Reaktoro/Kinetics/SmartKineticResult.hpp>
 #include <Reaktoro/Kinetics/ODEState.hpp>
+#include <Reaktoro/Kinetics/KineticRecord.h>
 #include <Reaktoro/Optimization/Canonicalizer.hpp> // class needed for to fetch primary species
 #include <Reaktoro/ODML/ClusterConnectivity.hpp> // class needed to maintain connectivity of the clusters
 #include <Reaktoro/ODML/PriorityQueue.hpp> // class needed to maintain priority queues of clusters and records inside them
@@ -157,6 +158,9 @@ struct SmartKineticSolver::Impl
     /// The molar abundance of the elements in the equilibrium species
     Vector be;
 
+    /// The scaled molar abundance of the elements in the equilibrium species
+    Vector be_bar;
+
     /// The combined vector of elemental molar abundance and composition of kinetic species [be nk]
     Vector benk;
 
@@ -190,40 +194,18 @@ struct SmartKineticSolver::Impl
     /// The sensitivity matrix of combined vector of elemental molar abundance and composition of kinetic species [be nk]
     Matrix benk_S;
 
+
+    /// ------------------------------------------------
+    /// Structures needed for the priority-based queue
+    /// ------------------------------------------------
+
     std::deque<Index> kinetics_priority;
 
     std::deque<Index> kinetics_ranking;
 
-    /// The record of the knowledge database containing input, output, and derivatives data.
-    struct Record
-    {
-        /// The temperature of the equilibrium state (in units of K).
-        double T;
-
-        /// The pressure of the equilibrium state (in units of Pa).
-        double P;
-
-        /// The amounts of elements in the equilibrium state (in units of mol).
-        Vector be;
-
-        /// The calculated equilibrium state at `T`, `P`, `be`.
-        ChemicalState state;
-
-        /// The chemical properties at the calculated equilibrium state.
-        ChemicalProperties properties;
-
-        /// The sensitivity derivatives at the calculated equilibrium state.
-        EquilibriumSensitivity sensitivity;
-
-        /// The matrix used to compute relative change of chemical potentials due to change in `be`.
-        Matrix Mbe;
-
-        /// Calculated kinetic state, containing initial and final value of [be, nk], initial and final time, and sensitivities
-        ODEState ode_state;
-
-        // Chemical kinetic rates
-        ChemicalVector rates;
-    };
+    /// ------------------------------------------------
+    /// Structures needed for the priority-based cluster
+    /// ------------------------------------------------
 
     /// The cluster storing learned input-output data with same classification.
     struct Cluster
@@ -235,7 +217,7 @@ struct SmartKineticSolver::Impl
         std::size_t label = 0;
 
         /// The records stored in this cluster with learning data.
-        std::deque<Record> records;
+        std::deque<KineticRecord> records;
 
         /// The priority queue for the records based on their usage count.
         PriorityQueue priority;
@@ -335,100 +317,6 @@ struct SmartKineticSolver::Impl
 
     }
 
-    /*
-    auto summarize() -> void {
-
-        std::cout << "***********************************************************************************" << std::endl;
-        std::cout << "***********************************************************************************" << std::endl;
-        std::cout << "total time of SmartKineticSolver : " << stats.time_total << std::endl;
-        std::cout << " - time kinetics             : " << stats.kinetics_time_total <<  " (" << stats.kinetics_time_total / stats.time_total * 100 << " %)" << std::endl;
-        std::cout << "   - time estimaton          : " << stats.estimation_time_total <<  " (" << stats.estimation_time_total / stats.kinetics_time_total * 100 << " %)" << std::endl;
-        std::cout << "     - time acceptance       : " << stats.confidence_time_total <<  " (" << stats.confidence_time_total / stats.estimation_time_total * 100 << " %)" << std::endl;
-        std::cout << "     - time search           : " << stats.search_time_total     <<  " (" << stats.search_time_total / stats.estimation_time_total * 100 << " %)" << std::endl;
-        std::cout << "   - time integration        : " << stats.integraion_time_total <<  " (" << stats.integraion_time_total / stats.kinetics_time_total * 100 << " %)" << std::endl;
-        std::cout << "     - incr time prop. eval. : " << stats.prop_eval_time_total << " (" << stats.prop_eval_time_total / stats.integraion_time_total * 100 << " %)" << std::endl;
-        std::cout << "     - incr time eq calls     : " << stats.eq_calls_time_total <<  " (" << stats.eq_calls_time_total / stats.integraion_time_total * 100 << " %)" << std::endl;
-        if(options.learning.use_smart_equilibrium_solver) std::cout << "       - incr time eq search  : " << stats.eq_search_time_total <<  " (" << stats.eq_search_time / stats.integraion_time_total * 100 << " %)" << std::endl;
-        std::cout << " - time equilibration        : " << stats.equilibration_time_total <<  " (" << stats.equilibration_time_total / stats.time_total * 100 << " %)" << std::endl;
-        std::cout << " - # of integration cell     : " << stats.conv_counter << " out of " << stats.conv_counter + stats.smart_counter
-                  << " (" << float(stats.conv_counter) / float(stats.conv_counter + stats.smart_counter) * 100 << ") % " << std::endl;
-        std::cout << "total time of SmartKineticSolver (without prop. evals) : " << stats.time_total - stats.prop_eval_time_total << std::endl;
-        // <<  " -> speed-up of " << stats.time_total / (stats.time_total - stats.prop_eval_time_total) << std::endl;
-        std::cout << "total time of SmartKineticSolver (without prop. evals and search) : "
-                  << stats.time_total - stats.prop_eval_time_total - stats.search_time_total << std::endl;
-        //<<  " -> speed-up of " << stats.time_total / (stats.time_total - stats.prop_eval_time_total - stats.search_time_total) << std::endl;
-        if(options.learning.use_smart_equilibrium_solver) {
-            std::cout << "total time of SmartKineticSolver (without prop. evals, search, and eq search) : "
-                      << stats.time_total - stats.prop_eval_time_total - stats.search_time_total - stats.eq_search_time_total << std::endl;
-            //<<  " -> speed-up of " << stats.time_total / (stats.time_total - stats.prop_eval_time_total - stats.search_time_total - stats.eq_search_time_total) << std::endl;
-        }
-        std::cout << "***********************************************************************************" << std::endl;
-        std::cout << "***********************************************************************************" << std::endl;
-
-    }
-    auto console() -> void {
-        //std::cout << "\nsmart_counter : " << stats.smart_counter << std::endl;
-        //std::cout << "conv_counter  : " << stats.conv_counter << std::endl;
-
-        double total_time_kinetics = stats.estimation_time + stats.confidence_time + stats.integraion_time;
-        double total_time = stats.estimation_time + stats.confidence_time + stats.integraion_time + stats.equilibration_time;
-
-        std::cout << "incr time total              : " << total_time << std::endl;
-        std::cout << " - incr time kinetics        : " << total_time_kinetics <<  " (" << total_time_kinetics / total_time * 100 << " %)" << std::endl;
-        std::cout << "   - incr time estimaton     : " << stats.estimation_time <<  " (" << stats.estimation_time / total_time_kinetics * 100 << " %)" << std::endl;
-        std::cout << "     - incr time acceptance  : " << stats.confidence_time <<  " (" << stats.confidence_time / stats.estimation_time * 100 << " %)" << std::endl;
-        std::cout << "     - incr time search      : " << stats.search_time     <<  " (" << stats.search_time / stats.estimation_time * 100 << " %)" << std::endl;
-        std::cout << "   - incr time integration   : " << stats.integraion_time <<  " (" << stats.integraion_time / total_time_kinetics * 100 << " %)" << std::endl;
-        std::cout << "     - incr time prop. eval. : " << stats.prop_eval_time << " (" << stats.prop_eval_time / stats.integraion_time * 100 << " %)" << std::endl;
-        std::cout << "     - incr time eq calls    : " << stats.eq_calls_time <<  " (" << stats.eq_calls_time / stats.integraion_time * 100 << " %)" << std::endl;
-        if(options.learning.use_smart_equilibrium_solver)  std::cout << "       - incr time eq search : " << stats.eq_search_time <<  " (" << stats.eq_search_time / total_time_kinetics * 100 << " %)" << std::endl;
-        std::cout << " - incr time equilibration   : " << stats.equilibration_time <<  " (" << stats.equilibration_time / total_time * 100 << " %)" << std::endl;
-        std::cout << " - # of integration cell     : " << stats.conv_counter << " out of " << stats.conv_counter + stats.smart_counter
-                  << " (" << float(stats.conv_counter) / float(stats.conv_counter + stats.smart_counter) * 100 << ") % " << std::endl;
-        std::cout << "--------------------------------------------" << std::endl;
-    }
-    auto refresh() -> void {
-
-        // Add the smart counter to the vector of smart counters on each step
-        stats.smart_numbers.emplace_back(stats.smart_counter);
-
-        stats.estimation_time_total += stats.estimation_time;
-        stats.confidence_time_total += stats.confidence_time;
-        stats.search_time_total += stats.search_time;
-        stats.integraion_time_total += stats.integraion_time;
-        stats.prop_eval_time_total     += stats.prop_eval_time;
-
-        stats.eq_calls_time_total  += stats.eq_calls_time;
-        stats.eq_search_time_total += stats.eq_search_time;
-
-        stats.equilibration_time_total += stats.equilibration_time;
-        stats.kinetics_time_total += stats.integraion_time + stats.estimation_time;
-
-        stats.time_total = stats.kinetics_time_total + stats.equilibration_time_total;
-
-        // Update the counter of smartly predicted cells per step
-        //stats.smart_counter = 0;
-
-        // Update the counter of smartly predicted cells per step
-        //stats.conv_counter = 0;
-
-        // Update the time measured for the current step
-        stats.estimation_time = 0.0;
-        stats.confidence_time = 0.0;
-        stats.integraion_time = 0.0;
-        stats.search_time = 0.0;
-        stats.equilibration_time = 0.0;
-        stats.prop_eval_time     = 0.0;
-        stats.kinetics_time      = 0.0;
-
-        stats.eq_calls_time = 0.0;
-        stats.eq_search_time = 0.0;
-
-        // Empty the tree for the next step
-        //tree.clear();
-    }
-    */
-
     auto setOptions(const SmartKineticOptions& options) -> void
     {
         // Initialise the options of the kinetic solver
@@ -458,7 +346,7 @@ struct SmartKineticSolver::Impl
         };
     }
 
-    auto addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
+    auto addPhaseSink(const std::string& phase, double volumerate, const std::string& units) -> void
     {
         const double volume = units::convert(volumerate, units, "m3/s");
         const Index iphase = system.indexPhaseWithError(phase);
@@ -521,7 +409,6 @@ struct SmartKineticSolver::Impl
         };
     }
 
-
     auto initialize(ChemicalState& state, double tstart) -> void {
 
         // Extract the composition of the equilibrium and kinetic species
@@ -538,6 +425,7 @@ struct SmartKineticSolver::Impl
         initialize(state, tstart, benk);
 
     }
+
     auto initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void
     {
         // Initialise the temperature and pressure variables
@@ -576,6 +464,12 @@ struct SmartKineticSolver::Impl
 
     }
 
+    /// ------------------------------------------------------------------------------------------------------------ ///
+    /// Estimate functions
+    /// ------------------------------------------------------------------------------------------------------------ ///
+
+    /// Learn by performing a full kinetics calculation using integration of system of ODEs
+    /// and save the learned state to the simple queue
     auto learn_nn_search(ChemicalState& state, double t, double dt) -> void
     {
         SmartKineticResult res = {};
@@ -594,10 +488,9 @@ struct SmartKineticSolver::Impl
         tic(INTEGRATE_STEP);
         // Compute `benk` by the conventional numerical integration
         ode.solve(t, dt, benk, benk_S);
-        //ode.solve_implicit_1st_order(t, dt, benk, benk_S);
+        //ode.solve_implicit_1st_order(t, dt, benk, benk_S); // TODO: compare CVODE and 1st order implicit scheme
         //ode.integrate(t, benk, t + dt, benk_S); // TODO: produces a delayed estimations, why?
         result.timing.learn_integration += toc(INTEGRATE_STEP);
-
 
         //---------------------------------------------------------------------
         // STORAGE STEP DURING THE LEARNING PROCESS
@@ -614,11 +507,6 @@ struct SmartKineticSolver::Impl
         nk = benk.tail(Nk);
         state.setSpeciesAmounts(nk, iks);
 
-        // TODO: must properties, sensitivities, and rates be evaluated after learning process or were they evaluated
-        // TODO: inside the kinetic integration step
-        // Evaluate chemical properties, reaction rate, and sensitivities (not needed, sinse it is evaluated in ode.solve())
-        //
-        ///*
         //---------------------------------------------------------------------
         // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
         //---------------------------------------------------------------------
@@ -637,27 +525,16 @@ struct SmartKineticSolver::Impl
         tic(SENSITIVITY_STEP);
         sensitivity = equilibrium.sensitivity();
         result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
-        //*/
 
         // Save the kinetic state to the tree of learned states
         tree.emplace_back(SmartKineticNode{ode_state, state, properties, sensitivity, rates, Matrix::Zero(10, 10), VectorXi::Zero(10)});
 
         result.timing.learn_storage += toc(STORAGE_STEP);
 
-        /*
-        // TODO: remove, left from debugging
-        std::cout << "t0     : " << ode_state.t0 << std::endl;
-        std::cout << "t      : " << ode_state.t << std::endl;
-        std::cout << "u0     : " << tr(ode_state.u0) << std::endl;
-        std::cout << "u      : " << tr(ode_state.u) << std::endl;
-        std::cout << "dndn0 : \n" << ode_state.dudu0 << std::endl;
-        std::cout << "properties.lnActivities().val : \n" << tr(properties.lnActivities().val) << std::endl;
-        std::cout << "r.val : \n" << r.val << std::endl;
-        std::cout << "sensitivity.dndb : \n" << sensitivity.dndb << std::end;
-        */
     }
 
-    /// Learn how to perform a full equilibrium calculation (with tracking)
+    /// Learn by performing a full kinetics calculation using integration of system of ODEs
+    /// and save the learned state (with the major potentials) to the priority queue
     auto learn_priority_based_acceptance_potential(ChemicalState& state, double t, double dt) -> void
     {
         SmartKineticResult res = {};
@@ -676,8 +553,7 @@ struct SmartKineticSolver::Impl
         tic(INTEGRATE_STEP);
         // Calculate `benk` by the conventional numerical integration
         ode.solve(t, dt, benk, benk_S);
-
-        //ode.solve_implicit_1st_order(t, dt, benk, benk_S);
+        //ode.solve_implicit_1st_order(t, dt, benk, benk_S); // TODO: compare CVODE and 1st order implicit scheme
         //ode.integrate(t, benk, t + dt, benk_S); // TODO: produces a delayed estimations, why?
         result.timing.learn_integration += toc(INTEGRATE_STEP);
 
@@ -691,13 +567,6 @@ struct SmartKineticSolver::Impl
         nk = benk.tail(Nk);
         state.setSpeciesAmounts(nk, iks);
 
-        //equilibrium.solve(state, T, P, be);
-
-        // TODO: must properties, sensitivities, and rates be evaluated after learning process or were they evaluated
-        // TODO: inside the kinetic integration step
-        // Evaluate chemical properties, reaction rate, and sensitivities (not needed, sinse it is evaluated in ode.solve())
-        //
-        ///*
         //---------------------------------------------------------------------
         // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
         //---------------------------------------------------------------------
@@ -716,7 +585,6 @@ struct SmartKineticSolver::Impl
         tic(SENSITIVITY_STEP);
         sensitivity = equilibrium.sensitivity();
         result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
-        //*/
 
         //---------------------------------------------------------------------
         // ERROR CONTROL MATRICES ASSEMBLING STEP DURING THE LEARNING PROCESS
@@ -779,7 +647,8 @@ struct SmartKineticSolver::Impl
         result.timing.learn_storage += toc(STORAGE_STEP);
     }
 
-    /// Learn how to perform a full equilibrium calculation (with tracking)
+    /// Learn by performing a full kinetics calculation using integration of system of ODEs
+    /// and save the learned state (with the primary potentials) to the priority queue
     auto learn_priority_based_acceptance_primary_potential(ChemicalState& state, double t, double dt) -> void
     {
         SmartKineticResult res = {};
@@ -798,9 +667,6 @@ struct SmartKineticSolver::Impl
         tic(INTEGRATE_STEP);
         // Calculate `benk` by the conventional numerical integration
         ode.solve(t, dt, benk, benk_S);
-
-        //ode.solve_implicit_1st_order(t, dt, benk, benk_S);
-        //ode.integrate(t, benk, t + dt, benk_S); // TODO: produces a delayed estimations, why?
         result.timing.learn_integration += toc(INTEGRATE_STEP);
 
         // Save the sensitivity values, the result time, and the obtain species' amount
@@ -813,13 +679,6 @@ struct SmartKineticSolver::Impl
         nk = benk.tail(Nk);
         state.setSpeciesAmounts(nk, iks);
 
-        //equilibrium.solve(state, T, P, be);
-
-        // TODO: must properties, sensitivities, and rates be evaluated after learning process or were they evaluated
-        // TODO: inside the kinetic integration step
-        // Evaluate chemical properties, reaction rate, and sensitivities (not needed, sinse it is evaluated in ode.solve())
-        //
-        ///*
         //---------------------------------------------------------------------
         // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
         //---------------------------------------------------------------------
@@ -838,7 +697,6 @@ struct SmartKineticSolver::Impl
         tic(SENSITIVITY_STEP);
         sensitivity = equilibrium.sensitivity();
         result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
-        //*/
 
         //---------------------------------------------------------------------
         // ERROR CONTROL MATRICES ASSEMBLING STEP DURING THE LEARNING PROCESS
@@ -909,8 +767,8 @@ struct SmartKineticSolver::Impl
         result.timing.learn_storage += toc(STORAGE_STEP);
     }
 
-    ///*
-    /// Learn how to perform a full equilibrium calculation (with tracking)
+    /// Learn by performing a full kinetics calculation using integration of system of ODEs
+    /// and save the learned state (with the primary potentials) to the priority-based cluster
     auto learn_clustering(ChemicalState& state, double t, double dt) -> void
     {
         SmartKineticResult res = {};
@@ -930,9 +788,8 @@ struct SmartKineticSolver::Impl
 
         // Calculate `benk` by the conventional numerical integration
         ode.solve(t, dt, benk, benk_S);
-        //ode.solve_implicit_1st_order(t, dt, benk, benk_S);
-        //ode.integrate(t, benk, t + dt, benk_S);
-
+        //ode.solve_implicit_1st_order(t, dt, benk, benk_S); // TODO: compare CVODE and 1st order implicit scheme
+        //ode.integrate(t, benk, t + dt, benk_S); // TODO: produces a delayed estimations, why?
         result.timing.learn_integration += toc(INTEGRATE_STEP);
 
         // Save the sensitivity values, the result time, and the obtain species' amount
@@ -1032,6 +889,7 @@ struct SmartKineticSolver::Impl
         if(iter < database.clusters.end())
         {
             auto& cluster = *iter;
+            //cluster.records.push_back({T, P, be0, state, properties, sensitivity, Mbe, ode_state, rates});
             cluster.records.push_back({T, P, be, state, properties, sensitivity, Mbe, ode_state, rates});
             cluster.priority.extend();
         }
@@ -1041,6 +899,7 @@ struct SmartKineticSolver::Impl
             Cluster cluster;
             cluster.iprimary = iprimary;
             cluster.label = label;
+            //cluster.records.push_back({T, P, be0, state, properties, sensitivity, Mbe, ode_state, rates});
             cluster.records.push_back({T, P, be, state, properties, sensitivity, Mbe, ode_state, rates});
             cluster.priority.extend();
 
@@ -1053,7 +912,12 @@ struct SmartKineticSolver::Impl
         result.timing.learn_storage = toc(STORAGE_STEP);
     }
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    /// ------------------------------------------------------------------------------------------------------------ ///
+    /// Estimate functions
+    /// ------------------------------------------------------------------------------------------------------------ ///
+
+    /// Estimate the equilibrium state using priority-based cluster for the search of the reference state and
+    /// potentials of primary species for the acceptance criteria
     auto estimate_clustering(ChemicalState& state, double& t) -> void
     {
         result.estimate.accepted = false;
@@ -1087,7 +951,7 @@ struct SmartKineticSolver::Impl
         // * `success` is true if error test succeeds, false otherwise.
         // * `error` is the first error value violating the tolerance
         // * `iprimaryspecies` is the index of the primary species that fails the error test
-        auto pass_error_test = [&be, &dbe, &reltol, &eps_b](const Record& record) -> std::tuple<bool, double, Index>
+        auto pass_error_test = [&be, &dbe, &reltol, &eps_b](const KineticRecord& record) -> std::tuple<bool, double, Index>
         {
             using std::abs;
             using std::max;
@@ -1142,11 +1006,6 @@ struct SmartKineticSolver::Impl
         // The ordering of the clusters to look for (starting with icluster)
         const auto& clusters_ordering = database.connectivity.order(icluster);
 
-//        std::cout << "size " << clusters_ordering.size() << ", clusters_ordering: ";
-//        for(auto item : clusters_ordering){
-//            std::cout << item;
-//        }
-//        std::cout << std::endl;
         //---------------------------------------------------------------------
         // SEARCH STEP DURING THE ESTIMATE PROCESS
         //---------------------------------------------------------------------
@@ -1171,10 +1030,6 @@ struct SmartKineticSolver::Impl
 
                 // Check if the current record passes the error test
                 const auto [success, error, iprimaryspecies] = pass_error_test(record);
-//                std::cout << "success = " << success << std::endl;
-//                std::cout << "error = " << error << std::endl;
-//                std::cout << "iprimaryspecies = " << iprimaryspecies << std::endl;
-//                getchar();
 
                 result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
 
@@ -1191,15 +1046,12 @@ struct SmartKineticSolver::Impl
                     const auto& dndn0_ref = record.ode_state.dudu0;
 
                     // Algorithm:
-                    // the reference state : u, u0, S = du/du0, t, f = du/dt
-                    // new initial values  : u0_new
-                    // the predicted state : u_new = u + S * (u0_new - u0)
-
-                    // Clarification:
-                    // benk0 is new initial condition (u0_tilde)
-                    // it.state.u0    is the initial condition of reference vector (u0)
-                    // it.state.u    is already calculated by integration vector  (u)
-                    // it.state.dudu0 is the sensitivity w.r.t. the initial condition (S)
+                    // the reference state contains:
+                    // u0 -> benk0_ref      is the initial condition of reference vector
+                    // u -> benk_ref        is already calculated by integration reference vector
+                    // du/du0 -> dndn0_ref  is the sensitivity w.r.t. the initial condition
+                    // new initial values  : benk0
+                    // the predicted state : benk_new = benk_ref + dndn0_ref * (benk0 - benk0_ref)
 
                     // Perform smart estimation of benk
                     Vector benk_new;
@@ -1220,7 +1072,8 @@ struct SmartKineticSolver::Impl
                     // Check predicted negative values of equilibrium species
                     // -------------------------------------------------------------------------------------------------------------
 
-                    auto pass_negative_equilibirum_species_amounts_error_test = [&](const auto& record) -> std::tuple<bool, VectorConstRef>
+                    // Define the function checking the negativity of the equilibrium species amounts
+                    auto pass_negative_equilibrium_species_amounts_error_test = [&](const auto& record) -> std::tuple<bool, VectorConstRef>
                     {
                         // Fetch properties of the reference state
                         const auto& state_ref = record.state;
@@ -1248,15 +1101,16 @@ struct SmartKineticSolver::Impl
 
                         return {ne_min > -eps_n, dne};
                     };
-
-                    auto [is_negequilibrium_test_passed, dne] = pass_negative_equilibirum_species_amounts_error_test(record);
-//                    std::cout << "is_negequilibrium_test_passed = " << is_negequilibrium_test_passed << std::endl;
-                    if(!is_negequilibrium_test_passed)
+                    // Check if the `negative equilibrium species amounts` pass the test
+                    auto [is_neg_equilibrium_test_passed, dne] = pass_negative_equilibrium_species_amounts_error_test(record);
+                    if(!is_neg_equilibrium_test_passed)
                         continue;
 
                     // -------------------------------------------------------------------------------------------------------------
                     // Check the variations of kinetic species
                     // -------------------------------------------------------------------------------------------------------------
+
+                    // Define the function checking the variations in the kinetics rate
                     auto pass_kinetic_rate_variation_error_test = [&](const auto& node, VectorConstRef dne) -> bool
                     {
 
@@ -1274,7 +1128,7 @@ struct SmartKineticSolver::Impl
 
                         // Initialize reaction rates
                         Vector drates = rates_ref.ddn * dn;
-                        rates.val = rates_ref.val + drates;
+                        //rates.val = rates_ref.val + drates;
 
                         // Fetch mole fractions
                         const auto& x_ref = properties_ref.moleFractions().val;
@@ -1291,18 +1145,14 @@ struct SmartKineticSolver::Impl
                         }
                         return true;
                     };
-
+                    // Check if the `the variations in the kinetics rate` pass the test
                     const auto is_kin_rate_variation_test_passed = pass_kinetic_rate_variation_error_test(record, dne);
-//                    std::cout << "is_kin_rate_variation_test_passed = " << is_kin_rate_variation_test_passed << std::endl;
                     if(!is_kin_rate_variation_test_passed)
                         continue;
 
                     result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
 
                     result.timing.estimate_search = toc(SEARCH_STEP);
-
-                    // After the search is finished successfully
-                    //---------------------------------------------------------------------
 
                     // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
                     for(unsigned int i = 0; i < benk_new.size(); ++i) if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
@@ -1314,8 +1164,6 @@ struct SmartKineticSolver::Impl
 
                     // Update the chemical properties of the system
                     properties = record.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
-
-                    result.estimate.accepted = true;
 
                     result.timing.estimate_taylor = toc(TAYLOR_STEP);
 
@@ -1335,6 +1183,7 @@ struct SmartKineticSolver::Impl
 
                     result.timing.estimate_database_priority_update = toc(PRIORITY_UPDATE_STEP);
 
+                    // Mark estimated result as accepted
                     result.estimate.accepted = true;
 
                     return;
@@ -1345,7 +1194,9 @@ struct SmartKineticSolver::Impl
         result.estimate.accepted = false;
 
     }
-    //*/
+
+    /// Estimate the equilibrium state using the nearest neightbor for the search of the reference state and
+    /// logarithms of activities for the acceptance criteria
     auto estimate_nn_search_acceptance_based_lna(ChemicalState& state, double& t) -> void
     {
         // Skip estimation if no previous full computation has been done
@@ -1504,7 +1355,7 @@ struct SmartKineticSolver::Impl
 
         // Initialize reaction rates
         Vector drates = rates_ref.ddn * dn;
-        rates.val = rates_ref.val + drates;
+        //rates.val = rates_ref.val + drates;
 
         // TODO: loop for more then one kinetic species
         bool kinetics_r_variation_check = true;
@@ -1548,9 +1399,6 @@ struct SmartKineticSolver::Impl
             return;
         }
 
-        // Mark estimated result as accepted
-        result.estimate.accepted = true;
-
         // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
         for(unsigned int i = 0; i < benk_new.size(); ++i) if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
 
@@ -1560,8 +1408,13 @@ struct SmartKineticSolver::Impl
         // Update properties by the reference one
         //properties = properties_ref;
 
+        // Mark estimated result as accepted
+        result.estimate.accepted = true;
+
     }
 
+    /// Estimate the equilibrium state using the nearest neightbor for the search of the reference state and
+    /// residual of the mass action equation for the acceptance criteria
     auto estimate_nn_search_acceptance_based_residual(ChemicalState& state, double& t) -> void
     {
         // Refresh acceptance result
@@ -1742,7 +1595,7 @@ struct SmartKineticSolver::Impl
 
         // Initialize reaction rates
         Vector drates = rates_ref.ddn * dn;
-        rates.val = rates_ref.val + drates;
+        //rates.val = rates_ref.val + drates;
 
         bool kinetics_r_variation_check = true;
         /// The vector of amounts of equilibrium species
@@ -1791,9 +1644,6 @@ struct SmartKineticSolver::Impl
         // Step 3: Checking the acceptance criterion
         //----------------------------------------------
 
-        // Set the estimate accepted status to true
-        result.estimate.accepted = true;
-
         // Update the chemical properties of the system
         //properties = prop_ref;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
 
@@ -1802,10 +1652,14 @@ struct SmartKineticSolver::Impl
         // Update the solution of kinetic problem by new estimated value
         benk = benk_new;
 
+        // Mark estimated result as accepted
+        result.estimate.accepted = true;
+
     }
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
-    auto estimate_priority_based_acceptance_potential(ChemicalState& state, double& t) -> void
+    /// Estimate the equilibrium state using the prioroty-based queue for the search of the reference state and
+    /// potentials of major species for the acceptance criteria
+    auto estimate_priority_based_acceptance_potential(ChemicalState& state, double& t, double dt) -> void
     {
         result.estimate.accepted = false;
 
@@ -1857,7 +1711,9 @@ struct SmartKineticSolver::Impl
             return { true, error, -1 };
         };
 
+        // Initialize the inode_prev node
         auto inode_prev = kinetics_priority.begin();
+
         for(auto inode=kinetics_priority.begin(); inode != kinetics_priority.end(); ++inode)
         {
             const auto& node = tree[*inode];
@@ -1886,15 +1742,12 @@ struct SmartKineticSolver::Impl
                 const auto& dndn0_ref = node.ode_state.dudu0;
 
                 // Algorithm:
-                // the reference state : u, u0, S = du/du0, t, f = du/dt
-                // new initial values  : u0_new
-                // the predicted state : u_new = u + S * (u0_new - u0)
-
-                // Clarification:
-                // benk0 is new initial condition (u0_tilde)
-                // it.state.u0    is the initial condition of reference vector (u0)
-                // it.state.u    is already calculated by integration vector  (u)
-                // it.state.dudu0 is the sensitivity w.r.t. the initial condition (S)
+                // the reference state contains:
+                // u0 -> benk0_ref      is the initial condition of reference vector
+                // u -> benk_ref        is already calculated by integration reference vector
+                // du/du0 -> dndn0_ref  is the sensitivity w.r.t. the initial condition
+                // new initial values  : benk0
+                // the predicted state : benk_new = benk_ref + dndn0_ref * (benk0 - benk0_ref)
 
                 // Perform smart estimation of benk
                 Vector benk_new;
@@ -1914,7 +1767,7 @@ struct SmartKineticSolver::Impl
                 // -------------------------------------------------------------------------------------------------------------
                 // Check the variations of equilibrium species
                 // -------------------------------------------------------------------------------------------------------------
-
+                // Define the function checking the negativity of the equilibrium species amounts
                 auto pass_negative_equilibirum_species_amounts_error_test = [&](const auto& node) -> std::tuple<bool, VectorConstRef>
                 {
 
@@ -1944,16 +1797,16 @@ struct SmartKineticSolver::Impl
                     //return {ne.minCoeff() > 1e-2 * options.cutoff, dne};
                 };
 
-                auto [is_negequilibrium_test_passed, dne] = pass_negative_equilibirum_species_amounts_error_test(node);
-                //std::cout << "is_negequilibrium_test_passed = " << is_negequilibrium_test_passed << std::endl;
-                //getchar();
-                if(!is_negequilibrium_test_passed)
+                // Check if the `negative equilibrium species amounts` pass the test
+                auto [is_neg_equilibrium_test_passed, dne] = pass_negative_equilibirum_species_amounts_error_test(node);
+                if(!is_neg_equilibrium_test_passed)
                     continue;
 
                 // -------------------------------------------------------------------------------------------------------------
                 // Check the variations of kinetic species
                 // -------------------------------------------------------------------------------------------------------------
 
+                // Define the function checking the variation of kinetics rates
                 auto pass_kinetic_rate_variation_error_test = [&](const auto& node, VectorConstRef dne) -> bool
                 {
 
@@ -1971,7 +1824,6 @@ struct SmartKineticSolver::Impl
 
                     // Initialize reaction rates
                     Vector drates = rates_ref.ddn * dn;
-                    rates.val = rates_ref.val + drates;
 
                     // Fetch mole fractions
                     const auto& x_ref = properties_ref.moleFractions().val;
@@ -1989,21 +1841,23 @@ struct SmartKineticSolver::Impl
                     return true;
                 };
 
+                // Check if the variation in the kinetics rates pass the test
                 const auto is_kin_rate_variation_test_passed = pass_kinetic_rate_variation_error_test(node, dne);
-                //std::cout << "is_kin_rate_variation_test_passed = " << is_kin_rate_variation_test_passed << std::endl;
-                //getchar();
                 if(!is_kin_rate_variation_test_passed)
                     continue;
 
                 result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
 
                 result.timing.estimate_search = toc(SEARCH_STEP);
+
                 // -------------------------------------------------------------------------------------------------------------
                 // Update the ranking and priority
                 // -------------------------------------------------------------------------------------------------------------
 
+                // Increase the raking of the node
                 kinetics_ranking[*inode] += 1;
 
+                // Sort the priority queue after increasing the ranking of the node
                 auto comp = [&](Index l, Index r) { return kinetics_ranking[l] > kinetics_ranking[r]; };
                 if( !((inode == kinetics_priority.begin()) || (kinetics_ranking[*inode_prev] >= kinetics_ranking[*inode])) ) {
                     std::stable_sort(kinetics_priority.begin(), inode + 1, comp);
@@ -2015,11 +1869,13 @@ struct SmartKineticSolver::Impl
                 // -------------------------------------------------------------------------------------------------------------
                 // Update the solution of kinetic problem by new estimated value
                 // -------------------------------------------------------------------------------------------------------------
-                //state = node.chemical_state;
+                //state = node.chemical_state; // this update doesn't work good for kinetics
                 benk = benk_new;
 
                 // Update the chemical properties of the system
                 properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+
+                // Mark estimated result as accepted
                 result.estimate.accepted = true;
 
                 return;
@@ -2034,7 +1890,8 @@ struct SmartKineticSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    /// Estimate the equilibrium state using the prioroty-based queue for the search of the reference state and
+    /// potentials of primary species for the acceptance criteria
     auto estimate_priority_based_acceptance_primary_potential(ChemicalState& state, double& t) -> void
     {
         result.estimate.accepted = false;
@@ -2203,7 +2060,7 @@ struct SmartKineticSolver::Impl
 
                     // Initialize reaction rates
                     Vector drates = rates_ref.ddn * dn;
-                    rates.val = rates_ref.val + drates;
+                    //rates.val = rates_ref.val + drates;
 
                     // Fetch mole fractions
                     const auto& x_ref = properties_ref.moleFractions().val;
@@ -2252,6 +2109,8 @@ struct SmartKineticSolver::Impl
 
                 // Update the chemical properties of the system
                 properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+
+                // Mark estimated result as accepted
                 result.estimate.accepted = true;
 
                 return;
@@ -2266,6 +2125,11 @@ struct SmartKineticSolver::Impl
 
     }
 
+    /// ------------------------------------------------------------------------------------------------------------ ///
+    /// Solve functions
+    /// ------------------------------------------------------------------------------------------------------------ ///
+
+    /// Solve the chemical kinetics problem from a given initial time to a final time.
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
     {
         // Reset the result of the last smart equilibrium calculation
@@ -2289,7 +2153,6 @@ struct SmartKineticSolver::Impl
         benk.head(Ee) = be;
         benk.tail(Nk) = nk;
 
-
         // Initialise the chemical kinetics solver
         initialize(state, t, benk);
 
@@ -2301,11 +2164,12 @@ struct SmartKineticSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate for the chemical state
-        //estimate_nn_search_acceptance_based_lna(state, t);
-        //estimate_nn_search_acceptance_based_residual(state, t);
-        //estimate_priority_based_acceptance_potential(state, t);
-        //estimate_priority_based_acceptance_primary_potential(state, t);
-        estimate_clustering(state, t);
+        if(options.smart_method == "kin-clustering-eq-clustering")
+            estimate_clustering(state, t);
+        else if (options.smart_method == "kin-priority-eq-priority")
+            estimate_priority_based_acceptance_potential(state, t, dt);
+        else
+            estimate_nn_search_acceptance_based_lna(state, t);
 
         result.timing.estimate = toc(ESTIMATE_STEP);
 
@@ -2316,9 +2180,13 @@ struct SmartKineticSolver::Impl
 
         // Perform a learning step if the smart prediction is not satisfactory
         if(!result.estimate.accepted){
-            //learn_nn_search(state, t, dt);
-            //learn_priority_based_acceptance_potential(state, t, dt);
-            learn_clustering(state, t, dt);
+            if(options.smart_method == "kin-clustering-eq-clustering")
+                learn_clustering(state, t, dt);
+            else if (options.smart_method == "kin-priority-eq-priority"){
+                learn_priority_based_acceptance_potential(state, t, dt);
+            }
+            else
+                learn_nn_search(state, t, dt);
         }
 
         // Extract the `be` and `nk` entries of the vector `benk`
@@ -2350,31 +2218,11 @@ struct SmartKineticSolver::Impl
 
         result.timing.solve = toc(SOLVE_STEP);
 
-        /*
-        std::cout << "smart equilibrium accepted? " << result.smart_equilibrium.estimate.accepted << ", index of ref elem in equilibrium " << result.smart_equilibrium.estimate.reference_state_index << std::endl; // << " out " << smart_equilibrium.tree().size()
-        std::cout << "smart kinetics accepted   ? " << result.estimate.accepted << ", index of ref elem in kinetics " << result.estimate.reference_state_index << std::endl; // << " out of " << tree.size() <<
-        getchar();
-        */
-        // If tree is of a certain size, do the cleanup
-        /*
-        if (tree.size() == 400){
-            auto it = tree.begin();
-            auto counter = 0;
-            for (auto it = tree.begin(); it!=tree.end();) {
-                if (!it->usage_count) {
-                    it = tree.erase(it); // return the iterator pointing on the elemnt after the removed one
-                }
-                else
-                    it++; // increase the iterator
-            }
-        }
-        */
     }
 
+    /// Solve the chemical kinetics problem from a given initial time to a final time (documenting the step and the cell).
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void
     {
-
-//        std::cout << "step " << step << ", icell " << icell << std::endl;
 
         // Reset the result of the last smart equilibrium calculation
         result = {};
@@ -2397,7 +2245,6 @@ struct SmartKineticSolver::Impl
         benk.head(Ee) = be;
         benk.tail(Nk) = nk;
 
-
         // Initialise the chemical kinetics solver
         initialize(state, t, benk);
 
@@ -2409,15 +2256,12 @@ struct SmartKineticSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate for the chemical state
-        //estimate_nn_search_acceptance_based_lna(state, t);
-        //estimate_nn_search_acceptance_based_residual(state, t);
-        //estimate_nn_search_acceptance_based_potentials(state, t);
-        //estimate_priority_based_acceptance_potential(state, t);
-        //estimate_priority_based_acceptance_potential(state, t);
-        //estimate_priority_based_acceptance_primary_potential(state, t);
-        estimate_clustering(state, t);
-        //std::cout << "result.estimate.accepted = " << result.estimate.accepted << std::endl;
-        //getchar();
+        if(options.smart_method == "kin-clustering-eq-clustering")
+            estimate_clustering(state, t);
+        else if (options.smart_method == "kin-priority-eq-priority")
+            estimate_priority_based_acceptance_potential(state, t, dt);
+        else
+            estimate_nn_search_acceptance_based_lna(state, t);
 
         result.timing.estimate = toc(ESTIMATE_STEP);
 
@@ -2427,11 +2271,15 @@ struct SmartKineticSolver::Impl
         tic(LEARN_STEP);
 
         // Perform a learning step if the smart prediction is not satisfactory
-        if(!result.estimate.accepted){
-            //learn_nn_search(state, t, dt);
-            //learn_priority_based_acceptance_potential(state, t, dt);
-            //learn_priority_based_acceptance_primary_potential(state, t, dt);
-            learn_clustering(state, t, dt);
+        if(!result.estimate.accepted)
+        {
+            if(options.smart_method == "kin-clustering-eq-clustering")
+                learn_clustering(state, t, dt);
+            else if (options.smart_method == "kin-priority-eq-priority"){
+                learn_priority_based_acceptance_potential(state, t, dt);
+            }
+            else
+                learn_nn_search(state, t, dt);
         }
 
         // Extract the `be` and `nk` entries of the vector `benk`
@@ -2443,39 +2291,50 @@ struct SmartKineticSolver::Impl
 
         result.timing.learn = toc(LEARN_STEP);
 
-//        std::cout << "kinetics result.estimate.accepted?  " << result.estimate.accepted << std::endl;
-//        getchar();
-
         // ----------------------------------------------------------------------------------
         // Equilibrate equilibrium species
         // ----------------------------------------------------------------------------------
         tic(EQUILIBRATE_STEP);
 
+
+//        if(options.use_smart_equilibrium_solver){
+//            SmartEquilibriumResult res = {};
+//            res += smart_equilibrium.solve(state, T, P, be);
+//            result.smart_equilibrium += res;
+//        }
+//        else{
+//            EquilibriumResult res = {};
+//            res += equilibrium.solve(state, T, P, be);
+//            result.equilibrium += res;
+//        }
+
+
+        // ----------------------------------------------------------------- //
+        // With scaling
+        // ----------------------------------------------------------------- //
+        // Scaling vector of element amounts
+        double be_total = sum(be);
+        be_bar.noalias() = be / be_total;
+
+        // Scale the initial vector of species amounts
+        state.scaleSpeciesAmounts(1 / be_total);
+
         if(options.use_smart_equilibrium_solver){
             SmartEquilibriumResult res = {};
-            res += smart_equilibrium.solve(state, T, P, be);
+            res += smart_equilibrium.solve(state, T, P, be_bar);
             result.smart_equilibrium += res;
         }
         else{
             EquilibriumResult res = {};
-            res += equilibrium.solve(state, T, P, be);
+            res += equilibrium.solve(state, T, P, be_bar);
             result.equilibrium += res;
         }
-        /*
-        if(step >= 240 && icell > 0 && icell < 10){
-            std::cout << "step " << step << ", icell " << icell << std::endl;
-            std::cout << "n(Mg++):  " << (state.speciesAmount("Mg++")) << std::endl;
-            std::cout << "n(H+):  " << (state.speciesAmount("H+")) << std::endl;
-            std::cout << "n(H+):  " << (state.speciesAmount("H+")) << std::endl;
-            //std::cout << "equilibrium result.estimate.accepted?  " << result.smart_equilibrium.estimate.accepted << std::endl;
-            getchar();
-        }
-        */
+
+        state.scaleSpeciesAmounts(be_total);
 
         result.timing.equilibrate = toc(EQUILIBRATE_STEP);
 
         result.timing.solve = toc(SOLVE_STEP);
-
 
     }
 
@@ -2622,25 +2481,6 @@ struct SmartKineticSolver::Impl
         return 0;
     }
 
-    auto printTree(const Index& step) -> void{
-        //if(options.learning.use_smart_equilibrium_solver) smart_equilibrium->showTree(step);
-        // Print the tree
-        /*
-        if (step == 99) {
-            std::cout << "\nTree with reference elements for smart kinetics of the size " << tree.size() << std::endl;
-            unsigned int i = 0;
-            unsigned int count_nonzero = 0;
-            for (auto node : tree) {
-                std::cout << "node " << i << " used " << node.usage_count << std::endl;
-                i += 1;
-                if (node.usage_count) count_nonzero++;
-            }
-            std::cout << "Number of non-zero entries is " << count_nonzero << " out of " << tree.size() << std::endl;
-            //getchar();
-        }
-        */
-    }
-
 };
 
 SmartKineticSolver::SmartKineticSolver()
@@ -2694,7 +2534,7 @@ auto SmartKineticSolver::addSource(const ChemicalState& state, double volumerate
     pimpl->addSource(state, volumerate, units);
 }
 
-auto SmartKineticSolver::addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
+auto SmartKineticSolver::addPhaseSink(const std::string& phase, double volumerate, const std::string& units) -> void
 {
     pimpl->addPhaseSink(phase, volumerate, units);
 }
@@ -2737,10 +2577,6 @@ auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt, Vector
 auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void
 {
     pimpl->solve(state, t, dt, b, step, icell);
-}
-
-auto SmartKineticSolver::printTree(const Index& step) -> void{
-    pimpl->printTree(step);
 }
 
 } // namespace Reaktoro

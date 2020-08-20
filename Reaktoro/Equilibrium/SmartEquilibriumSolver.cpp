@@ -37,6 +37,7 @@
 #include <Reaktoro/ODML/ClusterConnectivity.hpp>
 #include <Reaktoro/ODML/PriorityQueue.hpp>
 #include <Reaktoro/Optimization/Canonicalizer.hpp>
+#include <Reaktoro/Kinetics/KineticRecord.h>
 
 namespace Reaktoro {
 namespace detail {
@@ -298,6 +299,7 @@ struct SmartEquilibriumSolver::Impl
 
         result.timing.learn_storage = toc(STORAGE_STEP);
     }
+
     /// Learn how to perform a full equilibrium calculation (with tracking)
     auto learn_priority_based_acceptance_primary_potential(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
@@ -556,7 +558,7 @@ struct SmartEquilibriumSolver::Impl
         result.timing.learn_storage = toc(STORAGE_STEP);
     }
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expenses)
     auto estimate(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
         // Set the estimate status to false at the beginning
@@ -708,6 +710,8 @@ struct SmartEquilibriumSolver::Impl
 
                     // After the search is finished successfully
                     //---------------------------------------------------------------------
+                    // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
+                    for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
 
                     // Update the chemical state result with estimated amounts
                     //state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
@@ -745,7 +749,161 @@ struct SmartEquilibriumSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expenses)
+    auto estimate_with_record(ChemicalState& state, double T, double P, VectorConstRef be, const KineticRecord& record) -> void
+    {
+        // Set the estimate status to false at the beginning
+        result.estimate.accepted = false;
+
+        // Auxiliary relative and absolute tolerance parameters
+        const auto reltol = options.reltol;
+
+        // The threshold used to determine elements with insignificant amounts
+        const auto eps_b = options.amount_fraction_cutoff * sum(be);
+
+        // The current set of primary species in the chemical state
+        const auto& iprimary = state.equilibrium().indicesPrimarySpecies();
+
+        Vector dbe;
+
+        // The function that checks if a record in the database pass the error test.
+        // It returns (`success`, `error`, `iprimaryspecies`), where
+        // * `success` is true if error test succeeds, false otherwise.
+        // * `error` is the first error value violating the tolerance
+        // * `iprimaryspecies` is the index of the primary species that fails the error test
+        auto pass_error_test = [&be, &dbe, &reltol, &eps_b](const KineticRecord& record) -> std::tuple<bool, double, Index>
+        {
+            using std::abs;
+            using std::max;
+            const auto& state0 = record.state;
+            const auto& be0 = record.be;
+            const auto& Mbe0 = record.Mbe;
+            const auto& isue0 = state0.equilibrium().indicesStrictlyUnstableElements();
+
+            dbe.noalias() = be - be0;
+
+            // Check if state0 has strictly unstable elements (i.e. elements with zero amounts)
+            // which cannot be used for Taylor estimation if positive amounts for those elements are given.
+            if((dbe(isue0).array() > eps_b).any())
+            {
+                assert((be0(isue0).array() < eps_b).any()); // ensure this condition is never broken (effective during debug only)
+                return { false, 9999, -1 };
+            }
+
+            double error = 0.0;
+            const auto size = Mbe0.rows();
+            for(auto i = 1; i <= size; ++i) {
+                error = max(error, abs(Mbe0.row(size - i) * dbe)); // start checking primary species with least amount first
+                if(error >= reltol)
+                    return { false, error, size - i };
+            }
+
+            return { true, error, -1 };
+        };
+
+        // Generate the hash number for the indices of primary species in the state
+        const auto label = detail::hash(iprimary);
+
+        // The function that identifies the starting cluster index
+        auto index_starting_cluster = [&]() -> Index
+        {
+            // If no primary species, then return number of clusters to trigger use of total usage counts of clusters
+            if(iprimary.size() == 0)
+                return database.clusters.size();
+
+            // Find the index of the cluster with the same set of primary species (search those with highest count first)
+            for(auto icluster : database.priority.order())
+                if(database.clusters[icluster].label == label)
+                    return icluster;
+
+            // In no cluster with the same set of primary species if found, then return number of clusters
+            return database.clusters.size();
+        };
+
+        // The index of the starting cluster
+        const auto icluster = index_starting_cluster();
+
+        // The ordering of the clusters to look for (starting with icluster)
+        const auto& clusters_ordering = database.connectivity.order(icluster);
+
+        //---------------------------------------------------------------------
+        // ERROR CONTROL STEP DURING THE ESTIMATE PROCESS
+        //---------------------------------------------------------------------
+        tic(ERROR_CONTROL_STEP);
+
+        // Check if the current record passes the error test
+        const auto [success, error, iprimaryspecies] = pass_error_test(record);
+        //std::cout << "success  : " << success << std::endl;
+        //std::cout << "error  : " << error << std::endl;
+        //getchar();
+
+        result.timing.estimate_error_control += toc(ERROR_CONTROL_STEP);
+
+        if(success)
+        {
+            //---------------------------------------------------------------------
+            // TAYLOR PREDICTION STEP DURING THE ESTIMATE PROCESS
+            //---------------------------------------------------------------------
+            tic(TAYLOR_STEP);
+
+            const auto& ies = partition.indicesEquilibriumSpecies();
+            const auto& iee = partition.indicesEquilibriumElements();
+
+            // Fetch reference values
+            const auto& be0 = record.be;
+            const auto& n0 = record.state.speciesAmounts();
+            const auto& P0 = record.state.pressure();
+            const auto& T0 = record.state.temperature();
+            const auto& y0 = record.state.equilibrium().elementChemicalPotentials();
+            const auto& z0 = record.state.equilibrium().speciesStabilities();
+            const auto& ips0 = record.state.equilibrium().indicesEquilibriumSpecies();
+            const auto& Np0 = record.state.equilibrium().numPrimarySpecies();
+
+            const auto& dndb0 = record.sensitivity.dndb;
+            const auto& dndP0 = record.sensitivity.dndP;
+            const auto& dndT0 = record.sensitivity.dndT;
+
+            // Fetch reference values restricted to equilibrium species only
+            const auto& dnedbe0 = dndb0(ies, iee);
+            const auto& dnedbPe0 = dndP0(ies);
+            const auto& dnedbTe0 = dndT0(ies);
+            const auto& ne0 = n0(ies);
+
+            // Perform Taylor extrapolation
+            //ne.noalias() = ne0 + dnedbe0 * (be - be0);
+            ne.noalias() = ne0 + dnedbe0 * (be - be0) + dnedbPe0 * (P - P0) + dnedbTe0 * (T - T0);
+
+            //std::cout << "ne  : " << tr(ne) << std::endl;
+            //getchar();
+
+            // Check if all projected species amounts are positive
+            const double ne_min = min(ne);
+            const double ne_sum = sum(ne);
+            const auto eps_n = options.amount_fraction_cutoff * ne_sum;
+            if(ne_min <= -eps_n){
+                result.estimate.accepted = false;
+                return;
+            }
+
+            // Update the chemical state result with estimated amounts
+            //state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
+            state.setSpeciesAmounts(ne, ies);
+
+            // Update the chemical properties of the system
+            properties = record.properties;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+
+            result.timing.estimate_taylor = toc(TAYLOR_STEP);
+
+            result.estimate.accepted = true;
+
+            return;
+        }
+
+        result.estimate.accepted = false;
+
+    }
+
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expenses)
     auto estimate_priority_based_acceptance_potential(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
         result.estimate.accepted = false;
@@ -841,6 +999,9 @@ struct SmartEquilibriumSolver::Impl
 
                 result.timing.estimate_search = toc(SEARCH_STEP);
 
+                // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
+                for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
+
                 //-----------------------------------------------------------------------
                 // DATABASE PRIORITY AND RANKING UPDATE STEP DURING THE ESTIMATE PROCESS
                 //-----------------------------------------------------------------------
@@ -877,7 +1038,7 @@ struct SmartEquilibriumSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expenses)
     auto estimate_priority_based_acceptance_primary_potential(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
         result.estimate.accepted = false;
@@ -1022,7 +1183,7 @@ struct SmartEquilibriumSolver::Impl
     }
 
     /// Estimate the equilibrium state using sensitivity derivatives,
-    /// where search is performed by the NN algorithm and acceptance cirteria is using n and ln(a)
+    /// where search is performed by the NN algorithm and acceptance criteria is using n and ln(a)
     auto estimate_nnsearch_acceptance_based_on_lna(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
         // Skip estimation if no previous full computation has been done
@@ -1127,7 +1288,7 @@ struct SmartEquilibriumSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences) v.1
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expenses) v.1
     auto estimate_nnsearch_acceptance_based_on_residual(ChemicalState& state, double T, double P, VectorConstRef be) -> void
     {
         result.estimate.accepted = false;
@@ -1279,12 +1440,12 @@ struct SmartEquilibriumSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate of the chemical state
-        estimate(state, T, P, be);
-        //estimate_nnsearch_acceptance_based_on_lna(state, T, P, be);
-        //estimate_nnsearch_acceptance_based_on_residual(state, T, P, be);
-        //estimate_priority_based_acceptance_potential(state, T, P, be);
-        //estimate_priority_based_acceptance_primary_potential(state, T, P, be);
-        //result.estimate.accepted = false;
+        if(options.smart_method == "kin-clustering-eq-clustering")
+            estimate(state, T, P, be);
+        else if (options.smart_method == "kin-priority-eq-priority")
+            estimate_priority_based_acceptance_potential(state, T, P, be);
+        else
+            estimate_nnsearch_acceptance_based_on_lna(state, T, P, be);
 
         result.timing.estimate=toc(ESTIMATE_STEP);
 
@@ -1293,12 +1454,14 @@ struct SmartEquilibriumSolver::Impl
         //-----------------------------------------------------------------------------------------------------
         tic(LEARN_STEP);
 
-        // Perform a learning step if the smart prediction is not sactisfatory
+        // Perform a learning step if the smart prediction is not satisfactory
         if(!result.estimate.accepted){
-            learn(state, T, P, be);
-            //learn_nnsearch(state, T, P, be);
-            //learn_priority_based_acceptance_potential(state, T, P, be);
-            //learn_priority_based_acceptance_primary_potential(state, T, P, be);
+            if(options.smart_method == "kin-clustering-eq-clustering")
+                learn(state, T, P, be);
+            else if (options.smart_method == "kin-priority-eq-priority")
+                learn_priority_based_acceptance_potential(state, T, P, be);
+            else
+                learn_nnsearch(state, T, P, be);
         }
 
         result.timing.learn = toc(LEARN_STEP);
@@ -1308,6 +1471,8 @@ struct SmartEquilibriumSolver::Impl
         return result;
     }
 
+    /// Solve the equilibrium problem with given state, and input temperature, pressure, and element amounts, and
+    /// log the number of th step and cell the solve is at
     auto solve(ChemicalState& state, double T, double P, VectorConstRef be, Index istep, Index icell) -> SmartEquilibriumResult
     {
         tic(SOLVE_STEP);

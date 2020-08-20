@@ -15,14 +15,6 @@
 
 #include "ReactiveTransportSolver.hpp"
 
-// C++ includes
-#include <algorithm>
-#include <fstream>
-#include <iomanip>
-
-// Eigen includes
-#include <Reaktoro/deps/eigen3/Eigen/Dense>
-
 // Reaktoro includes
 #include <Reaktoro/Common/Exception.hpp>
 #include <Reaktoro/Common/Profiling.hpp>
@@ -85,6 +77,9 @@ struct ReactiveTransportSolver::Impl
 
     /// The amounts of equilibrium elements on each cell of the mesh.
     Matrix be;
+
+    /// The amounts of scaled equilibrium elements on each cell of the mesh.
+    Matrix be_bar;
 
     /// The current number of steps in the solution of the reactive transport equations.
     Index steps = 0;
@@ -276,11 +271,18 @@ struct ReactiveTransportSolver::Impl
                 const auto T = field[icell].temperature();
                 const auto P = field[icell].pressure();
 
-                // Solve with a smart equilibrium solver
-                smart_equilibrium_solver.solve(field[icell], T, P, be.row(icell));
+                // Scaling vector of element amounts
+                double be_total = sum(be.row(icell));
+                be_bar.noalias() = be.row(icell) / be_total;
 
-                // Update chemical properties of the field
-                properties[icell] = smart_equilibrium_solver.properties();
+                // Scale the initial vector of species amounts
+                field[icell].scaleSpeciesAmounts(1 / be_total);
+
+                // Solve with a smart equilibrium solver
+                smart_equilibrium_solver.solve(field[icell], T, P, be_bar);
+
+                // Scale back the vector of species amounts
+                field[icell].scaleSpeciesAmounts(be_total);
 
                 // Save the result of this cell's smart equilibrium calculation
                 result.smart_equilibrium_at_cell[icell] = smart_equilibrium_solver.result();
@@ -296,11 +298,18 @@ struct ReactiveTransportSolver::Impl
                 const auto T = field[icell].temperature();
                 const auto P = field[icell].pressure();
 
-                // Solve with a conventional equilibrium solver
-                equilibrium_solver.solve(field[icell], T, P, be.row(icell));
+                // Scale vector of element amounts
+                double be_total = sum(be.row(icell));
+                be_bar.noalias() = be.row(icell) / be_total;
 
-                // Update chemical properties of the field
-                properties[icell] = equilibrium_solver.properties();
+                // Scale the initial vector of species amounts
+                field[icell].scaleSpeciesAmounts(1 / be_total);
+
+                // Solve with a conventional equilibrium solver
+                equilibrium_solver.solve(field[icell], T, P, be_bar);
+
+                // Scale back the vector of species amounts
+                field[icell].scaleSpeciesAmounts(be_total);
 
                 // Save the result of this cell's smart equilibrium calculation.
                 result.equilibrium_at_cell[icell] = equilibrium_solver.result();
@@ -401,43 +410,19 @@ struct ReactiveTransportSolver::Impl
 
             for(Index icell = 0; icell < num_cells; ++icell)
             {
-                const auto T = states[icell].temperature();
-                const auto P = states[icell].pressure();
 
                 // Solve with a smart kinetic solver
                 //smart_kinetic_solver.solve(states[icell], t_start, dt, be.row(icell));
                 smart_kinetic_solver.solve(states[icell], t_start, dt, be.row(icell), steps, icell);
 
                 // Update chemical properties of the field
-                //properties[icell] = smart_kinetic_solver.properties();
-                /*
-                std::cout << "icell        : " << icell << std::endl;
-                if(steps > 200 && icell >- 0 && icell < 20) {
-                    std::cout << " step, cell : " << steps << " " << icell;
-                    std::cout << " Calcite : " << states[icell].speciesAmount("Calcite") ;
-                    std::cout << " Dolomite : " << states[icell].speciesAmount("Dolomite") << std::endl;
-                    getchar();
-                }
-                */
+                //properties[icell] = kinetic_solver.properties();
+
                 // Save the result of this cell's smart equilibrium calculation.
                 result.smart_kinetics_at_cell[icell] = smart_kinetic_solver.result();
                 if(options.use_smart_equilibrium_solver)    result.smart_equilibrium_at_cell[icell] = smart_kinetic_solver.result().smart_equilibrium;
                 else                                        result.equilibrium_at_cell[icell] = smart_kinetic_solver.result().equilibrium;
-                /*
-                // * TODO: debugging code to remove
 
-                std::cout << " - solve                     : " << result.smart_kinetics_at_cell[icell].timing.solve << std::endl;
-                std::cout << "   - learn : " << result.smart_kinetics_at_cell[icell].timing.learn << " (" << result.smart_kinetics_at_cell[icell].timing.learn / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "     - store                 : " << result.smart_kinetics_at_cell[icell].timing.learn_storage << " (" << result.smart_kinetics_at_cell[icell].timing.learn_storage / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "     - integrate             : " << result.smart_kinetics_at_cell[icell].timing.learn_integration << " (" << result.smart_kinetics_at_cell[icell].timing.learn_storage / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "       - chemical properties : " << result.smart_kinetics_at_cell[icell].timing.learn_chemical_properties << " (" << result.smart_kinetics_at_cell[icell].timing.learn_chemical_properties / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "       - integrate_reaction_rates      : " << result.smart_kinetics_at_cell[icell].timing.learn_reaction_rates << " (" << result.smart_kinetics_at_cell[icell].timing.learn_reaction_rates / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "       - sensitivity         : " << result.smart_kinetics_at_cell[icell].timing.learn_sensitivity << " (" << result.smart_kinetics_at_cell[icell].timing.learn_sensitivity / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "       - equilibration       : " << result.smart_kinetics_at_cell[icell].timing.learn_equilibration << " (" << result.smart_kinetics_at_cell[icell].timing.learn_equilibration / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "   - estimate              : " << result.smart_kinetics_at_cell[icell].timing.estimate << " (" << result.smart_kinetics_at_cell[icell].timing.estimate / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "     - estimate            : " << result.smart_kinetics_at_cell[icell].timing.estimate_search << " (" << result.smart_kinetics_at_cell[icell].timing.estimate_search / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "     - acceptance          : " << result.smart_kinetics_at_cell[icell].timing.estimate_error_control << " (" << result.smart_kinetics_at_cell[icell].timing.estimate_error_control / result.smart_kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                */
             }
         }
         else
@@ -449,8 +434,6 @@ struct ReactiveTransportSolver::Impl
 
             for(Index icell = 0; icell < num_cells; ++icell)
             {
-                const auto T = states[icell].temperature();
-                const auto P = states[icell].pressure();
 
                 // Solve with a conventional kinetic solver
                 kinetic_solver.solve(states[icell], t_start, dt, be.row(icell));
@@ -464,162 +447,16 @@ struct ReactiveTransportSolver::Impl
                 if(options.use_smart_equilibrium_solver)    result.smart_equilibrium_at_cell[icell] = kinetic_solver.result().smart_equilibrium;
                 else                                        result.equilibrium_at_cell[icell] = kinetic_solver.result().equilibrium;
 
-                /*
-                // * TODO: debugging code to remove
-                std::cout << " - solve                 : " << result.kinetics_at_cell[icell].timing.solve << std::endl;
-                std::cout << "   - chemical properties : " << result.kinetics_at_cell[icell].timing.chemical_properties << " (" << result.kinetics_at_cell[icell].timing.chemical_properties / result.kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "   - integrate_reaction_rates      : " << result.kinetics_at_cell[icell].timing.integrate_reaction_rates << " (" << result.kinetics_at_cell[icell].timing.integrate_reaction_rates / result.kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "   - sensitivity         : " << result.kinetics_at_cell[icell].timing.sensitivity << " (" << result.kinetics_at_cell[icell].timing.sensitivity / result.kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                std::cout << "   - equilibration       : " << result.kinetics_at_cell[icell].timing.equilibrate << " (" << result.kinetics_at_cell[icell].timing.equilibrate / result.kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                if(options.use_smart_equilibrium_solver)
-                {
-                    std::cout << "     - learning       : " << result.kinetics_at_cell[icell].smart_equilibrium.timing.learn << " (" << result.kinetics_at_cell[icell].smart_equilibrium.timing.learn / result.kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                    std::cout << "     - estimation     : " << result.kinetics_at_cell[icell].smart_equilibrium.timing.estimate << " (" << result.kinetics_at_cell[icell].smart_equilibrium.timing.estimate / result.kinetics_at_cell[icell].timing.solve * 100 << " %)" << std::endl;
-                }
-                getchar();
-                */
             }
         }
 
         result.timing.kinetics = toc(KINETIC_STEP);
 
-        /*
-         * // TODO: remove, left from debugging
-        double solve_time = 0.0;
-        double initialize = 0.0;
-        double integrate = 0.0;
-        double chemical_properties = 0.0;
-        double reaction_rates = 0.0;
-        double sensitivity = 0.0;
-        double equilibration = 0.0;
-        double estimation = 0.0;
-        double estimation_search = 0.0;
-        double learning = 0.0;
-        double kin_learn = 0.0;
-        double kin_estimate = 0.0;
-        double kin_estimate_search = 0.0;
-        double kin_estimate_acceptance = 0.0;
-
-        auto sum = [&](const ReactiveTransportResult& res){
-            for(unsigned int i=0; i < num_cells; ++i)
-            {
-                if(options.use_smart_kinetic_solver){
-                    initialize += res.smart_kinetics_at_cell.at(i).timing.initialize;
-                    solve_time += res.smart_kinetics_at_cell.at(i).timing.solve;
-                    integrate += res.smart_kinetics_at_cell.at(i).timing.learn_integration;
-
-                    chemical_properties += res.smart_kinetics_at_cell.at(i).timing.learn_chemical_properties;
-                    reaction_rates += res.smart_kinetics_at_cell.at(i).timing.learn_reaction_rates;
-                    sensitivity += res.smart_kinetics_at_cell.at(i).timing.learn_sensitivity;
-                    equilibration += res.smart_kinetics_at_cell.at(i).timing.learn_equilibration;
-                    kin_learn += res.smart_kinetics_at_cell.at(i).timing.learn;
-                    kin_estimate += res.smart_kinetics_at_cell.at(i).timing.estimate;
-                    kin_estimate_search += res.smart_kinetics_at_cell.at(i).timing.estimate_search;
-                    kin_estimate_acceptance += res.smart_kinetics_at_cell.at(i).timing.estimate_error_control;
-
-                }else{
-                    initialize += res.kinetics_at_cell.at(i).timing.initialize;
-                    solve_time += res.kinetics_at_cell.at(i).timing.solve;
-                    integrate += res.kinetics_at_cell.at(i).timing.integrate;
-
-                    chemical_properties += res.kinetics_at_cell.at(i).timing.integrate_chemical_properties;
-                    reaction_rates += res.kinetics_at_cell.at(i).timing.integrate_reaction_rates;
-                    sensitivity += res.kinetics_at_cell.at(i).timing.integrate_sensitivity;
-                    equilibration += res.kinetics_at_cell.at(i).timing.integrate_equilibration;
-                }
-                if(options.use_smart_equilibrium_solver) {
-
-                    learning += res.smart_equilibrium_at_cell.at(i).timing.learn;
-                    estimation += res.smart_equilibrium_at_cell.at(i).timing.estimate;
-                    estimation_search += res.smart_equilibrium_at_cell.at(i).timing.estimate_search;
-                }
-            }
-        };
-        sum(result);
-
-
-        std::cout << "transport : " << result.timing.transport << std::endl;
-        std::cout << "kinetics  : " << result.timing.kinetics << std::endl;
-        std::cout << " - solve                   : " << solve_time << std::endl;
-        std::cout << "   - learn                 : " << kin_learn << " (" << kin_learn / solve_time * 100 << " %)" << std::endl;
-        //std::cout << "     - initialize            : " << initialize << " (" << initialize / solve_time * 100 << " %)" << std::endl;
-        std::cout << "     - integrate             : " << integrate << " (" << integrate / solve_time * 100 << " %)" << std::endl;
-        std::cout << "       - chemical properties : " << chemical_properties << " (" << chemical_properties / solve_time * 100 << " %)" << std::endl;
-        std::cout << "       - sensitivity         : " << sensitivity << " (" << sensitivity / solve_time * 100 << " %)" << std::endl;
-        std::cout << "       - integrate_reaction_rates      : " << integrate_reaction_rates << " (" << integrate_reaction_rates / solve_time * 100 << " %)" << std::endl;
-        std::cout << "       - equilibration       : " << equilibration << " (" << equilibration / solve_time * 100 << " %)" << std::endl;
-        if (options.use_smart_kinetic_solver) {
-            std::cout << "   - estimate                 : " << kin_estimate << " (" << kin_estimate / solve_time * 100 << " %)" << std::endl;
-            std::cout << "     - search                 : " << kin_estimate_search << " (" << kin_estimate_search / solve_time * 100 << " %)" << std::endl;
-            std::cout << "     - acceptance             : " << kin_estimate_acceptance << " (" << kin_estimate_acceptance / solve_time * 100 << " %)" << std::endl;
-        }
-        int number_learnings;
-        auto sum_learnings = [&](const ReactiveTransportResult& res){
-            unsigned int number_learnings = 0;
-            for(unsigned int i=0; i < num_cells; ++i)
-                number_learnings += static_cast<int>(res.smart_kinetics_at_cell.at(i).estimate.accepted);
-            return number_learnings;
-        };
-        std::cout << "------------------------------------------------" << std::endl;
-        //getchar();
-        */
-        /*
-        if(options.use_smart_kinetic_solver) {
-            auto sum_learnings = [&](const ReactiveTransportResult &res) {
-                unsigned int number_learnings = 0;
-                for (unsigned int i = 0; i < num_cells; ++i)
-                    number_learnings += static_cast<int>(res.smart_kinetics_at_cell.at(i).estimate.accepted);
-                return number_learnings;
-            };
-            std::cout << "number of learnings on step " << steps << " : " << num_cells - sum_learnings(result)
-                      << " out of " << num_cells << std::endl;
-            if (!(steps % 10)) getchar();
-        }
-         */
-
-        /*
-        if(steps == 49) {
-            //TODO: code for debugging
-            std::cout << "transport : " << result.timing.transport << std::endl;
-            std::cout << "kinetics  : " << result.timing.kinetics << std::endl;
-            std::cout << " - solve                   : " << solve_time << std::endl;
-            std::cout << "   - initialize            : " << initialize << " (" << initialize / solve_time * 100 << " %)"
-                      << std::endl;
-            std::cout << "   - integrate             : " << integrate << " (" << integrate / solve_time * 100 << " %)"
-                      << std::endl;
-            std::cout << "     - chemical properties : " << chemical_properties << " ("
-                      << chemical_properties / solve_time * 100 << " %)" << std::endl;
-            std::cout << "     - sensitivity : " << sensitivity << " ("
-                      << sensitivity / solve_time * 100 << " %)" << std::endl;
-           std::cout << "     - integrate_reaction_rates      : " << integrate_reaction_rates << " (" << integrate_reaction_rates / solve_time * 100
-                      << " %)" << std::endl;
-            std::cout << "     - equilibration       : " << equilibration << " (" << equilibration / solve_time * 100
-                      << " %)" << std::endl;
-            if (options.use_smart_equilibrium_solver) {
-                std::cout << "       - learning          : " << learning << " (" << learning / solve_time * 100 << " %)"
-                          << std::endl;
-                std::cout << "       - estimation        : " << estimation << " (" << estimation / solve_time * 100
-                          << " %)" << std::endl;
-                std::cout << "         - estimation_search : " << estimation_search << " ("
-                          << estimation_search / solve_time * 100 << " %)" << std::endl;
-            }
-            std::cout << "------------------------------------------------" << std::endl;
-            getchar();
-        }
-        */
-
-        /*
-        if(options.use_smart_kinetic_solver)
-        {
-            smart_kinetic_solver.printTree(steps);
-        }
-        */
-
         // Update the output files with the chemical state of every cell
         for(Index icell = 0; icell < num_cells; ++icell)
             for(auto output : outputs){
                 output.update(states[icell], icell);
-                //output.update(states[icell], properties[icell], icell);
+                //output.update(states[icell], properties[icell], icell); // use properties for outputting
             }
 
         // Output chemical states in the output files

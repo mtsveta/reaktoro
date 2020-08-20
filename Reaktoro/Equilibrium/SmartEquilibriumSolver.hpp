@@ -35,6 +35,7 @@ class Partition;
 // Forward declarations (structs)
 struct SmartEquilibriumOptions;
 struct SmartEquilibriumResult;
+struct KineticRecord;
 
 /// A class used to perform equilibrium calculations using machine learning scheme.
 class SmartEquilibriumSolver
@@ -78,7 +79,6 @@ public:
     /// @param state[in,out] The initial guess and the final state of the equilibrium calculation
     /// @param problem The equilibrium problem with given temperature, pressure, and element amounts.
     auto solve(ChemicalState& state, const EquilibriumProblem& problem) -> SmartEquilibriumResult;
-
 
     /// Return the chemical properties of the calculated equilibrium state.
     /// @see ChemicalProperties

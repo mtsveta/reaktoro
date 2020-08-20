@@ -81,7 +81,7 @@ public:
     /// @param phase The name of the phase.
     /// @param volumerate The volumetric rate of the phase removal.
     /// @param units The units of the volumetric rate (compatible with m3/s).
-    auto addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void;
+    auto addPhaseSink(const std::string& phase, double volumerate, const std::string& units) -> void;
 
     /// Add a fluid sink to the chemical kinetics problem.
     /// This method allows the chemical kinetics problem to account for
@@ -119,14 +119,12 @@ public:
     /// @param b The amount of elements updated from the transport
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void;
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void;
+
     /// Return the result of the last smart kinetic calculation.
     auto result() const -> const SmartKineticResult&;
 
     // Return properties of the chemical state provided by the KineticSolver
     auto properties() const -> const ChemicalProperties&;
-
-    // Output tree with reference element to the console
-    auto printTree(const Index& step) -> void;
 
 private:
     struct Impl;
