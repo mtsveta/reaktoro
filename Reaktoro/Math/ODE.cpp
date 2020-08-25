@@ -355,7 +355,7 @@ struct ODESolver::Impl
 
         double t_start = t;
         // Solve the ode problem from `tstart` to `tfinal`
-        // CV_NORMAL - indicates that the step is controled by `tstart` and `tfinal`
+        // CV_NORMAL - indicates that the step is controlled by `tstart` and `tfinal`
         // CVODE will trigger integration from t until t + dt
         auto res = CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL);
 
@@ -572,7 +572,7 @@ struct ODESolver::Impl
 
         double t_start = t;
         // Solve the ode problem from `tstart` to `tfinal`
-        // CV_NORMAL - indicates that the step is controled by `tstart` and `tfinal`
+        // CV_NORMAL - indicates that the step is controlled by `tstart` and `tfinal`
         // CVODE will trigger integration from t until t + dt
         auto res = CVode(cvode_mem, t + dt, cvode_y, &t, CV_NORMAL);
 
@@ -606,7 +606,7 @@ struct ODESolver::Impl
     }
     //*/
     /// Solve the ODE equations from a given start time to a final one
-    /// with 2d order Taylor expantion scheme
+    /// with 2d order Taylor expansion scheme
     // TODO: test it instead of using CVODE
     auto solve_(double& t, double dt, VectorRef y, MatrixRef Sk1) -> void
     {
