@@ -782,9 +782,9 @@ auto KineticSolver::step(ChemicalState& state, double t) -> double
     return pimpl->step(state, t);
 }
 
-auto KineticSolver::step(ChemicalState& state, double t, double dt) -> double
+auto KineticSolver::step(ChemicalState& state, double t, double tfinal) -> double
 {
-    return pimpl->step(state, t, dt);
+    return pimpl->step(state, t, tfinal);
 }
 
 auto KineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
