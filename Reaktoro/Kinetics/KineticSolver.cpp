@@ -26,7 +26,6 @@ using namespace std::placeholders;
 #include <Reaktoro/Common/Exception.hpp>
 #include <Reaktoro/Common/Profiling.hpp>
 #include <Reaktoro/Math/Matrix.hpp>
-#include <Reaktoro/Common/StringUtils.hpp>
 #include <Reaktoro/Common/Units.hpp>
 #include <Reaktoro/Core/ChemicalProperties.hpp>
 #include <Reaktoro/Core/ChemicalState.hpp>
@@ -41,8 +40,6 @@ using namespace std::placeholders;
 #include <Reaktoro/Equilibrium/SmartEquilibriumSolver.hpp>
 #include <Reaktoro/Kinetics/KineticOptions.hpp>
 #include <Reaktoro/Kinetics/KineticResult.hpp>
-#include <Reaktoro/Kinetics/KineticProblem.hpp>
-#include <Reaktoro/Thermodynamics/Water/WaterConstants.hpp>
 
 namespace Reaktoro {
 
@@ -202,33 +199,6 @@ struct KineticSolver::Impl
         // Allocate memory for the partial derivatives of the source rates `q` w.r.t. to `u = [be nk]`
         dqdu.resize(system.numSpecies(), Ee + Nk);
 
-        if (Nk)
-        {
-            /*
-            //* TODO: remove when debugging is finished
-            std::cout << "ies :"; for (auto elem : ies) std::cout << elem << " "; std::cout << std::endl;
-            std::cout << "iks :"; for (auto elem : iks) std::cout << elem << " "; std::cout << std::endl;
-
-
-            std::cout << "setPartition function :" << std::endl;
-
-            std::cout << "iee :"; for (auto elem : iee) std::cout << elem << " "; std::cout << std::endl;
-            std::cout << "ike :"; for (auto elem : ike) std::cout << elem << " "; std::cout << std::endl;
-
-            std::cout << "S \n" << reactions.stoichiometricMatrix() << std::endl;
-            std::cout << "Se \n" << Se << std::endl;
-            std::cout << "Sk \n" << Sk << std::endl;
-
-            std::cout << "A \n" << A << std::endl;
-            std::cout << "Ae \n" << Ae << std::endl;
-            std::cout << "Ak \n" << Ak << std::endl;
-
-            std::cout << "B \n" << B << std::endl;
-
-            std::cout << "Ee " << Ee << std::endl;
-            std::cout << "Nk " << Nk << std::endl;
-            */
-        }
     }
 
     auto setOptions(const KineticOptions& options_) -> void
@@ -338,6 +308,7 @@ struct KineticSolver::Impl
         initialize(state, tstart, benk);
 
     }
+
     auto initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void
     {
         // Initialise the temperature and pressure variables
@@ -414,6 +385,74 @@ struct KineticSolver::Impl
         return t;
     }
 
+    auto solve(ChemicalState& state, double t, double dt) -> double
+    {
+        // Initialize result structure
+        result = {};
+
+        tic(SOLVE_STEP);
+
+        //------------------------------------------------------------------------------------------
+        // INITIALIZE OF THE VARIABLES DURING THE KINETICS SOLVE STEP
+        //------------------------------------------------------------------------------------------
+        tic(INITIALIZE_STEP);
+
+        // Extract the composition of the kinetic species from the state
+        const auto &n = state.speciesAmounts();
+        ne = n(ies);
+        nk = n(iks);
+
+        // Assemble the vector benk = [be nk]
+        benk.resize(Ee + Nk);
+        benk.tail(Nk) = nk;
+
+        result.timing.initialize=toc(INITIALIZE_STEP);
+
+        //------------------------------------------------------------------------------------------
+        // INTEGRATE ELEMENTS AND KINETICS' SPECIES STORED IN 'BENK' DURING THE KINETICS SOLVE STEP
+        //------------------------------------------------------------------------------------------
+        tic(INTEGRATE_STEP);
+
+        // Integrate the chemical kinetics ODE from `t` to `t + dt`
+        ode.solve(t, dt, benk);
+        //ode.solve_implicit_1st_order(t, dt, benk);
+
+        // Extract the `be` and `nk` entries of the vector `benk`
+        be = benk.head(Ee);
+        nk = benk.tail(Nk);
+
+        // Update the composition of the kinetic species
+        state.setSpeciesAmounts(nk, iks);
+
+        result.timing.integrate = toc(INTEGRATE_STEP);
+
+        //------------------------------------------------------------------------------------------
+        // EQUILIBRATE EQUILIBRIUM SPECIES STORED IN 'NE' DURING THE KINETICS SOLVE STEP
+        //------------------------------------------------------------------------------------------
+
+        tic(EQUILIBRATE_STEP);
+
+        if(options.use_smart_equilibrium_solver){
+            SmartEquilibriumResult res = {};
+            res += smart_equilibrium.solve(state, T, P, be);
+            result.smart_equilibrium += res;
+        }
+        else{
+            EquilibriumResult res = {};
+            res += equilibrium.solve(state, T, P, be);
+            result.equilibrium += res;
+        }
+
+        std::cout << "# iter = " << result.equilibrium.optimum.iterations << std::endl;
+
+        result.timing.equilibrate = toc(EQUILIBRATE_STEP);
+
+        result.timing.solve = toc(SOLVE_STEP);
+
+        return t;
+
+    }
+
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
     {
         // Initialize result structure
@@ -482,16 +521,9 @@ struct KineticSolver::Impl
         result.timing.solve = toc(SOLVE_STEP);
 
     }
+
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b, Index step, Index icell) -> void
     {
-
-        /*
-        if(step > 178)
-        {
-            std::cout << "benk after  ..." << tr(benk) << std::endl;
-        }
-        */
-
         // Initialize result structure
         result = {};
 
@@ -528,8 +560,6 @@ struct KineticSolver::Impl
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
         nk = benk.tail(Nk);
-
-        //std::cout << "state.setSpeciesAmounts(nk, iks)  ..." << std::endl;
 
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
@@ -582,19 +612,11 @@ struct KineticSolver::Impl
             // smart_equilibrium_result
             timeit(res += smart_equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration+=);
 
-            /*
-            std::cout << " - learn    : " << res.timing.learn << std::endl;
-            std::cout << " - estimate : " << res.timing.estimate << std::endl;
-            std::cout << "   - search : " << res.timing.estimate_search << std::endl;
-            getchar();
-            */
             result.smart_equilibrium += res;
 
             // If smart calculation failed, use cold-start
             if(!res.estimate.accepted && !res.learning.gibbs_energy_minimization.optimum.succeeded)
             {
-                //std::cout << "restart smart_equilibrium: " << res.learning.gibbs_energy_minimization.optimum.succeeded << std::endl;
-
                 state.setSpeciesAmounts(0.0);
                 timeit( res = smart_equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration+=);
 
@@ -616,18 +638,11 @@ struct KineticSolver::Impl
 
             // Check if the calculation failed, if so, use cold-start
             if (!res.optimum.succeeded) {
-                //std::cout << "t : " << t << std::endl;
-                //std::cout << "n : " << tr(state.speciesAmounts()) << std::endl;
                 state.setSpeciesAmounts(0.0);
                 timeit(res = equilibrium.solve(state, T, P, be), result.timing.integrate_equilibration +=);
 
             }
             if (!res.optimum.succeeded) {
-                //std::cout << "t : " << t << std::endl;
-                //std::cout << "n : " << tr(state.speciesAmounts()) << std::endl;
-                //std::cout << "n : " << state.speciesAmount("H+") << std::endl;
-                //std::cout << "error : " << res.optimum.error << std::endl;
-                //std::cout << "iterations : " << res.optimum.iterations << std::endl;
                 return 1; // ensure the ode solver will reduce the time step
             }
             // Assert the equilibrium calculation did not fail
@@ -636,12 +651,9 @@ struct KineticSolver::Impl
                    "The equilibrium calculation failed.");
         }
 
-
-        //std::cout << "properties ..." << std::endl;
         // Update the chemical properties of the system
         timeit(properties = state.properties(), result.timing.integrate_chemical_properties+=);
 
-        //std::cout << "reactions ..." << std::endl;
         // Calculate the kinetic rates of the reactions
         timeit(r = reactions.rates(properties), result.timing.integrate_reaction_rates+=);
 
@@ -785,6 +797,11 @@ auto KineticSolver::step(ChemicalState& state, double t) -> double
 auto KineticSolver::step(ChemicalState& state, double t, double tfinal) -> double
 {
     return pimpl->step(state, t, tfinal);
+}
+
+auto KineticSolver::solve(ChemicalState& state, double t, double dt) -> double
+{
+    pimpl->solve(state, t, dt);
 }
 
 auto KineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
