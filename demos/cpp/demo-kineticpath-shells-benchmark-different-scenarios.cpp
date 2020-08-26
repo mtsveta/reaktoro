@@ -21,7 +21,12 @@ using namespace Reaktoro;
 int main()
 {
     double t0 = 0;
-    double t1 = 0.1; // in minutes
+    double dt = 0.1; // in minutes
+    int n = 1;
+    Index ncells = 1;
+
+    std::string activity_model = "pitzer";
+    //std::string activity_model = "hkf";
 
     Database database("supcrt07.xml");
 
@@ -29,10 +34,14 @@ int main()
     dhModel.setPHREEQC();
 
     ChemicalEditor editor(database);
-    editor.addAqueousPhaseWithElements("H Cl S O Ca Na K Mg C Si Al")
-        .setChemicalModelDebyeHuckel(dhModel)
-        .setChemicalModelPitzerHMW()
-        .setActivityModelDrummondCO2();
+    if(activity_model=="pitzer")
+        editor.addAqueousPhaseWithElements("H Cl S O Ca Na K Mg C Si Al")
+                .setChemicalModelDebyeHuckel(dhModel)
+                .setChemicalModelPitzerHMW()
+                .setActivityModelDrummondCO2();
+    else if(activity_model=="hkf")
+        editor.addAqueousPhaseWithElements("H Cl S O Ca Na K Mg C Si Al")
+                .setChemicalModelDebyeHuckel(dhModel);
 
     std::vector<std::string> minerals = {"Halite", "Calcite", "Dolomite", "K-Feldspar", "Quartz", "Kaolinite"};
     auto num_minerals = minerals.size();
@@ -80,10 +89,10 @@ int main()
     ChemicalSystem system(editor);
     ReactionSystem reactions(editor);
 
-    std::vector<Partition> partitions(minerals.size());
+    std::vector<Partition> partitions(num_minerals + 1);
     std::fill(partitions.begin(), partitions.end(), Partition(system));
 
-    for(int i = 0; i < minerals.size(); i++){
+    for(int i = 0; i < num_minerals + 1; i++){
         auto kinetic_minerals = std::vector<std::string>(minerals.begin(), minerals.end() - i);
         std::cout << "Kinetic minerals: "; for(const auto& mineral : kinetic_minerals) std::cout << mineral << ", "; std::cout << std::endl;
 
@@ -107,23 +116,32 @@ int main()
         problem.add("K", 1e-9, "mol");
         problem.pH(7.0);
 
-        ChemicalState state0 = equilibrate(problem);
+        EquilibriumInverseSolver solver(partitions[i]);
+        ChemicalState state0(system);
+        EquilibriumResult result = solver.solve(state0, problem);
 
-        state0.setSpeciesMass("Calcite", 100.0869 * 10, "g"); //  molar mass of CaCO3 = 100.0869 g/mol
-        state0.setSpeciesMass("Quartz", 60.08 * 10, "g"); // molar mass of SiO2 = 60.08 g/mol
-        state0.setSpeciesMass("Halite", 58.44 * 10, "g"); // molar mass of NaCl = 58.44 g/mol
-        state0.setSpeciesMass("Dolomite", 184.4008 * 10, "g"); // molar mass of CaMg(CO3)2 = 184.4008 g/mol
-        state0.setSpeciesMass("Kaolinite", 258.1604 * 10, "g"); // molar mass of Al2Si2O5(OH)4 =  258.1604 g/mol
-        state0.setSpeciesMass("K-Feldspar", 278.3315 * 10, "g"); // molar mass of K(AlSi3)O8 = 278.3315 g/mol
+        std::cout << "# iter = " << result.optimum.iterations << std::endl;
+
+        double initial_mineral_amount_mol = 10.0;
+        state0.setSpeciesAmount("Calcite", initial_mineral_amount_mol, "mol");
+        state0.setSpeciesAmount("Quartz", initial_mineral_amount_mol, "mol");
+        state0.setSpeciesAmount("Halite", initial_mineral_amount_mol, "mol");
+        state0.setSpeciesAmount("Dolomite", initial_mineral_amount_mol, "mol");
+        state0.setSpeciesAmount("Kaolinite", initial_mineral_amount_mol, "mol");
+        state0.setSpeciesAmount("K-Feldspar", initial_mineral_amount_mol, "mol");
 
         KineticPath path(reactions, partitions[i]);
 
-        std::string result_filename = "kinetics-benchmark-" + std::to_string(num_kinetic_minerals) + "-kin-"
-                                                            + std::to_string(num_minerals - num_kinetic_minerals) + "-eq-tfinal-"
-                                                            + std::to_string(t1) + ".txt";
+        std::string result_filename = "kinetics-benchmark-kin-" + std::to_string(num_kinetic_minerals)
+                                                           + "-eq-" + std::to_string(num_minerals - num_kinetic_minerals)
+                                                           + "-dt-" + std::to_string(dt)
+                                                           + "-n-" +  std::to_string(n) +
+                                                           + "-ncells-" +  std::to_string(ncells) +
+                                                           + "-activity-model-" + activity_model +
+                                                           + "-uniform.txt";
         ChemicalOutput output = path.output();
         output.filename(result_filename);
-        output.add("time(units=minute)");
+        output.add("time(units=second)");
         output.add("speciesMolality(Na+ units=mmolal)", "Na+ [mmol]");
         output.add("speciesMolality(Cl- units=mmolal)", "Cl- [mmol]");
         output.add("speciesMolality(Mg++ units=mmolal)", "Mg++ [mmol]");
@@ -141,7 +159,8 @@ int main()
 
         tic(KINETIC_PATH);
 
-        path.solve(state0, t0, t1, "second");
+        //path.solve(state0, t0, t1, "second");
+        path.solve(state0, t0, dt, n, "second");
 
         auto kinetic_path_time = toc(KINETIC_PATH);
         std::cout << "----------------------------------------" << std::endl;
