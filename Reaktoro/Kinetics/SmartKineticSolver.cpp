@@ -1195,7 +1195,7 @@ struct SmartKineticSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using the nearest neightbor for the search of the reference state and
+    /// Estimate the equilibrium state using the nearest neighbour for the search of the reference state and
     /// logarithms of activities for the acceptance criteria
     auto estimate_nn_search_acceptance_based_lna(ChemicalState& state, double& t) -> void
     {
@@ -1413,7 +1413,7 @@ struct SmartKineticSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using the nearest neightbor for the search of the reference state and
+    /// Estimate the equilibrium state using the nearest neighbour for the search of the reference state and
     /// residual of the mass action equation for the acceptance criteria
     auto estimate_nn_search_acceptance_based_residual(ChemicalState& state, double& t) -> void
     {
@@ -1657,7 +1657,7 @@ struct SmartKineticSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using the prioroty-based queue for the search of the reference state and
+    /// Estimate the equilibrium state using the priority-based queue for the search of the reference state and
     /// potentials of major species for the acceptance criteria
     auto estimate_priority_based_acceptance_potential(ChemicalState& state, double& t, double dt) -> void
     {
@@ -1890,7 +1890,7 @@ struct SmartKineticSolver::Impl
 
     }
 
-    /// Estimate the equilibrium state using the prioroty-based queue for the search of the reference state and
+    /// Estimate the equilibrium state using the priority-based queue for the search of the reference state and
     /// potentials of primary species for the acceptance criteria
     auto estimate_priority_based_acceptance_primary_potential(ChemicalState& state, double& t) -> void
     {
@@ -2297,40 +2297,40 @@ struct SmartKineticSolver::Impl
         tic(EQUILIBRATE_STEP);
 
 
-//        if(options.use_smart_equilibrium_solver){
-//            SmartEquilibriumResult res = {};
-//            res += smart_equilibrium.solve(state, T, P, be);
-//            result.smart_equilibrium += res;
-//        }
-//        else{
-//            EquilibriumResult res = {};
-//            res += equilibrium.solve(state, T, P, be);
-//            result.equilibrium += res;
-//        }
-
-
-        // ----------------------------------------------------------------- //
-        // With scaling
-        // ----------------------------------------------------------------- //
-        // Scaling vector of element amounts
-        double be_total = sum(be);
-        be_bar.noalias() = be / be_total;
-
-        // Scale the initial vector of species amounts
-        state.scaleSpeciesAmounts(1 / be_total);
-
         if(options.use_smart_equilibrium_solver){
             SmartEquilibriumResult res = {};
-            res += smart_equilibrium.solve(state, T, P, be_bar);
+            res += smart_equilibrium.solve(state, T, P, be);
             result.smart_equilibrium += res;
         }
         else{
             EquilibriumResult res = {};
-            res += equilibrium.solve(state, T, P, be_bar);
+            res += equilibrium.solve(state, T, P, be);
             result.equilibrium += res;
         }
 
-        state.scaleSpeciesAmounts(be_total);
+
+//        // ----------------------------------------------------------------- //
+//        // With scaling
+//        // ----------------------------------------------------------------- //
+//        // Scaling vector of element amounts
+//        double be_total = sum(be);
+//        be_bar.noalias() = be / be_total;
+//
+//        // Scale the initial vector of species amounts
+//        state.scaleSpeciesAmounts(1 / be_total);
+//
+//        if(options.use_smart_equilibrium_solver){
+//            SmartEquilibriumResult res = {};
+//            res += smart_equilibrium.solve(state, T, P, be_bar);
+//            result.smart_equilibrium += res;
+//        }
+//        else{
+//            EquilibriumResult res = {};
+//            res += equilibrium.solve(state, T, P, be_bar);
+//            result.equilibrium += res;
+//        }
+
+//        state.scaleSpeciesAmounts(be_total);
 
         result.timing.equilibrate = toc(EQUILIBRATE_STEP);
 
