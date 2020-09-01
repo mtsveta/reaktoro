@@ -708,9 +708,9 @@ struct SmartEquilibriumSolver::Impl
 
                     result.timing.estimate_search = toc(SEARCH_STEP);
 
-                    // After the search is finished successfully
-                    //---------------------------------------------------------------------
-                    // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
+
+
+                    // Assign small values to all the amount  in the interval [cutoff, 0] (instead of mirroring above)
                     for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
 
                     // Update the chemical state result with estimated amounts
@@ -999,9 +999,6 @@ struct SmartEquilibriumSolver::Impl
 
                 result.timing.estimate_search = toc(SEARCH_STEP);
 
-                // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
-                for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
-
                 //-----------------------------------------------------------------------
                 // DATABASE PRIORITY AND RANKING UPDATE STEP DURING THE ESTIMATE PROCESS
                 //-----------------------------------------------------------------------
@@ -1019,6 +1016,13 @@ struct SmartEquilibriumSolver::Impl
 
                 result.timing.estimate_database_priority_update = toc(PRIORITY_UPDATE_STEP);
 
+                //---------------------------------------------------------------------
+                // After the search is finished successfully
+                //---------------------------------------------------------------------
+
+                // Assign small values to all the amount  in the interval [cutoff, 0] (instead of mirroring above)
+                for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
+
                 // Update the amounts of elements for the equilibrium species
                 //state = node.state; // this line was removed because it was destroying kinetics simulations
                 state.setSpeciesAmounts(ne, ies);
@@ -1026,6 +1030,7 @@ struct SmartEquilibriumSolver::Impl
                 // Update the chemical properties of the system
                 properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
                 result.estimate.accepted = true;
+
                 return;
             }
             else {
@@ -1276,8 +1281,11 @@ struct SmartEquilibriumSolver::Impl
             return;
         }
 
-        // Set the output chemical state to the approximate amounts of species
-        // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
+        //---------------------------------------------------------------------
+        // After the search is finished successfully
+        //---------------------------------------------------------------------
+
+        // Assign small values to all the amount  in the interval [cutoff, 0] (instead of mirroring above)
         for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
 
         // Update equilibrium species
