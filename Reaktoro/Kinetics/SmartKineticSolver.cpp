@@ -507,24 +507,26 @@ struct SmartKineticSolver::Impl
         nk = benk.tail(Nk);
         state.setSpeciesAmounts(nk, iks);
 
-        //---------------------------------------------------------------------
-        // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(CHEMICAL_PROPERTIES_STEP);
-        properties = state.properties();
-        result.timing.learn_chemical_properties += toc(CHEMICAL_PROPERTIES_STEP);
-        //---------------------------------------------------------------------
-        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(CHEMICAL_RATES_STEP);
-        rates = reactions.rates(properties);
-        result.timing.learn_reaction_rates += toc(CHEMICAL_RATES_STEP);
-        //---------------------------------------------------------------------
-        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(SENSITIVITY_STEP);
-        sensitivity = equilibrium.sensitivity();
-        result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
+//        // TODO: evaluations are not needed since the function and jacobian were evaluated in
+//        // ode.solve(t, dt, benk, benk_S) at t = t_{k+1}, so properties, rates, sensitivities we evaluated as well
+//        //---------------------------------------------------------------------
+//        // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
+//        //---------------------------------------------------------------------
+//        tic(CHEMICAL_PROPERTIES_STEP);
+//        properties = state.properties();
+//        result.timing.learn_chemical_properties += toc(CHEMICAL_PROPERTIES_STEP);
+//        //---------------------------------------------------------------------
+//        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
+//        //---------------------------------------------------------------------
+//        tic(CHEMICAL_RATES_STEP);
+//        rates = reactions.rates(properties);
+//        result.timing.learn_reaction_rates += toc(CHEMICAL_RATES_STEP);
+//        //---------------------------------------------------------------------
+//        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
+//        //---------------------------------------------------------------------
+//        tic(SENSITIVITY_STEP);
+//        sensitivity = equilibrium.sensitivity();
+//        result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
 
         // Save the kinetic state to the tree of learned states
         tree.emplace_back(SmartKineticNode{ode_state, state, properties, sensitivity, rates, Matrix::Zero(10, 10), VectorXi::Zero(10)});
@@ -1234,26 +1236,19 @@ struct SmartKineticSolver::Impl
         // Fetch the data stored in the reference element
         const auto& benk0_ref = it->ode_state.u0;
         const auto& benk_ref = it->ode_state.u;
-        const auto& t0_ref = it->ode_state.t0;
-        const auto& t_ref = it->ode_state.t;
         const auto& dndn0_ref = it->ode_state.dudu0;
 
         // Algorithm:
-        // the reference state : u, u0, S = du/du0, t, f = du/dt
-        // new initial values  : u0_new
-        // the predicted state : u_new = u + S * (u0_new - u0)
-
-        // Clarification:
-        // benk0 is new initial condition (u0_tilde)
-        // it.state.u0    is the initial condition of reference vector (u0)
-        // it.state.u    is already calculated by integration vector  (u)
-        // it.state.dudu0 is the sensitivity w.r.t. the initial condition (S)
+        // the reference state contains:
+        // u0 -> benk0_ref      is the initial condition of reference vector
+        // u -> benk_ref        is already calculated by integration reference vector
+        // du/du0 -> dndn0_ref  is the sensitivity w.r.t. the initial condition
+        // new initial values  : benk0
+        // the predicted state : benk_new = benk_ref + dndn0_ref * (benk0 - benk0_ref)
 
         // Perform smart estimation of benk
         Vector benk_new;
         benk_new.noalias() = benk_ref + dndn0_ref * (benk0 - benk0_ref);
-
-        //std::cout << "benk_new : " << tr(benk_new) << std::endl;
 
         result.timing.estimate_taylor =  toc(TAYLOR_STEP);
 
@@ -1262,7 +1257,7 @@ struct SmartKineticSolver::Impl
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_STEP);
 
-        // Fetch the be and nk unknowns from vector benk = [be; nk]
+        // Fetch the be and nk unknowns from vector benk_new = [be_new; nk_new]
         VectorConstRef be_new = benk_new.head(Ee);
         VectorConstRef nk_new = benk_new.tail(Nk);
 
