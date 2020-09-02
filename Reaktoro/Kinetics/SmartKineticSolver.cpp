@@ -570,25 +570,6 @@ struct SmartKineticSolver::Impl
         state.setSpeciesAmounts(nk, iks);
 
         //---------------------------------------------------------------------
-        // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(CHEMICAL_PROPERTIES_STEP);
-        properties = state.properties();
-        result.timing.learn_chemical_properties += toc(CHEMICAL_PROPERTIES_STEP);
-        //---------------------------------------------------------------------
-        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(CHEMICAL_RATES_STEP);
-        rates = reactions.rates(properties);
-        result.timing.learn_reaction_rates += toc(CHEMICAL_RATES_STEP);
-        //---------------------------------------------------------------------
-        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(SENSITIVITY_STEP);
-        sensitivity = equilibrium.sensitivity();
-        result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
-
-        //---------------------------------------------------------------------
         // ERROR CONTROL MATRICES ASSEMBLING STEP DURING THE LEARNING PROCESS
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_MATRICES);
@@ -606,9 +587,7 @@ struct SmartKineticSolver::Impl
         const auto& dudn = u.ddn;
         const Matrix dudb = dudn * dndb;
 
-        // Define the canonicalizer based on formular matrix A and priority weights set by the species amounts
-        //const auto& Ae = system.formulaMatrix();
-        //Canonicalizer canonicalizer(Ae);
+        // Define the canonicalizer with priority weights set by the species amounts
         canonicalizer.updateWithPriorityWeights(ne);
 
         // Set tolerances for species' elements and fractions
@@ -1239,12 +1218,15 @@ struct SmartKineticSolver::Impl
         const auto& dndn0_ref = it->ode_state.dudu0;
 
         // Algorithm:
-        // the reference state contains:
-        // u0 -> benk0_ref      is the initial condition of reference vector
-        // u -> benk_ref        is already calculated by integration reference vector
-        // du/du0 -> dndn0_ref  is the sensitivity w.r.t. the initial condition
-        // new initial values  : benk0
-        // the predicted state : benk_new = benk_ref + dndn0_ref * (benk0 - benk0_ref)
+        // the reference state : u, u0, S = du/du0, t, f = du/dt
+        // new initial values  : u0_new
+        // the predicted state : u_new = u + S * (u0_new - u0)
+
+        // Clarification:
+        // benk0 is new initial condition (u0_tilde)
+        // it.state.u0    is the initial condition of reference vector (u0)
+        // it.state.u    is already calculated by integration vector  (u)
+        // it.state.dudu0 is the sensitivity w.r.t. the initial condition (S)
 
         // Perform smart estimation of benk
         Vector benk_new;
@@ -1257,7 +1239,7 @@ struct SmartKineticSolver::Impl
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_STEP);
 
-        // Fetch the be and nk unknowns from vector benk_new = [be_new; nk_new]
+        // Fetch the be and nk unknowns from vector benk = [be; nk]
         VectorConstRef be_new = benk_new.head(Ee);
         VectorConstRef nk_new = benk_new.tail(Nk);
 
@@ -1266,133 +1248,109 @@ struct SmartKineticSolver::Impl
         const auto& properties_ref = it->properties;
         const auto& sensitivity_ref = it->sensitivity;
         const auto& rates_ref = it->rates;
+        const auto& n_ref = state_ref.speciesAmounts();
 
-        const auto& N = ies.size() + iks.size();
+        // Fetch properties related to either equilibrium or kinetics species
         const auto& be_ref = benk_ref.head(Ee);
         const auto& nk_ref = benk_ref.tail(Nk);
-        const auto& n_ref = state_ref.speciesAmounts();
         const auto& ne_ref = n_ref(ies);
 
         // Get the sensitivity derivatives dln(a) / dn
-        MatrixConstRef dlnadn_ref = properties_ref.lnActivities().ddn; // TODO: this line is assuming all species are equilibrium specie! get the rows and columns corresponding to equilibrium species
+        MatrixConstRef dlnadn_ref = properties_ref.lnActivities().ddn;
         VectorConstRef lna_ref = properties_ref.lnActivities().val;
+        MatrixConstRef dsdn_ref = sensitivity_ref.dndb;
 
         // Get the sensitivity derivatives w.r.t. the equilibrium species dln(a) / dne
         MatrixConstRef dlnaedne_ref = dlnadn_ref(ies, ies);
         VectorConstRef lnae_ref = lna_ref(ies);
+        MatrixConstRef dsdne_ref = dsdn_ref(ies, iee);
 
         // Define vectors of equilibrium species ne, delta(ne), delta(lnae)
         Vector dne, dlnae;
-        dne.noalias() = sensitivity_ref.dndb(ies, iee) * (be_new - be_ref); // delta(ne) = dn/db * (be - be0)
-        ne.noalias() = ne_ref + dne;                                                             // ne = ne_ref + delta(ne)
-        dlnae.noalias() = dlnaedne_ref * dne;                                                    // delta(dlnae) = d (ln ae) / d(ne)
+        dne.noalias() = dsdne_ref * (be_new - be_ref); // delta(ne) = dn/db * (be - be0)
+        ne.noalias() = ne_ref + dne;                   // ne = ne_ref + delta(ne)
+        dlnae.noalias() = dlnaedne_ref * dne;          // delta(dlnae) = d (ln ae) / d(ne)
 
         // Fetch mole fractions
         const auto& x_ref = properties_ref.moleFractions().val;
         VectorConstRef xe_ref = x_ref(ies);
         VectorConstRef xk_ref = x_ref(iks);
 
-        // -------------------------------------------------------------------------------------------------------------
-        // Check the variations of equilibrium species
-        // -------------------------------------------------------------------------------------------------------------
-        bool equilibrium_neg_amount_check = ne.minCoeff() > options.cutoff;
+        ///---------------------------------------------------------------------
+        // ERROR CONTROL RELATED TO THE EQUILIBRIUM SPECIES
+        //---------------------------------------------------------------------
 
-        // Loop via equilibrium species and consider only big enough fractions
-        bool equilibrium_variation_check = true;
-        for(int i = 0; i < xe_ref.size(); ++i){
+        // Run the test checking the negative value of projected equilibrium species
+        auto pass_negative_equilibrium_species_error_test = [&]() -> bool
+        {
+            // Check if all projected species amounts are positive
+            const double ne_min = min(ne);
+            const double ne_sum = sum(ne);
+            const auto eps_n = options.amount_fraction_cutoff * ne_sum;
 
-            // If the fraction is too small, skip the variational check
-            if(xe_ref[i] < options.mole_fraction_cutoff)
-                continue;
+            return {ne_min > -eps_n};
+        };
+        auto equilibrium_neg_amount_check = pass_negative_equilibrium_species_error_test();
+        if(!equilibrium_neg_amount_check) return;
 
-            // Absolute tolerance parameters
-            //const auto abstol = 1e-3;
+        // Run the test checking the variations of ln(a) of equilibrium species
+        auto pass_ln_activities_equilibrium_species_error_test = [&]() -> bool
+        {
+            // Loop through all the equilibrium species
+            for(int i = 0; i < xe_ref.size(); ++i) {
 
-            // Perform the variational check
-            if(std::abs(dlnae[i]) > options.abstol + options.reltol * std::abs(lnae_ref[i])) {
-                equilibrium_variation_check = false;
-                result.estimate.failed_with_species = system.species(ies[i]).name();
-                result.estimate.failed_with_amount = ne[i];
-                result.estimate.failed_with_chemical_potential = lnae_ref[i] + dlnae[i]; // TODO: change to the chemical potential
-                /*
-                std::cout << "ne[i]     : " << ne[i] << std::endl;
-                std::cout << "system.species(ies[i]).name()     : " << system.species(ies[i]).name() << std::endl;
-                std::cout << "lnae_ref[i] + dlnae[i]     : " << lnae_ref[i] + dlnae[i] << std::endl;
-                std::cout << "|delta_lna[i]| : " << std::abs(dlnae[i]) << std::endl;
-                std::cout << "|lnae_ref[i]|  : " << std::abs(lnae_ref[i]) << std::endl;
-                */
-                break;
+                // If the fraction is too small, skip the variational check
+                if (xe_ref[i] < options.mole_fraction_cutoff)
+                    continue;
+
+                // Perform the variational check
+                if (std::abs(dlnae[i]) > options.abstol + options.reltol * std::abs(lnae_ref[i])) {
+                    result.estimate.failed_with_species = system.species(ies[i]).name();
+                    result.estimate.failed_with_amount = ne[i];
+                    return false;
+
+                }
             }
-        }
-        /*
-        // Correction of dne
-        for(auto i = 0; i < ne.size(); ++i)
-            if(ne[i] <= 0.0 && ne[i] >= equilibrium_neg_amount_check)
-                ne[i] = options.equilibrium.epsilon;
+            return true;
+        };
+        bool equilibrium_variation_check = pass_ln_activities_equilibrium_species_error_test();
+        if(!equilibrium_variation_check)
+            return;
 
-        // Recompute the change in n
-        dne = ne - ne_ref;
-        */
+        // ---------------------------------------------------------------------
+        // ERROR CONTROL RELATED TO THE KINETIC SPECIES
+        // ---------------------------------------------------------------------
 
+        auto pass_rate_variation_kinetic_species_error_test = [&]() -> bool
+        {
+            /// Auxiliary vectors
+            Vector dnk;
+            dnk.noalias() = nk_new - nk_ref;
+            Vector dn;
+            dn.resize(Nk + Ne);
+            dn(ies) << dne;
+            dn(iks) << dnk;
 
-        /// -------------------------------------------------------------------------------------------------------------
-        // Check the variations of kinetic species
-        // -------------------------------------------------------------------------------------------------------------
-
-        // Initialize delta_n = [dne; delta_nk]
-        /// Auxiliary vectors
-        Vector dnk;
-        dnk.noalias() = nk_new - nk_ref;
-        Vector dn;
-        dn.resize(Nk + Ne);
-        dn(ies) << dne;
-        dn(iks) << dnk;
-
-        // Initialize reaction rates
-        Vector drates = rates_ref.ddn * dn;
-        //rates.val = rates_ref.val + drates;
-
-        // TODO: loop for more then one kinetic species
-        bool kinetics_r_variation_check = true;
-        for(Index i = 0; i < xk_ref.size(); ++i){
-            // If the fraction is too small, skip the variational check
-            if(xk_ref[i] < options.mole_fraction_cutoff)
-                continue;
-
-            if(std::abs(drates.array()[i]) > options.abstol + options.reltol * std::abs(rates_ref.val.array()[i])){
-                //std::cout << "|delta_r / rates_ref| : " << std::abs(drates.array()[i]/rates_ref.val.array()[i]) << std::endl;
-                kinetics_r_variation_check = false;
-                break;
+            // Initialize reaction rates
+            Vector drates = rates_ref.ddn * dn;
+            for(Index i = 0; i < xk_ref.size(); ++i){
+                // If the fraction is too small, skip the variational check
+                if(xk_ref[i] < options.mole_fraction_cutoff)
+                    continue;
+                if(std::abs(drates.array()[i]) > options.abstol + options.reltol * std::abs(rates_ref.val.array()[i]))
+                    return false;
             }
-        }
+            return true;
+
+        };
+        bool kinetics_r_variation_check = pass_rate_variation_kinetic_species_error_test();
+        if(!kinetics_r_variation_check)
+            return;
 
         result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
 
-        if(!equilibrium_variation_check || !equilibrium_neg_amount_check || !kinetics_r_variation_check)
-        //if(!equilibrium_variation_check || !kinetics_r_variation_check)
-        {
-            /*
-            if(step>=1000) {
-                //std::cout << "|xk_ref|  : " << TR(xk_ref)  << std::endl;
-                //std::cout << fraction_tol  : " << fraction_tol  << std::endl;
-                //std::cout << "|delta_r| : " << delta_r.array().abs() << std::endl;
-                //std::cout << "|r_ref|   : " << r_ref.val.array().abs() << std::endl;
-                //std::cout << "abstol + reltol * |r_ref|    : " << kinetics_abstol + kinetics_reltol * std::abs(r_ref.val.array()[i]) << std::endl;
-
-                std::cout << "lnae_var_check     : " << equilibrium_variation_check;
-                std::cout << ", eq_amount_check  : " << equilibrium_neg_amount_check;
-                std::cout << ", r_var_check    : " << kinetics_r_variation_check << std::endl;
-
-                getchar();
-            }
-            */
-            /*
-            std::cout << "equilibrium_variation_check     : " << equilibrium_variation_check;
-            std::cout << ", equilibrium_neg_amount_check eq_amount_check  : " << equilibrium_neg_amount_check;
-            std::cout << ", kinetics_r_variation_check    : " << kinetics_r_variation_check << std::endl;
-            */
-            return;
-        }
+        // Mark estimated result as accepted
+        result.estimate.accepted = true;
 
         // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
         for(unsigned int i = 0; i < benk_new.size(); ++i) if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
@@ -1401,10 +1359,7 @@ struct SmartKineticSolver::Impl
         benk = benk_new;
 
         // Update properties by the reference one
-        //properties = properties_ref;
-
-        // Mark estimated result as accepted
-        result.estimate.accepted = true;
+        properties = properties_ref;
 
     }
 
@@ -1712,7 +1667,6 @@ struct SmartKineticSolver::Impl
         for(auto inode=kinetics_priority.begin(); inode != kinetics_priority.end(); ++inode)
         {
             const auto& node = tree[*inode];
-            //const auto& imajor = node.imajor;
 
             //---------------------------------------------------------------------
             // SEARCH CONTROL DURING THE ESTIMATE PROCESS
@@ -1720,7 +1674,6 @@ struct SmartKineticSolver::Impl
             tic(ERROR_CONTROL_STEP);
 
             const auto [success, error, ispecies] = pass_equilibrium_potential_error_test(node);
-            //std::cout << "success = " << success << std::endl;
 
             if(success)
             {
@@ -1763,7 +1716,7 @@ struct SmartKineticSolver::Impl
                 // Check the variations of equilibrium species
                 // -------------------------------------------------------------------------------------------------------------
                 // Define the function checking the negativity of the equilibrium species amounts
-                auto pass_negative_equilibirum_species_amounts_error_test = [&](const auto& node) -> std::tuple<bool, VectorConstRef>
+                auto pass_negative_equilibrium_species_amounts_error_test = [&](const auto& node) -> std::tuple<bool, VectorConstRef>
                 {
 
                     // Fetch properties of the reference state
@@ -1779,7 +1732,6 @@ struct SmartKineticSolver::Impl
                     VectorConstRef dne = sensitivity_ref.dndb(ies, iee) * (be_new - be_ref); // delta(ne) = dn/db * (be - be0)
                     ne.noalias() = ne_ref + dne;                                                                  // ne = ne_ref + delta(ne)
 
-
                     // Check if all projected species amounts are positive
                     const double ne_min = min(ne);
                     const double ne_sum = sum(ne);
@@ -1787,13 +1739,10 @@ struct SmartKineticSolver::Impl
 
                     return {ne_min > -eps_n, dne};
 
-                    // Negative cutoff check for the equilibrium
-                    // ---------------------------------------------------
-                    //return {ne.minCoeff() > 1e-2 * options.cutoff, dne};
                 };
 
                 // Check if the `negative equilibrium species amounts` pass the test
-                auto [is_neg_equilibrium_test_passed, dne] = pass_negative_equilibirum_species_amounts_error_test(node);
+                auto [is_neg_equilibrium_test_passed, dne] = pass_negative_equilibrium_species_amounts_error_test(node);
                 if(!is_neg_equilibrium_test_passed)
                     continue;
 
@@ -1804,12 +1753,11 @@ struct SmartKineticSolver::Impl
                 // Define the function checking the variation of kinetics rates
                 auto pass_kinetic_rate_variation_error_test = [&](const auto& node, VectorConstRef dne) -> bool
                 {
-
                     const auto& rates_ref = node.rates;
                     const auto& nk_ref = benk_ref.tail(Nk);
                     const auto& properties_ref = node.properties;
 
-                    // Initialize delta_n = [dne; delta_nk]
+                    // Initialize delta_n = [dne; dnk]
                     Vector dnk;
                     dnk.noalias() = nk_new - nk_ref;
                     Vector dn;
@@ -1823,8 +1771,8 @@ struct SmartKineticSolver::Impl
                     // Fetch mole fractions
                     const auto& x_ref = properties_ref.moleFractions().val;
                     VectorConstRef xk_ref = x_ref(iks);
-                    // TODO: loop for more then one kinetic species
-                    bool kinetics_r_variation_check = true;
+
+                    // Loop over kinetic species with significant fractions
                     for(Index i = 0; i < xk_ref.size(); ++i){
                         // If the fraction is too small, skip the variational check
                         if(xk_ref[i] < options.mole_fraction_cutoff)
