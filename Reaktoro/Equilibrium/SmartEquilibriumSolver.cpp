@@ -1229,14 +1229,16 @@ struct SmartEquilibriumSolver::Impl
         // Get the sensitivity derivatives dln(a) / dn (assuming all species are equilibrium species)
         MatrixConstRef dlna_dn = properties0.lnActivities().ddn;
         VectorConstRef lna0 = properties0.lnActivities().val;
+        MatrixConstRef dsdn0 = sensitivity0.dndb;
 
         // Get the sensitivity derivatives w.r.t. the equilibrium species dln(ae) / dne
         MatrixConstRef dlnae_dne = dlna_dn(ies, ies);
         VectorConstRef lnae0 = lna0(ies);
+        MatrixConstRef dsdne0 = dsdn0(ies, iee);
 
         /// Auxiliary vectors delta(n) and delta(lna) in estimate function version v0
         Vector dne, dlnae;
-        dne.noalias() = sensitivity0.dndb(ies, iee) * (be - be0); // delta(ne) = dne/db * (b - b0)
+        dne.noalias() = dsdne0 * (be - be0); // delta(ne) = dne/db * (b - b0)
         ne.noalias() = ne0 + dne;                                                   // n = n0 + delta(n)
         dlnae.noalias() = dlnae_dne * dne;                                          // delta(ln(a)) = d(lna)/dn * delta(n)
 
@@ -1248,38 +1250,33 @@ struct SmartEquilibriumSolver::Impl
         tic(ERROR_CONTROL_STEP);
 
         // Fetch mole fractions
-        Vector xe = properties0.moleFractions().val(ies);
+        const auto& x0 = properties0.moleFractions().val;
+        Vector xe0 = x0(ies);
 
         // Perform the check for the negative amounts
         const bool amount_check = ne.minCoeff() > options.cutoff;
+        if(!amount_check){
+            result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
+            return;
+        }
 
         // Check in the loop mole fractions, negative amount check, and variations of the ln(a)
-        bool variation_check = true;
         for(Index i = 0; i < ne.size(); ++i)
         {
             // If the fraction is too small, skip the variational check
-            if(xe[i] < options.mole_fraction_cutoff)
+            if(xe0[i] < options.mole_fraction_cutoff)
                 continue;
 
-            // Absolute tolerance parameters
-            const auto abstol = 1e-2;
             // Perform the variational check
-            if(std::abs(dlnae[i]) > abstol + options.reltol * std::abs(lnae0[i])) {
-                variation_check = false;    // variation test failed
+            if(std::abs(dlnae[i]) > options.abstol + options.reltol * std::abs(lnae0[i])) {
                 result.estimate.failed_with_species = system.species(ies[i]).name();
                 result.estimate.failed_with_amount = ne[i];
-                result.estimate.failed_with_chemical_potential = lna0[i] + dlnae[i]; // TODO: change to the chemical potential
-
-                break;
+                result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
+                return;
             }
         }
 
         result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
-
-        // Check if smart estimation failed with respect to variation of chemical potentials or amounts
-        if(!variation_check || !amount_check){
-            return;
-        }
 
         //---------------------------------------------------------------------
         // After the search is finished successfully
