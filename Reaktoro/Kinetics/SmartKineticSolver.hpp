@@ -126,6 +126,9 @@ public:
     // Return properties of the chemical state provided by the KineticSolver
     auto properties() const -> const ChemicalProperties&;
 
+    /// Output clusters created during the ODML algorithm
+    auto outputClusterInfo() const -> void;
+
 private:
     struct Impl;
 

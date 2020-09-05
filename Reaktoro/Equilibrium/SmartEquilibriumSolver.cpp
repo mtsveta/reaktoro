@@ -1449,6 +1449,8 @@ struct SmartEquilibriumSolver::Impl
             estimate(state, T, P, be);
         else if (options.smart_method == "kin-priority-eq-priority")
             estimate_priority_based_acceptance_potential(state, T, P, be);
+        else if (options.smart_method == "kin-priority-primary-eq-priority-primary")
+            estimate_priority_based_acceptance_primary_potential(state, T, P, be);
         else
             estimate_nnsearch_acceptance_based_on_lna(state, T, P, be);
 
@@ -1465,6 +1467,8 @@ struct SmartEquilibriumSolver::Impl
                 learn(state, T, P, be);
             else if (options.smart_method == "kin-priority-eq-priority")
                 learn_priority_based_acceptance_potential(state, T, P, be);
+            else if (options.smart_method == "kin-priority-primary-eq-priority-primary")
+                learn_priority_based_acceptance_primary_potential(state, T, P, be);
             else
                 learn_nnsearch(state, T, P, be);
         }

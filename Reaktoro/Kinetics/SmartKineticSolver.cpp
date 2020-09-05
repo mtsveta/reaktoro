@@ -18,6 +18,7 @@
 // C++ includes
 #include <functional>
 #include <deque>
+#include <fstream>
 
 using namespace std::placeholders;
 
@@ -315,6 +316,9 @@ struct SmartKineticSolver::Impl
         // Allocate the memory for the sensitivity matrix
         benk_S.resize(Ee + Nk, Ee + Nk);
 
+//        std::ofstream myfile;
+//        myfile.open("debug.txt", std::ios::out);
+//        myfile.close();
     }
 
     auto setOptions(const SmartKineticOptions& options) -> void
@@ -506,27 +510,6 @@ struct SmartKineticSolver::Impl
         be = benk.head(Ee);
         nk = benk.tail(Nk);
         state.setSpeciesAmounts(nk, iks);
-
-//        // TODO: evaluations are not needed since the function and jacobian were evaluated in
-//        // ode.solve(t, dt, benk, benk_S) at t = t_{k+1}, so properties, rates, sensitivities we evaluated as well
-//        //---------------------------------------------------------------------
-//        // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
-//        //---------------------------------------------------------------------
-//        tic(CHEMICAL_PROPERTIES_STEP);
-//        properties = state.properties();
-//        result.timing.learn_chemical_properties += toc(CHEMICAL_PROPERTIES_STEP);
-//        //---------------------------------------------------------------------
-//        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-//        //---------------------------------------------------------------------
-//        tic(CHEMICAL_RATES_STEP);
-//        rates = reactions.rates(properties);
-//        result.timing.learn_reaction_rates += toc(CHEMICAL_RATES_STEP);
-//        //---------------------------------------------------------------------
-//        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-//        //---------------------------------------------------------------------
-//        tic(SENSITIVITY_STEP);
-//        sensitivity = equilibrium.sensitivity();
-//        result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
 
         // Save the kinetic state to the tree of learned states
         tree.emplace_back(SmartKineticNode{ode_state, state, properties, sensitivity, rates, Matrix::Zero(10, 10), VectorXi::Zero(10)});
@@ -784,25 +767,6 @@ struct SmartKineticSolver::Impl
         state.setSpeciesAmounts(nk, iks);
 
         //---------------------------------------------------------------------
-        // CHEMICAL PROPERTIES UPDATE STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(CHEMICAL_PROPERTIES_STEP);
-        properties = state.properties();
-        result.timing.learn_chemical_properties += toc(CHEMICAL_PROPERTIES_STEP);
-        //---------------------------------------------------------------------
-        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(CHEMICAL_RATES_STEP);
-        rates = reactions.rates(properties);
-        result.timing.learn_reaction_rates += toc(CHEMICAL_RATES_STEP);
-        //---------------------------------------------------------------------
-        // SENSITIVITY MATRIX COMPUTATION STEP DURING THE LEARNING PROCESS
-        //---------------------------------------------------------------------
-        tic(SENSITIVITY_STEP);
-        sensitivity = equilibrium.sensitivity();
-        result.timing.learn_sensitivity += toc(SENSITIVITY_STEP);
-
-        //---------------------------------------------------------------------
         // ERROR CONTROL MATRICES ASSEMBLING STEP DURING THE LEARNING PROCESS
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_MATRICES);
@@ -970,7 +934,7 @@ struct SmartKineticSolver::Impl
         {
             // If no primary species, then return number of clusters to trigger use of total usage counts of clusters
             if(iprimary.size() == 0)
-                return database.clusters.size();
+                return database.clusters.size(); // or database.clusters.size() - 1 ?
 
             // Find the index of the cluster with the same set of primary species (search those with highest count first)
             for(auto icluster : database.priority.order())
@@ -978,7 +942,7 @@ struct SmartKineticSolver::Impl
                     return icluster;
 
             // In no cluster with the same set of primary species if found, then return number of clusters
-            return database.clusters.size();
+            return database.clusters.size(); // or database.clusters.size() - 1 ?
         };
 
         // The index of the starting cluster
@@ -1099,7 +1063,7 @@ struct SmartKineticSolver::Impl
                         const auto& nk_ref = benk_ref.tail(Nk);
                         const auto& properties_ref = node.properties;
 
-                        // Initialize delta_n = [dne; delta_nk]
+                        // Initialize delta_n = [dne; dnk]
                         Vector dnk;
                         dnk.noalias() = nk_new - nk_ref;
                         Vector dn;
@@ -1114,8 +1078,7 @@ struct SmartKineticSolver::Impl
                         // Fetch mole fractions
                         const auto& x_ref = properties_ref.moleFractions().val;
                         VectorConstRef xk_ref = x_ref(iks);
-                        // TODO: loop for more then one kinetic species
-                        bool kinetics_r_variation_check = true;
+
                         for(Index i = 0; i < xk_ref.size(); ++i){
                             // If the fraction is too small, skip the variational check
                             if(xk_ref[i] < options.mole_fraction_cutoff)
@@ -1142,9 +1105,10 @@ struct SmartKineticSolver::Impl
                     // Update the solution of kinetic problem by new estimated value
                     // -------------------------------------------------------------------------------------------------------------
                     benk = benk_new;
+                    state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
 
                     // Update the chemical properties of the system
-                    properties = record.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+                    //properties = record.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
 
                     result.timing.estimate_taylor = toc(TAYLOR_STEP);
 
@@ -1218,15 +1182,12 @@ struct SmartKineticSolver::Impl
         const auto& dndn0_ref = it->ode_state.dudu0;
 
         // Algorithm:
-        // the reference state : u, u0, S = du/du0, t, f = du/dt
-        // new initial values  : u0_new
-        // the predicted state : u_new = u + S * (u0_new - u0)
-
-        // Clarification:
-        // benk0 is new initial condition (u0_tilde)
-        // it.state.u0    is the initial condition of reference vector (u0)
-        // it.state.u    is already calculated by integration vector  (u)
-        // it.state.dudu0 is the sensitivity w.r.t. the initial condition (S)
+        // the reference state contains:
+        // u0 -> benk0_ref      is the initial condition of reference vector
+        // u -> benk_ref        is already calculated by integration reference vector
+        // du/du0 -> dndn0_ref  is the sensitivity w.r.t. the initial condition
+        // new initial values  : benk0
+        // the predicted state : benk_new = benk_ref + dndn0_ref * (benk0 - benk0_ref)
 
         // Perform smart estimation of benk
         Vector benk_new;
@@ -1250,13 +1211,12 @@ struct SmartKineticSolver::Impl
         const auto& rates_ref = it->rates;
         const auto& n_ref = state_ref.speciesAmounts();
 
-        // Fetch properties related to either equilibrium or kinetics species
         const auto& be_ref = benk_ref.head(Ee);
         const auto& nk_ref = benk_ref.tail(Nk);
         const auto& ne_ref = n_ref(ies);
 
         // Get the sensitivity derivatives dln(a) / dn
-        MatrixConstRef dlnadn_ref = properties_ref.lnActivities().ddn;
+        MatrixConstRef dlnadn_ref = properties_ref.lnActivities().ddn; // TODO: this line is assuming all species are equilibrium specie! get the rows and columns corresponding to equilibrium species
         VectorConstRef lna_ref = properties_ref.lnActivities().val;
         MatrixConstRef dsdn_ref = sensitivity_ref.dndb;
 
@@ -1280,18 +1240,10 @@ struct SmartKineticSolver::Impl
         // ERROR CONTROL RELATED TO THE EQUILIBRIUM SPECIES
         //---------------------------------------------------------------------
 
-        // Run the test checking the negative value of projected equilibrium species
-        auto pass_negative_equilibrium_species_error_test = [&]() -> bool
-        {
-            // Check if all projected species amounts are positive
-            const double ne_min = min(ne);
-            const double ne_sum = sum(ne);
-            const auto eps_n = options.amount_fraction_cutoff * ne_sum;
-
-            return {ne_min > -eps_n};
-        };
-        auto equilibrium_neg_amount_check = pass_negative_equilibrium_species_error_test();
-        if(!equilibrium_neg_amount_check) return;
+        // Run the test checking the negative values of equilibrium species
+        bool equilibrium_neg_amount_check = ne.minCoeff() > options.cutoff;
+        if(!equilibrium_neg_amount_check)
+            return;
 
         // Run the test checking the variations of ln(a) of equilibrium species
         auto pass_ln_activities_equilibrium_species_error_test = [&]() -> bool
@@ -1321,6 +1273,7 @@ struct SmartKineticSolver::Impl
         // ERROR CONTROL RELATED TO THE KINETIC SPECIES
         // ---------------------------------------------------------------------
 
+        // Run the test checking the variations rates of kinetics species
         auto pass_rate_variation_kinetic_species_error_test = [&]() -> bool
         {
             /// Auxiliary vectors
@@ -1333,6 +1286,8 @@ struct SmartKineticSolver::Impl
 
             // Initialize reaction rates
             Vector drates = rates_ref.ddn * dn;
+
+            // Loop over all kinetics species
             for(Index i = 0; i < xk_ref.size(); ++i){
                 // If the fraction is too small, skip the variational check
                 if(xk_ref[i] < options.mole_fraction_cutoff)
@@ -1349,17 +1304,19 @@ struct SmartKineticSolver::Impl
 
         result.timing.estimate_error_control = toc(ERROR_CONTROL_STEP);
 
-        // Mark estimated result as accepted
-        result.estimate.accepted = true;
-
         // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
-        for(unsigned int i = 0; i < benk_new.size(); ++i) if(benk_new[i] < 0) benk_new[i] = options.equilibrium.epsilon;
+        for(unsigned int i = 0; i < benk_new.size(); ++i)
+            if(benk_new[i] < 0)
+                benk_new[i] = options.equilibrium.epsilon;
 
         // Update the solution of kinetic problem by new estimated value
         benk = benk_new;
 
         // Update properties by the reference one
-        properties = properties_ref;
+        // properties = properties_ref; // does not influence results
+
+        // Mark estimated result as accepted
+        result.estimate.accepted = true;
 
     }
 
@@ -1654,7 +1611,7 @@ struct SmartKineticSolver::Impl
             double error = 0.0;
             for(auto i = 0; i < imajor_ref.size(); ++i) {
                 error = max(error, abs(Mb_ref.row(i) * dbe));
-                if(error >= reltol)
+                if(error >= options.tol)
                     return {false, error, imajor_ref[i] };
             }
 
@@ -1664,6 +1621,7 @@ struct SmartKineticSolver::Impl
         // Initialize the inode_prev node
         auto inode_prev = kinetics_priority.begin();
 
+        // Loop through all the nodes in priority ques
         for(auto inode=kinetics_priority.begin(); inode != kinetics_priority.end(); ++inode)
         {
             const auto& node = tree[*inode];
@@ -1715,6 +1673,7 @@ struct SmartKineticSolver::Impl
                 // -------------------------------------------------------------------------------------------------------------
                 // Check the variations of equilibrium species
                 // -------------------------------------------------------------------------------------------------------------
+
                 // Define the function checking the negativity of the equilibrium species amounts
                 auto pass_negative_equilibrium_species_amounts_error_test = [&](const auto& node) -> std::tuple<bool, VectorConstRef>
                 {
@@ -1732,15 +1691,15 @@ struct SmartKineticSolver::Impl
                     VectorConstRef dne = sensitivity_ref.dndb(ies, iee) * (be_new - be_ref); // delta(ne) = dn/db * (be - be0)
                     ne.noalias() = ne_ref + dne;                                                                  // ne = ne_ref + delta(ne)
 
-                    // Check if all projected species amounts are positive
-                    const double ne_min = min(ne);
-                    const double ne_sum = sum(ne);
-                    const auto eps_n = options.amount_fraction_cutoff * ne_sum;
+//                    // Check if all projected species amounts are positive
+//                    const double ne_min = min(ne);
+//                    const double ne_sum = sum(ne);
+//                    const auto eps_n = options.amount_fraction_cutoff * ne_sum;
+//                    return {ne_min > -eps_n, dne};
 
-                    return {ne_min > -eps_n, dne};
+                    return {ne.minCoeff() > options.cutoff, dne}; // this check results in smaller number of learnings
 
                 };
-
                 // Check if the `negative equilibrium species amounts` pass the test
                 auto [is_neg_equilibrium_test_passed, dne] = pass_negative_equilibrium_species_amounts_error_test(node);
                 if(!is_neg_equilibrium_test_passed)
@@ -1783,7 +1742,6 @@ struct SmartKineticSolver::Impl
                     }
                     return true;
                 };
-
                 // Check if the variation in the kinetics rates pass the test
                 const auto is_kin_rate_variation_test_passed = pass_kinetic_rate_variation_error_test(node, dne);
                 if(!is_kin_rate_variation_test_passed)
@@ -1816,7 +1774,7 @@ struct SmartKineticSolver::Impl
                 benk = benk_new;
 
                 // Update the chemical properties of the system
-                properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+                //properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
 
                 // Mark estimated result as accepted
                 result.estimate.accepted = true;
@@ -1894,7 +1852,6 @@ struct SmartKineticSolver::Impl
         for(auto inode=kinetics_priority.begin(); inode != kinetics_priority.end(); ++inode)
         {
             const auto& node = tree[*inode];
-            //const auto& imajor = node.imajor;
 
             //---------------------------------------------------------------------
             // SEARCH CONTROL DURING THE ESTIMATE PROCESS
@@ -1947,7 +1904,7 @@ struct SmartKineticSolver::Impl
                 // Check the variations of equilibrium species
                 // -------------------------------------------------------------------------------------------------------------
 
-                auto pass_negative_equilibirum_species_amounts_error_test = [&](const auto& node) -> std::tuple<bool, VectorConstRef>
+                auto pass_negative_equilibrium_species_amounts_error_test = [&](const auto& node) -> std::tuple<bool, VectorConstRef>
                 {
 
                     // Fetch properties of the reference state
@@ -1976,10 +1933,10 @@ struct SmartKineticSolver::Impl
                     //return {ne.minCoeff() > 1e-2 * options.cutoff, dne};
                 };
 
-                auto [is_negequilibrium_test_passed, dne] = pass_negative_equilibirum_species_amounts_error_test(node);
-                //std::cout << "is_negequilibrium_test_passed = " << is_negequilibrium_test_passed << std::endl;
+                auto [is_neg_equilibrium_test_passed, dne] = pass_negative_equilibrium_species_amounts_error_test(node);
+                //std::cout << "is_neg_equilibrium_test_passed = " << is_neg_equilibrium_test_passed << std::endl;
                 //getchar();
-                if(!is_negequilibrium_test_passed)
+                if(!is_neg_equilibrium_test_passed)
                     continue;
 
                 // -------------------------------------------------------------------------------------------------------------
@@ -2049,9 +2006,10 @@ struct SmartKineticSolver::Impl
                 // -------------------------------------------------------------------------------------------------------------
                 //state = node.chemical_state;
                 benk = benk_new;
+                state = node.chemical_state;
 
                 // Update the chemical properties of the system
-                properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+                //properties = node.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
 
                 // Mark estimated result as accepted
                 result.estimate.accepted = true;
@@ -2172,6 +2130,7 @@ struct SmartKineticSolver::Impl
 
         tic(SOLVE_STEP);
 
+
         //------------------------------------------------------------------------------------------
         // INITIALIZE OF THE VARIABLES DURING THE KINETICS SOLVE STEP
         //------------------------------------------------------------------------------------------
@@ -2203,6 +2162,8 @@ struct SmartKineticSolver::Impl
             estimate_clustering(state, t);
         else if (options.smart_method == "kin-priority-eq-priority")
             estimate_priority_based_acceptance_potential(state, t, dt);
+        else if (options.smart_method == "kin-priority-primary-eq-priority-primary")
+            estimate_priority_based_acceptance_primary_potential(state, t);
         else
             estimate_nn_search_acceptance_based_lna(state, t);
 
@@ -2220,6 +2181,9 @@ struct SmartKineticSolver::Impl
                 learn_clustering(state, t, dt);
             else if (options.smart_method == "kin-priority-eq-priority"){
                 learn_priority_based_acceptance_potential(state, t, dt);
+            }
+            else if (options.smart_method == "kin-priority-primary-eq-priority-primary"){
+                learn_priority_based_acceptance_primary_potential(state, t, dt);
             }
             else
                 learn_nn_search(state, t, dt);
@@ -2424,6 +2388,54 @@ struct SmartKineticSolver::Impl
         return 0;
     }
 
+    auto outputClusterInfo() const -> void
+    {
+        std::cout << "***********************************************************************************" << std::endl;
+        std::cout << "Clusters ordered by order of their creation" << std::endl;
+        std::cout << "***********************************************************************************" << std::endl;
+
+        Index i = 0;
+        for(auto cluster : database.clusters)
+        {
+            std::cout << "CLUSTER #" << i << std::endl;
+            std::cout << "  RANK OF CLUSTER: " << database.priority.priorities()[i] << std::endl;
+            std::cout << "  PRIMARY SPECIES: ";
+            for(auto j : database.clusters[i].iprimary)
+                std::cout << system.species(j).name() << " ";
+            std::cout << std::endl;
+            std::cout << "  NUMBER OF RECORDS: " << database.clusters[i].records.size() << std::endl;
+            //std::cout << "  RANK OF RECORDS: ";
+            //for(auto j : database.clusters[i].priority.order())
+            //    std::cout << database.clusters[i].priority.priorities()[j] << " ";
+            std::cout << std::endl;
+            std::cout << std::endl;
+            i++;
+        }
+        std::cout << "***********************************************************************************" << std::endl;
+
+        /*
+        for(auto i : database.priority.order())
+        {
+            std::cout << "CLUSTER #" << i << std::endl;
+            std::cout << "  RANK OF CLUSTER: " << database.priority.priorities()[i] << std::endl;
+            std::cout << "  PRIMARY SPECIES: ";
+            for(auto j : database.clusters[i].iprimary)
+                std::cout << system.species(j).name() << " ";
+            std::cout << std::endl;
+            std::cout << "  NUMBER OF RECORDS: " << database.clusters[i].records.size() << std::endl;
+            std::cout << "  RANK OF RECORDS: ";
+            for(auto j : database.clusters[i].priority.order())
+                std::cout << database.clusters[i].priority.priorities()[j] << " ";
+            std::cout << std::endl;
+            std::cout << "  NEXT CLUSTER: " << database.connectivity.order(i)[1] << std::endl;
+            std::cout << "  NEXT CLUSTER PRIMARY SPECIES: ";
+            for(auto j : database.clusters[database.connectivity.order(i)[1]].iprimary)
+                std::cout << system.species(j).name() << " ";
+            std::cout << std::endl;
+            std::cout << std::endl;
+        }
+        */
+    }
 };
 
 SmartKineticSolver::SmartKineticSolver()
@@ -2521,5 +2533,10 @@ auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt, Vector
 {
     pimpl->solve(state, t, dt, b, step, icell);
 }
+
+auto SmartKineticSolver::outputClusterInfo() const -> void
+    {
+        return pimpl->outputClusterInfo();
+    }
 
 } // namespace Reaktoro

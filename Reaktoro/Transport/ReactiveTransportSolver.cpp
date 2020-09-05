@@ -471,10 +471,17 @@ struct ReactiveTransportSolver::Impl
 
     // Show clusters created by the ODML method
     auto outputClusterInfo() const -> void {
+
+        if (options.use_smart_kinetic_solver) {
+            smart_kinetic_solver.outputClusterInfo();
+        } else {
+            std::cout << "No clusters were created in the conventional kinetics algorithm!" << std::endl;
+        }
+
         if (options.use_smart_equilibrium_solver) {
             smart_equilibrium_solver.outputClusterInfo();
         } else {
-            std::cout << "No clusters were created in the conventional algorithm!" << std::endl;
+            std::cout << "No clusters were created in the conventional equilibrium algorithm!" << std::endl;
         }
     }
 };
