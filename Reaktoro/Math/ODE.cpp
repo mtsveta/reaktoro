@@ -300,15 +300,11 @@ struct ODESolver::Impl
             Matrix I = Matrix::Identity(data.num_equations, data.num_equations);
 
             // Set the value of the current jacobian
+            problem.function(t, y, f);
             problem.jacobian(t, y, J);
-            if(t == tfinal) problem.function(t, y, f);
 
-            // Initialize system matrix A = I - dt * J^{k+1}
-            Matrix A;
-            A = I - dt * J;
-
-            // Perform LU decomposition for matrix A
-            LU lu(A);
+            // Perform LU decomposition for matrix A = I - dt * J^{k+1}
+            LU lu(I - dt * J);
 
             // Solve system of equation (I - dt * J^{k+1}) * S^{k+1} = S^k
             Sk1 = lu.solve(Sk1);
