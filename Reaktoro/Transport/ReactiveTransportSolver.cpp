@@ -410,7 +410,9 @@ struct ReactiveTransportSolver::Impl
 
             for(Index icell = 0; icell < num_cells; ++icell)
             {
-
+                std::ofstream myfile("debug-2000-neg-eps.txt", std::ios::out | std::ios::app | std::ios::binary);
+                myfile << "icell " << icell << "\n";
+                myfile.close();
                 // Solve with a smart kinetic solver
                 //smart_kinetic_solver.solve(states[icell], t_start, dt, be.row(icell));
                 smart_kinetic_solver.solve(states[icell], t_start, dt, be.row(icell), steps, icell);
@@ -472,15 +474,15 @@ struct ReactiveTransportSolver::Impl
     // Show clusters created by the ODML method
     auto outputClusterInfo() const -> void {
 
-        if (options.use_smart_kinetic_solver) {
+        if(options.use_smart_kinetic_solver) {
             smart_kinetic_solver.outputClusterInfo();
-        } else {
+        }else{
             std::cout << "No clusters were created in the conventional kinetics algorithm!" << std::endl;
         }
 
-        if (options.use_smart_equilibrium_solver) {
+        if(options.use_smart_equilibrium_solver) {
             smart_equilibrium_solver.outputClusterInfo();
-        } else {
+        }else{
             std::cout << "No clusters were created in the conventional equilibrium algorithm!" << std::endl;
         }
     }
