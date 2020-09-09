@@ -410,9 +410,6 @@ struct ReactiveTransportSolver::Impl
 
             for(Index icell = 0; icell < num_cells; ++icell)
             {
-                std::ofstream myfile("debug-2000-neg-eps.txt", std::ios::out | std::ios::app | std::ios::binary);
-                myfile << "icell " << icell << "\n";
-                myfile.close();
                 // Solve with a smart kinetic solver
                 //smart_kinetic_solver.solve(states[icell], t_start, dt, be.row(icell));
                 smart_kinetic_solver.solve(states[icell], t_start, dt, be.row(icell), steps, icell);
