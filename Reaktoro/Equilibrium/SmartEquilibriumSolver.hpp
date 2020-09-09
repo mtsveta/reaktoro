@@ -89,7 +89,7 @@ public:
     /// molar amounts of the equilibrium species with respect to temperature `T`, pressure `P`,
     /// and molar amounts of equilibrium elements `be`.
     /// @see EquilibriumSensitivity
-    auto sensitivity() -> const EquilibriumSensitivity&;
+    auto sensitivity() const -> const EquilibriumSensitivity&;
 
     /// Return the result of the last smart equilibrium calculation.
     /// @see SmartEquilibriumResult

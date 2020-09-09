@@ -1445,9 +1445,9 @@ struct SmartEquilibriumSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate of the chemical state
-        if(options.smart_method == "kin-clustering-eq-clustering")
+            if(options.smart_method == "kin-clustering-eq-clustering" || options.smart_method == "kin-clustering-extended-eq-clustering" || options.smart_method == "eq-clustering")
             estimate(state, T, P, be);
-        else if (options.smart_method == "kin-priority-eq-priority")
+        else if (options.smart_method == "kin-priority-eq-priority" || options.smart_method == "eq-priority")
             estimate_priority_based_acceptance_potential(state, T, P, be);
         else if (options.smart_method == "kin-priority-primary-eq-priority-primary")
             estimate_priority_based_acceptance_primary_potential(state, T, P, be);
@@ -1463,9 +1463,9 @@ struct SmartEquilibriumSolver::Impl
 
         // Perform a learning step if the smart prediction is not satisfactory
         if(!result.estimate.accepted){
-            if(options.smart_method == "kin-clustering-eq-clustering")
+            if(options.smart_method == "kin-clustering-eq-clustering" || options.smart_method == "kin-clustering-extended-eq-clustering" || options.smart_method == "eq-clustering")
                 learn(state, T, P, be);
-            else if (options.smart_method == "kin-priority-eq-priority")
+            else if (options.smart_method == "kin-priority-eq-priority" || options.smart_method == "eq-priority")
                 learn_priority_based_acceptance_potential(state, T, P, be);
             else if (options.smart_method == "kin-priority-primary-eq-priority-primary")
                 learn_priority_based_acceptance_primary_potential(state, T, P, be);
@@ -1639,6 +1639,11 @@ auto SmartEquilibriumSolver::solve(ChemicalState& state, const EquilibriumProble
 auto SmartEquilibriumSolver::properties() const -> const ChemicalProperties&
 {
     return pimpl->properties;
+}
+
+auto SmartEquilibriumSolver::sensitivity() const -> const EquilibriumSensitivity&
+{
+    return pimpl->solver.sensitivity();
 }
 
 auto SmartEquilibriumSolver::result() const -> const SmartEquilibriumResult&
