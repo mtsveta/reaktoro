@@ -138,7 +138,11 @@ struct KineticPath::Impl
     {
         t0 = units::convert(t0, units, "s");
         dt = units::convert(dt, units, "s");
-        kinetic_solver.initialize(state, t0);
+
+        if(!kin_path_options.use_smart_kinetic_solver)
+            kinetic_solver.initialize(state, t0);
+        else
+            smart_kinetic_solver.initialize(state, t0);
 
         double t = t0;
 
