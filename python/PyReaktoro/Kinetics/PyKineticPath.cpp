@@ -26,7 +26,7 @@
 #include <Reaktoro/Core/ReactionSystem.hpp>
 #include <Reaktoro/Kinetics/KineticOptions.hpp>
 #include <Reaktoro/Kinetics/KineticPath.hpp>
-
+#include <Reaktoro/Kinetics/KineticPathOptions.hpp>
 namespace Reaktoro {
 
 void exportKineticPath(py::module& m)
@@ -34,9 +34,13 @@ void exportKineticPath(py::module& m)
     auto solve1 = static_cast<void(KineticPath::*)(ChemicalState&, double, double, const std::string&)>(&KineticPath::solve);
     auto solve2 = static_cast<void(KineticPath::*)(ChemicalState& , double, double, int, const std::string&)>(&KineticPath::solve);
 
+    auto setOptions1 = static_cast<void(KineticPath::*)(const KineticOptions&)>(&KineticPath::setOptions);
+    auto setOptions2 = static_cast<void(KineticPath::*)(const KineticPathOptions&)>(&KineticPath::setOptions);
+
     py::class_<KineticPath>(m, "KineticPath")
         .def(py::init<const ReactionSystem&, const Partition&>())
-        .def("setOptions", &KineticPath::setOptions)
+        .def("setOptions", setOptions1)
+        .def("setOptions", setOptions2)
         .def("addSource", &KineticPath::addSource)
         .def("addPhaseSink", &KineticPath::addPhaseSink)
         .def("addFluidSink", &KineticPath::addFluidSink)

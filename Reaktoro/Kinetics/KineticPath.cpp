@@ -29,6 +29,9 @@
 #include <Reaktoro/Kinetics/KineticOptions.hpp>
 #include <Reaktoro/Kinetics/KineticSolver.hpp>
 
+#include <Reaktoro/Kinetics/KineticPathOptions.hpp>
+#include <Reaktoro/Kinetics/SmartKineticSolver.hpp>
+
 namespace Reaktoro {
 
 struct KineticPath::Impl
@@ -43,10 +46,16 @@ struct KineticPath::Impl
     Partition partition;
 
     /// The kinetic solver instance
-    KineticSolver kineticsolver;
+    KineticSolver kinetic_solver;
+
+    /// The kinetic solver instance
+    SmartKineticSolver smart_kinetic_solver;
 
     /// The options of the kinetic path
     KineticOptions options;
+
+    /// The options of the kinetic path
+    KineticPathOptions kin_path_options;
 
     /// The output instance of the kinetic path calculation
     ChemicalOutput output;
@@ -59,7 +68,8 @@ struct KineticPath::Impl
     : reactions(reactions),
       system(partition.system()),
       partition(partition),
-      kineticsolver(reactions, partition)
+      kinetic_solver(reactions, partition),
+      smart_kinetic_solver(reactions, partition)
     {
     }
 
@@ -69,14 +79,33 @@ struct KineticPath::Impl
         options = options_;
 
         // Set the options of the kinetic solver
-        kineticsolver.setOptions(options);
+        kinetic_solver.setOptions(options);
+    }
+    auto setOptions(const KineticPathOptions& options) -> void
+    {
+        // Initialise the options of the kinetic path
+        kin_path_options = options;
+
+        // Set options of kinetic solvers
+        kinetic_solver.setOptions(kin_path_options.kinetics);
+        this->kin_path_options.kinetics.use_smart_equilibrium_solver = options.use_smart_equilibrium_solver; // TODO: make sure the flag is set
+
+        // Set options of smart kinetic solvers
+        smart_kinetic_solver.setOptions(options.smart_kinetics);
+        this->kin_path_options.smart_kinetics.use_smart_equilibrium_solver = options.use_smart_equilibrium_solver; // TODO: make sure the flag is set
+
+        // Set options of equilibrium solvers
+        this->kin_path_options.equilibrium = options.equilibrium;
+        this->kin_path_options.smart_equilibrium = options.smart_equilibrium;
+
     }
 
     auto solve(ChemicalState& state, double t0, double t1, const std::string& units) -> void
     {
         t0 = units::convert(t0, units, "s");
         t1 = units::convert(t1, units, "s");
-        kineticsolver.initialize(state, t0);
+
+        kinetic_solver.initialize(state, t0);
 
         double t = t0;
 
@@ -95,7 +124,7 @@ struct KineticPath::Impl
             for(auto& plot : plots) plot.update(state, t);
 
             // Integrate one time step only
-            t = kineticsolver.step(state, t, t1);
+            t = kinetic_solver.step(state, t, t1);
         }
 
         // Update the output with the final state
@@ -109,7 +138,7 @@ struct KineticPath::Impl
     {
         t0 = units::convert(t0, units, "s");
         dt = units::convert(dt, units, "s");
-        kineticsolver.initialize(state, t0);
+        kinetic_solver.initialize(state, t0);
 
         double t = t0;
 
@@ -132,9 +161,10 @@ struct KineticPath::Impl
             //std::cout << "dt = " << dt << " s" << std::endl;
 
             // Integrate one time step only
-            t = kineticsolver.solve(state, t, dt);
-
-            //std::cout << "t = " << t << " s" << std::endl;
+            if(!kin_path_options.use_smart_kinetic_solver)
+                t = kinetic_solver.solve(state, t, dt);
+            else
+                t = smart_kinetic_solver.solve(state, t, dt);
 
             // Update the output with current state
             if(output) output.update(state, t);
@@ -174,6 +204,11 @@ auto KineticPath::setOptions(const KineticOptions& options) -> void
     pimpl->setOptions(options);
 }
 
+auto KineticPath::setOptions(const KineticPathOptions& options) -> void
+{
+    pimpl->setOptions(options);
+}
+
 auto KineticPath::setPartition(const Partition& partition) -> void
 {
     RuntimeError("Cannot proceed with KineticPath::setPartition.",
@@ -183,22 +218,22 @@ auto KineticPath::setPartition(const Partition& partition) -> void
 
 auto KineticPath::addSource(const ChemicalState& state, double volumerate, const std::string& units) -> void
 {
-    pimpl->kineticsolver.addSource(state, volumerate, units);
+    pimpl->kinetic_solver.addSource(state, volumerate, units);
 }
 
 auto KineticPath::addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
 {
-    pimpl->kineticsolver.addPhaseSink(phase, volumerate, units);
+    pimpl->kinetic_solver.addPhaseSink(phase, volumerate, units);
 }
 
 auto KineticPath::addFluidSink(double volumerate, const std::string& units) -> void
 {
-    pimpl->kineticsolver.addFluidSink(volumerate, units);
+    pimpl->kinetic_solver.addFluidSink(volumerate, units);
 }
 
 auto KineticPath::addSolidSink(double volumerate, const std::string& units) -> void
 {
-    pimpl->kineticsolver.addSolidSink(volumerate, units);
+    pimpl->kinetic_solver.addSolidSink(volumerate, units);
 }
 
 auto KineticPath::solve(ChemicalState& state, double t0, double t1, const std::string& units) -> void
