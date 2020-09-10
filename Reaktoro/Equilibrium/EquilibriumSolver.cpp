@@ -527,7 +527,7 @@ struct EquilibriumSolver::Impl
         // Set the maximum number of iterations in each optimization pass
         optimum_options.max_iterations = 10;
 
-        // Start the several opmization passes (stop if convergence attained)
+        // Start the several optimization passes (stop if convergence attained)
         auto counter = 0;
         while(counter < options.optimum.max_iterations)
         {
