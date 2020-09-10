@@ -35,8 +35,8 @@ int main()
     double molar_mass_kfeldspar = 278.3315; // g / mol
     double molar_mass_kaolinite = 258.071; // g / mol // or 258.1604
 
-    std::string activity_model = "pitzer";
-    //std::string activity_model = "hkf";
+    //std::string activity_model = "pitzer";
+    std::string activity_model = "hkf";
 
     Database database("supcrt07.xml");
 
@@ -132,7 +132,12 @@ int main()
         problem.add("K", 1e-9, "mol");
         problem.pH(7.0);
 
+
+        EquilibriumOptions options;
+        options.hessian = GibbsHessian::ApproximationDiagonal;
+
         EquilibriumInverseSolver solver(partitions[i]);
+        solver.setOptions(options);
         ChemicalState state0(system);
         EquilibriumResult result = solver.solve(state0, problem);
 
@@ -146,7 +151,11 @@ int main()
         state0.setSpeciesAmount("Kaolinite", initial_mineral_amount_mol, "mol");
         state0.setSpeciesAmount("K-Feldspar", initial_mineral_amount_mol, "mol");
 
+        KineticOptions kinetic_options;
+        kinetic_options.equilibrium = options;
+
         KineticPath path(reactions, partitions[i]);
+        path.setOptions(kinetic_options);
 
         std::string result_filename = "kinetics-benchmark-kin-" + std::to_string(num_kinetic_minerals)
                                                            + "-eq-" + std::to_string(num_minerals - num_kinetic_minerals)
