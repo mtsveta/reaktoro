@@ -374,13 +374,10 @@ struct KineticSolver::Impl
         // Update the composition of the kinetic species
         state.setSpeciesAmounts(nk, iks);
 
-
         // Update the composition of the equilibrium species
         if(options.use_smart_equilibrium_solver) smart_equilibrium.solve(state, T, P, be);
         else{
-            EquilibriumResult res;
-            res = equilibrium.solve(state, T, P, be);
-            std::cout << "# iter. : " << res.optimum.iterations << ", time    : " << res.optimum.time << std::endl;
+            EquilibriumResult res = equilibrium.solve(state, T, P, be);
         }
         return t;
     }
@@ -443,7 +440,7 @@ struct KineticSolver::Impl
             result.equilibrium += res;
         }
 
-        std::cout << "# iter = " << result.equilibrium.optimum.iterations << std::endl;
+        //std::cout << "# iter = " << result.equilibrium.optimum.iterations << std::endl;
 
         result.timing.equilibrate = toc(EQUILIBRATE_STEP);
 
