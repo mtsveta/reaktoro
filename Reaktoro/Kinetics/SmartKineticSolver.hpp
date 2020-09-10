@@ -111,6 +111,12 @@ public:
     /// @param benk The initial vector of unknowns `benk` = [be, nk].
     auto initialize(ChemicalState& state, double tstart, VectorConstRef benk) -> void;
 
+    /// Solve the chemical kinetics problem from a given initial time to a final time (used in KineticPath)
+    /// @param state The kinetic state of the system
+    /// @param t The start time of the integration (in units of seconds)
+    /// @param dt The step to be used for the integration from `t` to `t + dt` (in units of seconds)
+    auto solve(ChemicalState& state, double t, double dt) -> double;
+
     /// Solve the chemical kinetics problem from a given initial time to a final time.
     /// Used in reactive transport solver, which provides updated element amounts.
     /// @param state The kinetic state of the system

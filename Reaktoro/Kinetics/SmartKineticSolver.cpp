@@ -2608,6 +2608,93 @@ struct SmartKineticSolver::Impl
     /// Solve functions
     /// ------------------------------------------------------------------------------------------------------------ ///
 
+    auto solve(ChemicalState& state, double t, double dt) -> double
+    {
+        // Initialize result structure
+        result = {};
+
+        tic(SOLVE_STEP);
+
+        //------------------------------------------------------------------------------------------
+        // INITIALIZE OF THE VARIABLES DURING THE KINETICS SOLVE STEP
+        //------------------------------------------------------------------------------------------
+        tic(INITIALIZE_STEP);
+
+        // Extract the composition of the kinetic species from the state
+        const auto &n = state.speciesAmounts();
+        ne = n(ies);
+        nk = n(iks);
+
+        // Assemble the vector benk = [be nk]
+        benk.resize(Ee + Nk);
+        benk.tail(Nk) = nk;
+
+        result.timing.initialize=toc(INITIALIZE_STEP);
+
+        //-----------------------------------------------------------------------------------------------
+        // ESTIMATE ELEMENTS AND KINETICS' SPECIES STORED IN 'BENK' DURING THE SMART-KINETICS SOLVE STEP
+        //-----------------------------------------------------------------------------------------------
+        tic(ESTIMATE_STEP);
+
+        // Perform a smart estimate for the chemical state
+        if(options.smart_method == "kin-clustering-eq-clustering")
+            estimate_clustering(state, t);
+        else if (options.smart_method == "kin-priority-eq-priority")
+            estimate_priority_based_acceptance_potential(state, t, dt);
+        else
+            estimate_nn_search_acceptance_based_lna(state, t);
+
+        result.timing.estimate = toc(ESTIMATE_STEP);
+
+        //-----------------------------------------------------------------------------------------------
+        // INTEGRATE ELEMENTS AND KINETICS' SPECIES STORED IN 'BENK' DURING THE SMART-KINETICS SOLVE STEP
+        //-----------------------------------------------------------------------------------------------
+        tic(LEARN_STEP);
+
+        // Perform a learning step if the smart prediction is not satisfactory
+        if(!result.estimate.accepted){
+            if(options.smart_method == "kin-clustering-eq-clustering")
+                learn_clustering(state, t, dt);
+            else if (options.smart_method == "kin-priority-eq-priority"){
+                learn_priority_based_acceptance_potential(state, t, dt);
+            }
+            else
+                learn_nn_search(state, t, dt);
+        }
+
+        // Extract the `be` and `nk` entries of the vector `benk`
+        be = benk.head(Ee);
+        nk = benk.tail(Nk);
+
+        // Update the composition of the kinetic species
+        state.setSpeciesAmounts(nk, iks);
+
+        result.timing.learn = toc(LEARN_STEP);
+
+        //------------------------------------------------------------------------------------------
+        // EQUILIBRATE EQUILIBRIUM SPECIES STORED IN 'NE' DURING THE KINETICS SOLVE STEP
+        //------------------------------------------------------------------------------------------
+
+        tic(EQUILIBRATE_STEP);
+
+        if(options.use_smart_equilibrium_solver){
+            SmartEquilibriumResult res = {};
+            res += smart_equilibrium.solve(state, T, P, be);
+            result.smart_equilibrium += res;
+        }
+        else{
+            EquilibriumResult res = {};
+            res += equilibrium.solve(state, T, P, be);
+            result.equilibrium += res;
+        }
+
+        result.timing.equilibrate = toc(EQUILIBRATE_STEP);
+
+        result.timing.solve = toc(SOLVE_STEP);
+
+        return t;
+
+    }
     /// Solve the chemical kinetics problem from a given initial time to a final time.
     auto solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
     {
@@ -3112,6 +3199,11 @@ auto SmartKineticSolver::result() const -> const SmartKineticResult&
 auto SmartKineticSolver::properties() const -> const ChemicalProperties&
 {
     return pimpl->properties;
+}
+
+auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt) -> double
+{
+    pimpl->solve(state, t, dt);
 }
 
 auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
