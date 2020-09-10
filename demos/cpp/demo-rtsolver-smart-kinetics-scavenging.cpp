@@ -34,8 +34,8 @@ using namespace Reaktoro;
 struct Params
 {
     // Discretization params
-    int ncells = 0; // the number of cells in the spacial discretization
-    int nsteps = 0; // the number of steps in the reactive transport simulation
+    Index ncells = 0; // the number of cells in the spacial discretization
+    Index nsteps = 0; // the number of steps in the reactive transport simulation
     double xl = 0.0; // the x-coordinates of the left boundaries
     double xr = 0.0; // the x-coordinates of the right boundaries
     double dx = 0.0; // the space step (in units of m)
@@ -54,7 +54,6 @@ struct Params
     double smart_equilibrium_reltol = 0.0;
     double smart_equilibrium_abstol = 0.0;
     double smart_equilibrium_cutoff = 0.0;
-    double smart_equilibrium_tol = 0.0;
 
     double smart_kinetics_reltol = 0.0;
     double smart_kinetics_abstol = 0.0;
@@ -83,7 +82,7 @@ struct RTKineticsResults
     double conv_kin_conv_eq_total_ideal_properties = 0.0;
 
     /// Total CPU time (in s) required for equilibrium in the conventional kinetic using equilibrium schemes
-    double conv_kin_conv_eq_total_equilibiration = 0.0;
+    double conv_kin_conv_eq_total_equilibration = 0.0;
 
     // Smart kinetic and conventional equilibrium schemes' times
     // *********************************************************************************//
@@ -411,8 +410,8 @@ int main()
 
     results.conv_kin_conv_eq_total = results.kinetic_timing.solve;
     results.conv_kin_conv_eq_total_ideal_properties = results.kinetic_timing.solve - results.kinetic_timing.integrate_chemical_properties;
-    results.conv_kin_conv_eq_total_equilibiration = results.kinetic_timing.integrate_equilibration
-                                                    +results.kinetic_timing.equilibrate;
+    results.conv_kin_conv_eq_total_equilibration = results.kinetic_timing.integrate_equilibration
+                                                   + results.kinetic_timing.equilibrate;
 
     std::cout << "-----------------------------------------------------" << std::endl;
     std::cout << " - solve                   : " << results.kinetic_timing.solve << std::endl;
@@ -458,7 +457,7 @@ int main()
                   << std::endl;
 
         std::cout << "speed up in equilibration    : "
-                  << results.conv_kin_conv_eq_total_equilibiration /
+                  << results.conv_kin_conv_eq_total_equilibration /
                      results.conv_kin_smart_eq_total_smart_equilibration << std::endl;
         std::cout << "time RT conv.kin.& conv.eq.  : " << results.time_reactive_transport_conv_kin_conv_eq << std::endl;
         std::cout << "time RT conv.kin.& smart.eq. : " << results.time_reactive_transport_conv_kin_smart_eq
@@ -575,18 +574,45 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Fe2O3 + 4*H+ = 2*H2O(l) + 2*Fe++ + 0.5*O2(aq)
     // .setEquation("Hematite + 4*H+ = 2*H2O(l) + 2*Fe++ + 0.5*O2(aq)")
     // Fe2O3 + 6*H+ = 3*H2O(l) + 2*Fe+++
+    // Fe2O3 + 6H+ = 2Fe+3 + 3H2O
+    /*
     MineralReaction reaction = editor.addMineralReaction("Hematite")
             .setEquation("Hematite + 4*H+ = 2*H2O(l) + 2*Fe++ + 0.5*O2(aq)")
             .addMechanism("logk = -14.60 mol/(m2*s); Ea = 66.2 kJ/mol")
             .addMechanism("logk = -9.39 mol/(m2*s); Ea = 66.2 kJ/mol; a[H+] = 1.0")
-            .setSpecificSurfaceArea(10, "cm2/g");
+            .setSpecificSurfaceArea(1000, "cm2/g");
+    */
+    /*
+    MineralReaction reaction = editor.addMineralReaction("Hematite")
+            .setEquation("Hematite + 6*H+ = 3*H2O(l) + 2*Fe+++")
+            .addMechanism("logk = -14.60 mol/(m2*s); Ea = 66.2 kJ/mol")
+            .addMechanism("logk = -9.39 mol/(m2*s); Ea = 66.2 kJ/mol; a[H+] = 1.0")
+            .setSpecificSurfaceArea(1000, "cm2/g");
+    */
+    // Fe2O3 + 6 H3O+ = 2 Fe+3 + 9 H2O - does not work because H3O+ species is not present in the chemical system
+    MineralReaction reaction = editor.addMineralReaction("Hematite")
+            .setEquation("Hematite + 6*H3O+ = 9*H2O(l) + 2*Fe+++")
+            .addMechanism("logk = -14.60 mol/(m2*s); Ea = 66.2 kJ/mol")
+            .addMechanism("logk = -9.39 mol/(m2*s); Ea = 66.2 kJ/mol; a[H+] = 1.0")
+            .setSpecificSurfaceArea(1000, "cm2/g");
+
+
     // Pyrite: FeS2
     // 4*FeS2 + 4*H2O(l) =  H+ + SO4-- + 4*Fe++ + 7*HS-
-//    editor.addMineralReaction("Pyrite")
-//            .setEquation("Pyrite + H2O(l)  =  0.25*H+ + 0.25*SO4-- + Fe++ + 1.75*HS-")
-//            .addMechanism("logk = -4.55 mol/(m2*s); Ea = 56.9 kJ/mol; a[H+] = 0.500")
-//            .setSpecificSurfaceArea(10, "cm2/g");
-
+    // FeS2 + 2H+ + 2e- = Fe+2 + 2HS-
+    //
+    ///*
+    editor.addMineralReaction("Pyrite")
+            .setEquation("Pyrite + H2O(l) = 0.25*H+ + 0.25*SO4-- + Fe++ + 1.75*HS-")
+            .addMechanism("logk = -4.55 mol/(m2*s); Ea = 56.9 kJ/mol; a[H+] = 0.500")
+            .setSpecificSurfaceArea(10, "cm2/g");
+    //*/
+    /*
+    editor.addMineralReaction("Pyrite")
+            .setEquation("Pyrite + 2*H+ + 2*e- = Fe++ + 2*HS-")
+            .addMechanism("logk = -4.55 mol/(m2*s); Ea = 56.9 kJ/mol; a[H+] = 0.500")
+            .setSpecificSurfaceArea(10, "cm2/g");
+    */
     // Step **: Create the ReactionSystem instances
     ReactionSystem reactions(editor);
 
@@ -721,6 +747,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         output.add("elementmolality(O)");
         output.add("elementmolality(S)");
         output.add("elementmolality(Z)");
+        output.add("speciesMolality(Fe+++)");
         output.filename(folder + "/" + "test.txt");
     }
     // Step **: Create RTProfiler to track the timing and results of reactive transport
@@ -846,7 +873,8 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                                  (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    std::string tag = "../plotting-results/rt-new-scavenging"; // -kin-clustering-eq-clustering";
+    std::string tag = "../plotting-results-20.08.2020/rt-scavenging-with-hematite"; // -kin-clustering-eq-clustering";
+    //std::string tag = "../plotting-results/rt-scavenging-with-hematite-1000-pyrite"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-scavenging-no-kinetics"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-kin-priority-eq-clustering";
     //std::string tag = "../plotting-results/rt-kin-priority-eq-priority-primary-potentials";
@@ -1065,4 +1093,80 @@ Index                    Species                  Element                  Phase
 78                       Pyrite
 79                       Hematite
 ====================================================================================================
+ */
+
+
+/*
+Hematite
+Fe2O3 + 6 H3O+ = 2 Fe+3 + 9 H2O
+log_k           -4.008
+delta_h -30.845 kcal
+
+Hematite
+Fe2O3 + 6 H+ = 2 Fe+3 + 3 H2O
+-log_k	-4.008
+-delta_h -30.845 kcal
+-Vm 30.39
+
+Hematite            108
+Fe2O3 + 6H+ = 2Fe+3 + 3H2O
+log_k           -4.008
+delta_h -30.845 kcal
+
+
+Hematite
+	Fe2O3 + 6 H+ = 2 Fe+3 + 3 H2O
+	log_k		0.1086
+	-delta_H	-129.415	kJ/mol
+#	deltafH		-197.72		kcal/mol
+	-analytic	-2.2015e2 -6.0290e-2 1.1812e4 8.0253e1 1.8438e2
+#	Range		0-350
+	-Vm		30.274
+#	Extrapol	supcrt92
+#	Ref		HDN+78
+
+Hematite
+        Fe2O3 + 6 H3O+ = 2 Fe+3 + 9 H2O
+        log_k           -4.008
+        delta_h -30.845 kcal
+
+Hematite
+        Fe2O3 +6.0000 H+  =  + 2.0000 Fe+++ + 3.0000 H2O
+        log_k           0.1086
+	-delta_H	-129.415	kJ/mol	# Calculated enthalpy of reaction	Hematite
+#	Enthalpy of formation:	-197.72 kcal/mol
+        -analytic -2.2015e+002 -6.0290e-002 1.1812e+004 8.0253e+001 1.8438e+002
+#       -Range:  0-300
+
+Hematite
+        Fe2O3 + 6H+ = 2Fe+3 + 3H2O
+        log_k   -4.008
+        delta_h -30.845 kcal
+
+Hematite
+Fe2O3 + 6H+ = 2Fe+3 + 3H2O
+log_k	-1.418
+delta_h	-128.987	kJ
+
+
+Hematite
+Fe2O3 + 6 H+ = 2 Fe+3 + 3 H2O
+-log_k	-4.008
+-delta_h -30.845 kcal
+-Vm 30.39
+
+
+Hematite
+Fe2O3     = 2.000Fe+3     - 6.000H+     + 3.000H2O
+log_k    -1.020     #05GRI
+delta_h -123.679    #kJ/mol
+# Enthalpy of formation:           -831.811        #kJ/mol
+-analytic -2.26876E+1 0E+0 6.46019E+3 0E+0 0E+0
+
+
+Hematite            108
+Fe2O3 + 6H+ = 2Fe+3 + 3H2O
+log_k           -4.008
+delta_h -30.845 kcal
+
  */
