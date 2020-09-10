@@ -74,8 +74,7 @@ auto runKinetics(const Params & params) -> void{
     Partition partition(system);
     partition.setKineticSpecies({"Calcite"});
 
-    EquilibriumProblem problem(system);
-    problem.setPartition(partition);
+    EquilibriumProblem problem(partition);
     problem.setTemperature(60, "celsius");
     problem.setPressure(100, "bar");
     problem.add("H2O", 1, "kg");
@@ -92,8 +91,7 @@ auto runKinetics(const Params & params) -> void{
         chemical_states[i].setSpeciesMass("Calcite", 100, "g");
     }
 
-    KineticPath path(reactions);
-    path.setPartition(partition);
+    KineticPath path(reactions, partition);
 
     ChemicalOutput output = path.output();
     output.add("t");

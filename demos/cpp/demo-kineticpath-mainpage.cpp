@@ -36,8 +36,7 @@ int main()
     Partition partition(system);
     partition.setKineticSpecies({"Calcite"});
 
-    EquilibriumProblem problem(system);
-    problem.setPartition(partition);
+    EquilibriumProblem problem(partition);
     problem.setTemperature(60, "celsius");
     problem.setPressure(100, "bar");
     problem.add("H2O", 1, "kg");
@@ -47,8 +46,7 @@ int main()
 
     initialstate.setSpeciesMass("Calcite", 100, "g");
 
-    KineticPath path(reactions);
-    path.setPartition(partition);
+    KineticPath path(reactions, partition);
 
     ChemicalPlot plot1 = path.plot();
     plot1.x("time(units=minute)");

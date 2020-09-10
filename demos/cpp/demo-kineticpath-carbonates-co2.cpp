@@ -52,8 +52,7 @@ int main()
     Partition partition(system);
     partition.setKineticSpecies({"Calcite", "Magnesite", "Dolomite"});
 
-    EquilibriumProblem problem(system);
-    problem.setPartition(partition);
+    EquilibriumProblem problem(partition);
     problem.add("H2O", 1, "kg");
     problem.add("NaCl", 1, "mol");
     problem.add("CO2", 1, "mol");
@@ -65,8 +64,20 @@ int main()
     state0.setSpeciesMass("Calcite", 100, "g");
     state0.setSpeciesMass("Dolomite", 50, "g");
 
-    KineticPath path(reactions);
-    path.setPartition(partition);
+    KineticOptions options;
+    options.use_smart_equilibrium_solver = false;
+    //options.smart_equilibrium.smart_method = "eq-priority";
+
+    KineticPath path(reactions, partition);
+    path.setOptions(options);
+
+    ChemicalOutput output = path.output();
+    output.add("t(units=second)");
+    output.add("pH");
+    output.add("speciesMass(Calcite units=g)", "Calcite");
+    output.add("speciesMass(Dolomite units=g)", "Dolomite");
+    output.add("speciesMass(Magnesite units=g)", "Magnesite");
+    output.filename("demo-kineticpath-carbonates-co2-kinetics.txt");
 
     ChemicalPlot plot0 = path.plot();
     plot0.x("time(units=hour)");
@@ -95,7 +106,9 @@ int main()
     plot3.xlabel("Time [hour]");
     plot3.ylabel("Mass [g]");
 
+    tic(KINETICS);
     path.solve(state0, 0, 25, "hours");
+    double time = toc(KINETICS);
+    std::cout << "total time = " << time << std::endl;
 
-    std::cout << state0 << std::endl;
 }
