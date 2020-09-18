@@ -54,6 +54,8 @@ struct Params
     double mole_fraction_cutoff = 0;
 
     std::string activity_model = "";
+
+    std::string smart_method = "";
 };
 
 struct Results
@@ -121,8 +123,14 @@ int main()
     params.T = 25.0;                     // the temperature (in units of degC)
     params.P = 1.01325;                      // the pressure (in units of bar)
 
+//    // Define parameters of the equilibrium solvers
+//    params.smart_method = "eq-clustering";
+//    params.smart_equilibrium_reltol = 0.01;
+
     // Define parameters of the equilibrium solvers
+    params.smart_method = "eq-priority";
     params.smart_equilibrium_reltol = 0.01;
+
     params.activity_model = "dk-full";
     //params.activity_model = "pitzer-full";
     //params.activity_model = "dk";
@@ -148,7 +156,7 @@ int main()
     results.smart_total_ideal_search_store = results.smart_equilibrium_timing.solve
                                              - results.smart_equilibrium_timing.estimate_search
                                              - results.smart_equilibrium_timing.estimate_database_priority_update
-                                             - results.smart_equilibrium_timing.learning_storage;
+                                             - results.smart_equilibrium_timing.learn_storage;
 
     // Output speed-us
     std::cout << "speed up                            : "
@@ -177,7 +185,7 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     // Step **: Define smart chemical equilibrium solver options
     SmartEquilibriumOptions smart_equilibrium_options;
     smart_equilibrium_options.reltol = params.smart_equilibrium_reltol;
-
+    smart_equilibrium_options.smart_method = params.smart_method;
     smart_equilibrium_options.amount_fraction_cutoff = params.amount_fraction_cutoff;
     smart_equilibrium_options.mole_fraction_cutoff = params.mole_fraction_cutoff;
 
@@ -252,7 +260,6 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     problem_ic.add("K+", 23.142e-3, "kg");
     problem_ic.add("HCO3-", 8.236e-3, "kg");
     problem_ic.add("O2(aq)", 58e-12, "kg");
-    problem_ic.add("Siderite", 0.5, "mol");
     problem_ic.add("Pyrite", 0.0, "mol");
     problem_ic.add("Hematite", 0.5, "mol");
     problem_ic.pH(8.951);
@@ -422,7 +429,8 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-nsteps-" + std::to_string(params.nsteps) +
                            "-" + params.activity_model + "-reference";
 
-    std::string smart_test_tag = "-dt-" + dt_stream.str() +
+    std::string smart_test_tag = "-" + params.smart_method +
+                                 "-dt-" + dt_stream.str() +
                                  "-ncells-" + std::to_string(params.ncells) +
                                  "-nsteps-" + std::to_string(params.nsteps) +
                                  "-reltol-" + reltol_stream.str() +
@@ -454,6 +462,7 @@ auto outputConsole(const Params& params) -> void {
     std::cout << "P       : " << params.P << std::endl;
     std::cout << "eqreltol       : " << params.smart_equilibrium_reltol << std::endl;
     std::cout << "activity model : " << params.activity_model << std::endl;
+    std::cout << "smart method   : " << params.smart_method << std::endl;
 
 }
 

@@ -313,7 +313,7 @@ int main()
 
     KineticPathOptions kinetic_path_options;
     kinetic_path_options.use_smart_equilibrium_solver = kinetic_options.use_smart_equilibrium_solver;
-    kinetic_path_options.use_smart_kinetic_solver = true;
+    kinetic_path_options.use_smart_kinetic_solver = false;
     kinetic_path_options.equilibrium = equilibrium_options;
     kinetic_path_options.smart_equilibrium = smart_equilibrium_options;
     kinetic_path_options.kinetics = kinetic_options; // TODO: think about better structure of the kinetic and equilibrium options
