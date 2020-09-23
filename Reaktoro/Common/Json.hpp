@@ -39,7 +39,7 @@ public:
 
     /// Output a value (converted to json object) to a file.
     template<typename T>
-    auto operator<<(const T& val)
+    auto operator<<(const T& val) -> JsonOutput&
     {
         file << json(val);
         file.close();
