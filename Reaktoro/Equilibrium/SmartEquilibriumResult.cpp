@@ -43,16 +43,22 @@ auto SmartEquilibriumResultDuringEstimate::operator+=(const SmartEquilibriumResu
     failed_with_species = other.failed_with_species;
     failed_with_amount = other.failed_with_amount;
     failed_with_chemical_potential = other.failed_with_chemical_potential;
+
+    return *this;
 }
 
 auto SmartEquilibriumResultDuringLearning::operator+=(const SmartEquilibriumResultDuringLearning& other) -> SmartEquilibriumResultDuringLearning&
 {
     gibbs_energy_minimization +=other.gibbs_energy_minimization;
+
+    return *this;
 }
 auto SmartEquilibriumResult::operator+=(const SmartEquilibriumResult& other) -> SmartEquilibriumResult&
 {
     estimate += other.estimate;
     learning += other.learning;
     timing   += other.timing;
+
+    return *this;
 }
 } // namespace Reaktoro

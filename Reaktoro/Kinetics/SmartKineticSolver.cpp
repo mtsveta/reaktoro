@@ -3203,7 +3203,7 @@ auto SmartKineticSolver::properties() const -> const ChemicalProperties&
 
 auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt) -> double
 {
-    pimpl->solve(state, t, dt);
+    return pimpl->solve(state, t, dt);
 }
 
 auto SmartKineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
