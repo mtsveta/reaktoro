@@ -24,8 +24,6 @@ int main()
     editor.addMineralPhase("Dolomite");
 
     ChemicalSystem system(editor);
-    std::cout << "system = " << system << std::endl;
-    getchar();
 
     // Amount of water
     double water_kg = 1.00;
@@ -40,7 +38,7 @@ int main()
     problem_pw.pH(7.0, "HCl", "NaOH");
            
     ChemicalState state_pw = equilibrate(problem_pw);
-    std::cout << "state_pw = " << state_pw << std::endl;
+    std::cout << "Pure water: \n" << state_pw << std::endl;
     getchar();
     
     // Define the state with seawater
@@ -59,14 +57,17 @@ int main()
     problem_sw.pH(8.22, "HCl", "NaOH");
     
     ChemicalState state_sw = equilibrate(problem_sw);
-    std::cout << "state_sw = " << state_sw << std::endl;
+    std::cout << "Sea water: \n" << state_sw << std::endl;
     getchar();
   
     // Conduct the mixing pure water and seawater
-    EquilibriumSolver solver(system);
-    EquilibriumResult res = solver.solve(state_pw, T, P, state_sw.elementAmounts());
+    ChemicalState state_mixed = 0.3 * state_sw + 0.7 * state_pw;
+    state_mixed.setSpeciesAmount("Calcite", 10.0, "mol");
 
-    std::cout << "state_pw (after mixing with pure water) = " << state_pw << std::endl;
+    // Define solver for equilibration new mixed state
+    EquilibriumSolver solver(system);
+    EquilibriumResult res = solver.solve(state_mixed);
+    std::cout << "mixture(SW 30% and PW 70%) equilibrated with 10 mol of Calcite: \n" << state_mixed << std::endl;
     getchar();
 
 }

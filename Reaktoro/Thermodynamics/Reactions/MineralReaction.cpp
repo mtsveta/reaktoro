@@ -229,7 +229,7 @@ struct MineralReaction::Impl
     /// The surface area of the mineral
     double surface_area = 0.0;
 
-    /// The mineral rate mechanisms of the mineral dismixture/precipitation equation
+    /// The mineral rate mechanisms of the mineral dissolution/precipitation equation
     std::vector<MineralMechanism> mechanisms;
 
     Impl()
@@ -463,9 +463,6 @@ auto createReaction(const MineralReaction& mineralrxn, const ChemicalSystem& sys
 
     // The sum function of the mechanism contributions
     ChemicalScalar f(num_species);
-
-    // The rate of the reaction
-    ChemicalScalar res;
 
     // Create the mineral rate function
     ReactionRateFunction rate;
