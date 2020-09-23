@@ -161,9 +161,6 @@ struct KineticPath::Impl
         unsigned int k = 0;
         while(k < n)
         {
-            //std::cout << "t = " << t << " s" << std::endl;
-            //std::cout << "dt = " << dt << " s" << std::endl;
-
             // Integrate one time step only
             if(!kin_path_options.use_smart_kinetic_solver)
                 t = kinetic_solver.solve(state, t, dt);
@@ -225,7 +222,7 @@ auto KineticPath::addSource(const ChemicalState& state, double volumerate, const
     pimpl->kinetic_solver.addSource(state, volumerate, units);
 }
 
-auto KineticPath::addPhaseSink(std::string phase, double volumerate, const std::string& units) -> void
+auto KineticPath::addPhaseSink(const std::string& phase, double volumerate, const std::string& units) -> void
 {
     pimpl->kinetic_solver.addPhaseSink(phase, volumerate, units);
 }
@@ -257,7 +254,7 @@ auto KineticPath::output() -> ChemicalOutput
 
 auto KineticPath::plot() -> ChemicalPlot
 {
-    pimpl->plots.push_back(ChemicalPlot(pimpl->reactions));
+    pimpl->plots.emplace_back(ChemicalPlot(pimpl->reactions));
     return pimpl->plots.back();
 }
 

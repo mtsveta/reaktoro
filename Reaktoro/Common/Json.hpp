@@ -33,13 +33,13 @@ class JsonOutput
 {
 public:
     /// Construct a JsonOutput object.
-    JsonOutput(std::string filename)
+    JsonOutput(const std::string& filename)
     : file(filename)
     {}
 
     /// Output a value (converted to json object) to a file.
     template<typename T>
-    auto operator<<(const T& val) -> JsonOutput&
+    auto operator<<(const T& val)
     {
         file << json(val);
         file.close();

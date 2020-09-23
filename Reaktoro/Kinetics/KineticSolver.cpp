@@ -657,6 +657,11 @@ struct KineticSolver::Impl
         // Calculate the right-hand side function of the ODE
         res = A * r.val;
 
+//        std::cout << "A : \n" << (A) << std::endl;
+//        std::cout << "r.val : \n" << r.val << std::endl;
+//        std::cout << "res : \n" << (res) << std::endl;
+//        getchar();
+
         // Add the function contribution from the source rates
         if(source_fn)
         {
@@ -798,7 +803,7 @@ auto KineticSolver::step(ChemicalState& state, double t, double tfinal) -> doubl
 
 auto KineticSolver::solve(ChemicalState& state, double t, double dt) -> double
 {
-    pimpl->solve(state, t, dt);
+    return pimpl->solve(state, t, dt);
 }
 
 auto KineticSolver::solve(ChemicalState& state, double t, double dt, VectorConstRef b) -> void
