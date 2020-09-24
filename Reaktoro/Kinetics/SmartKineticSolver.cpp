@@ -2732,8 +2732,12 @@ struct SmartKineticSolver::Impl
         // Perform a smart estimate for the chemical state
         if(options.smart_method == "kin-clustering-eq-clustering")
             estimate_clustering(state, t);
+        else if(options.smart_method == "kin-clustering-extended-eq-clustering")
+            estimate_clustering_extended(state, t);
         else if (options.smart_method == "kin-priority-eq-priority")
             estimate_priority_based_acceptance_potential(state, t, dt);
+        else if (options.smart_method == "kin-priority-primary-eq-priority-primary")
+            estimate_priority_based_acceptance_primary_potential(state, t);
         else
             estimate_nn_search_acceptance_based_lna(state, t);
 
@@ -2745,16 +2749,21 @@ struct SmartKineticSolver::Impl
         tic(LEARN_STEP);
 
         // Perform a learning step if the smart prediction is not satisfactory
-        if(!result.estimate.accepted){
+        if(!result.estimate.accepted)
+        {
             if(options.smart_method == "kin-clustering-eq-clustering")
                 learn_clustering(state, t, dt);
+            else if(options.smart_method == "kin-clustering-extended-eq-clustering")
+                learn_clustering_extended(state, t, dt);
             else if (options.smart_method == "kin-priority-eq-priority"){
                 learn_priority_based_acceptance_potential(state, t, dt);
+            }
+            else if (options.smart_method == "kin-priority-primary-eq-priority-primary"){
+                learn_priority_based_acceptance_primary_potential(state, t, dt);
             }
             else
                 learn_nn_search(state, t, dt);
         }
-
         // Extract the `be` and `nk` entries of the vector `benk`
         be = benk.head(Ee);
         nk = benk.tail(Nk);
