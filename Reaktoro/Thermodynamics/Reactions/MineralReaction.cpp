@@ -461,25 +461,25 @@ auto createReaction(const MineralReaction& mineralrxn, const ChemicalSystem& sys
     for(const MineralMechanism& mechanism : mineralrxn.mechanisms())
         mechanisms.push_back(mineralMechanismFunction(mechanism, reaction, system));
 
-    // The sum function of the mechanism contributions
-    ChemicalScalar f(num_species);
-
     // Create the mineral rate function
     ReactionRateFunction rate;
 
-    if(mineralrxn.surfaceArea())
+    // The surface area of the mineral
+    const double surface_area = mineralrxn.surfaceArea();
+
+    if(surface_area)
     {
         rate = [=](const ChemicalProperties& properties)
         {
             // The mineral reaction rate using specified surface area
-            ChemicalScalar r(num_species);
+            ChemicalScalar r(num_species, 0);
 
             // Iterate over all mechanism functions
             for(const ReactionRateFunction& mechanism : mechanisms)
                 r += mechanism(properties);
 
             // Multiply the mechanism contributions by the surface area of the mineral
-            r *= mineralrxn.surfaceArea();
+            r *= surface_area;
 
             return r;
         };
@@ -489,11 +489,11 @@ auto createReaction(const MineralReaction& mineralrxn, const ChemicalSystem& sys
         // The molar surface area of the mineral
         const double molar_surface_area = molarSurfaceArea(mineralrxn, system);
 
-        // The surface area of the mineral
-        const double surface_area = mineralrxn.surfaceArea();
-
         rate = [=](const ChemicalProperties& properties) mutable
         {
+            // The mineral reaction rate using specified surface area
+            ChemicalScalar r(num_species, 0);
+
             // The composition of the chemical system
             const auto n = properties.composition();
 
@@ -504,15 +504,13 @@ auto createReaction(const MineralReaction& mineralrxn, const ChemicalSystem& sys
             nm.val = std::max(nm.val, 0.0);
 
             // Iterate over all mechanism functions
-            f = 0.0;
             for(const ReactionRateFunction& mechanism : mechanisms)
-                f += mechanism(properties);
+                r += mechanism(properties);
 
-            // Multiply the mechanism contributions by the molar surface area of the mineral
-            f *= molar_surface_area;
+            // Multiply the mechanism contributions by the seed-value and the molar surface area of the mineral
+            r *= nm * molar_surface_area;
 
-            // The rate of the reaction and its partial derivatives
-            return nm * f;
+            return r;
         };
     }
 
