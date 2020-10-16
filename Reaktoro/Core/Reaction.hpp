@@ -83,6 +83,8 @@ public:
     /// Set the rate function of the reaction (in units of mol/s).
     auto setRate(const ReactionRateFunction& function) -> void;
 
+    auto setInitialAmounts(VectorConstRef n_) -> void;
+
     /// Return the name of the reaction.
     auto name() const -> std::string;
 
@@ -103,6 +105,8 @@ public:
 
     /// Return the indices of the reacting species of the reaction
     auto indices() const -> const Indices&;
+
+    auto initialAmounts() const -> const VectorRef;
 
     /// Return the stoichiometries of the reacting species of the reaction
     auto stoichiometries() const -> VectorConstRef;
