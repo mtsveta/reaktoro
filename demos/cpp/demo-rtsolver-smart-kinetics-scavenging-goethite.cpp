@@ -471,23 +471,21 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         const auto lnOmega = lnQ - lnK;
 
         // Calculate the saturation index
-        const auto Omega = exp(lnOmega);
+        const auto Omega = exp(lnOmega).val;
 
         // The composition of the chemical system
         const auto n = properties.composition();
-        const auto n0_rxn = reaction_goethite.initialAmounts();
+        const auto n0 = reaction_goethite.initialAmounts();
 
         // The index of the mineral
         const Index imineral = system.indexSpeciesWithError(min_reaction_goethite.mineral());
 
         // The number of moles of the mineral
-        auto nm = n[imineral];
-        auto nm0_rxn = n0_rxn[imineral];
+        auto nm = n[imineral].val;
+        auto nm0 = n0[imineral];
 
-
+        // Calculate the activity of species HS-
         VectorConstRef lna = properties.lnActivities().val;
-        const Index i_h = system.indexSpeciesWithError("H+");
-        double activity_h = std::exp(lna(i_h));
         const Index i_hs = system.indexSpeciesWithError("HS-");
         double activity_hs = std::exp(lna(i_hs));
 
@@ -519,10 +517,10 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
             -end
          */
         // If (m <= 0) and (SRmin < 1) Then GoTo 250
-        if(nm.val <= 0 && Omega < 1) // the is no way to precipitate further
+        if(nm <= 0 && Omega < 1) // the is no way to precipitate further
             res = ChemicalScalar(num_species, 0.0);
-        // S = 1 # Default value
-        const auto ssa = 1.0;
+        // S = 1 # default value in m2/g
+        const auto ssa = 1.0 * 1e3;
 
         if(Omega < 1) // dissolution kinetics
         {
@@ -549,7 +547,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 
             // Calculate the resulting mechanism function
             // rate = S * m * Mm * ((m/m0)^(2/3)) * k * (1 - SRmin) # by default
-            res += f * ssa * nm.val * molar_mass * pow(nm.val/nm0_rxn, 2/3) * kappa * (1 - Omega);
+            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2 / 3) * kappa * (1 - Omega);
 
             // Do not dissolve more than what is available
             // IF (moles > M) THEN moles = M
@@ -628,7 +626,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 //    std::cout << "state_ic = \n" << state_ic << std:: endl;
 //    getchar();
 
-    // Set initial value of Hemitite
+    // Set initial value of minerals
     reaction_goethite.setInitialAmounts(state_ic.speciesAmounts());
 
     // Step **: Create the mesh for the column
