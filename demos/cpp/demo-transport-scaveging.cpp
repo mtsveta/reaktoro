@@ -27,7 +27,7 @@ using namespace Reaktoro;
 
 int main()
 {
-    std::string path = "results_demo_transport_and_scaveging"; //folder 
+    std::string path = "results_demo_transport_and_scavenging"; //folder
 #ifdef _WIN32
     return ::_mkdir(path.c_str());
 #else
@@ -58,12 +58,12 @@ int main()
      dhModel.setPHREEQC();
 
      ChemicalEditor editor(database);
-     
+
      editor.addAqueousPhase({ "H2O(l)",  "H+", "OH-", 
                             "HCO3-", "Mg(HCO3)+", "Ca(HCO3)+", "MgCO3(aq)",  "CO3--", "CaCO3(aq)" ,
                             "Ca++", "CaSO4(aq)", "CaOH+", 
                             "Cl-", "FeCl++", "FeCl2(aq)", "FeCl+", 
-                            "Fe++", "FeOH+",  "FeOH++", "Fe+++", 
+                            "Fe++", "FeOH+",  "FeOH++", "Fe+++",
                             "H2(aq)",
                             "K+", "KSO4-", 
                             "Mg++", "MgSO4(aq)", "MgCO3(aq)", "MgOH+", 
@@ -141,7 +141,7 @@ int main()
      output.add("phaseAmount(Pyrrhotite)");
      output.add("phaseAmount(Siderite)");
  
-     rt.initialize(field);
+     rt.initialize();
  
      auto t = 0.0;
      auto step = 0.0;
