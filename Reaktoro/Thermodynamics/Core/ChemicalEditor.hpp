@@ -22,7 +22,10 @@
 #include <string>
 #include <vector>
 
-// Reaktoro includes
+// Forward declarations for ThermoFun
+#ifdef REAKTORO_USING_THERMOFUN
+namespace ThermoFun { class Database; }
+#endif
 
 namespace Reaktoro {
 
@@ -86,8 +89,13 @@ public:
     /// of a ChemicalEditor instance using the default constructor.
     ChemicalEditor();
 
-    /// Construct a ChemicalEditor instance with the provided database.
+    /// Construct a ChemicalEditor instance with a provided database.
     explicit ChemicalEditor(const Database& database);
+
+    /// Construct a ChemicalEditor instance with a provided ThermoFun database.
+#ifdef REAKTORO_USING_THERMOFUN
+    explicit ChemicalEditor(const ThermoFun::Database& database);
+#endif
 
     /// Construct a copy of the provided ChemicalEditor instance.
     ChemicalEditor(const ChemicalEditor& other);
@@ -101,12 +109,12 @@ public:
     /// Set the temperatures for constructing interpolation tables of thermodynamic properties.
     /// @param values The temperature values
     /// @param units The units of the temperature values
-    auto setTemperatures(const std::vector<double>&, const std::string& units) -> void;
+    auto setTemperatures(std::vector<double> values, const std::string& units) -> void;
 
     /// Set the pressures for constructing interpolation tables of thermodynamic properties.
     /// @param values The pressure values
     /// @param units The units of the pressure values
-    auto setPressures(const std::vector<double>& values, const std::string& units) -> void;
+    auto setPressures(std::vector<double> values, const std::string& units) -> void;
 
     /// Initialize all possible phases that can exist with given elements.
     /// @param elements The element symbols of interest.
@@ -241,8 +249,8 @@ public:
     /// needed, consists of specifying a list of chemical element, compound, or substance names,
     /// and let the ChemicalEditor to figure out automatically which species from the loaded database
     /// should be added in the phase. This functionality is supported by method
-    /// @ref addGaseousPhaseWithElements(std::string elements).
-    /// @ref addGaseousPhaseWithElementsOf(std::string compounds).
+    /// @ref addGaseousPhaseWithElements(const std::string& elements).
+    /// @ref addGaseousPhaseWithElementsOf(const std::string& compounds).
     /// @param species A StringList containing the names of the species.
     /// @return A reference to the created GaseousPhase object.
     /// @see addAqueousPhase, addLiquidPhase, addMineralPhase
@@ -308,8 +316,8 @@ public:
     /// needed, consists of specifying a list of chemical element, compound, or substance names,
     /// and let the ChemicalEditor to figure out automatically which species from the loaded database
     /// should be added in the phase. This functionality is supported by method
-    /// @ref addLiquidPhaseWithElements(std::string elements).
-    /// @ref addLiquidPhaseWithElementsOf(std::string compounds).
+    /// @ref addLiquidPhaseWithElements(const std::string& elements).
+    /// @ref addLiquidPhaseWithElementsOf(const std::string& compounds).
     /// @param species A StringList containing the names of the species.
     /// @return A reference to the created LiquidPhase object.
     /// @see addAqueousPhase, addGaseousPhase, addMineralPhase
@@ -383,14 +391,14 @@ public:
     /// needed, consists of specifying a list of chemical elements or compounds,
     /// and let the ChemicalEditor to figure out automatically which species from the loaded database
     /// should be added in the phase. This functionality is supported by methods
-    /// @ref addMineralPhaseWithElements(std::string elements) and
-	/// @ref addMineralPhaseWithElementsOf(std::string compounds).
+    /// @ref addMineralPhaseWithElements(const std::string& elements) and
+	/// @ref addMineralPhaseWithElementsOf(const std::string& compounds).
     /// @param species A StringList containing the names of the species.
     /// @return A reference to the created MineralPhase object.
     /// @see addAqueousPhase, addLiquidPhase, addGaseousPhase
     ///
     /// @note The old use of this function to add elements and/or compounds was removed. To use these
-    /// functionalities, use addMineralPhaseWitElements to add elements and addMineralPhaseWitElementsOf
+    /// functionalities, use addMineralPhaseWitElements to add eslements and addMineralPhaseWitElementsOf
     /// to add compounds.
     auto addMineralPhase(const StringList& species) -> MineralPhase&;
 
@@ -411,7 +419,7 @@ public:
     /// editor.addMineralPhaseWithElements({"Ca", "C", "O"});
     ///
     /// // This will only recognize the element "O", and CaC will be ignored
-    /// editor.addMineralPhaseWithElements({"CaC", "O"}); 
+    /// editor.addMineralPhaseWithElements({"CaC", "O"});
     /// ~~~
     /// @note In most cases, the solid solutions of interest have predefined mineral composition, so that
     /// one might prefer instead to list the mineral end-members one by one, instead of letting

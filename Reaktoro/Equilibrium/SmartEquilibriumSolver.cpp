@@ -201,8 +201,9 @@ struct SmartEquilibriumSolver::Impl
         if(!result.learning.gibbs_energy_minimization.optimum.succeeded){
             state.setSpeciesAmounts(0.0);
             result.learning.gibbs_energy_minimization = solver.solve(state, T, P, be);
+            // If solve has not converged, do not store output.
             if(!result.learning.gibbs_energy_minimization.optimum.succeeded){
-                    return;
+                return;
             }
         }
         result.timing.learning_gibbs_energy_minimization = toc(EQUILIBRIUM_STEP);

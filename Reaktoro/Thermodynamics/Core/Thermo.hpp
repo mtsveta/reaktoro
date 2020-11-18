@@ -24,6 +24,11 @@
 // Reaktoro includes
 #include <Reaktoro/Common/ScalarTypes.hpp>
 
+#ifdef REAKTORO_USING_THERMOFUN
+// Forward declarations for ThermoFun
+namespace ThermoFun { class Database; }
+#endif
+
 namespace Reaktoro {
 
 // Forward declarations
@@ -37,6 +42,11 @@ class Thermo
 public:
     /// Construct a Thermo instance with given Database instance
     explicit Thermo(const Database& database);
+
+#ifdef REAKTORO_USING_THERMOFUN
+    /// Construct a Thermo instance with given ThermoFun::Database instance
+    explicit Thermo(const ThermoFun::Database& database);
+#endif
 
     /// Calculate the apparent standard molar Gibbs free energy of a species (in units of J/mol).
     /// @param T The temperature value (in units of K)
