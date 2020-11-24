@@ -18,6 +18,37 @@ using namespace Reaktoro;
 
 int main()
 {
+
+    // Step **: Define chemical equilibrium solver options
+    EquilibriumOptions equilibrium_options;
+    equilibrium_options.hessian = GibbsHessian::Exact;
+
+    // Step **: Define smart chemical equilibrium solver options
+    SmartEquilibriumOptions smart_equilibrium_options;
+    smart_equilibrium_options.reltol = 1e-3;
+    smart_equilibrium_options.learning.hessian = GibbsHessian::Exact;
+    smart_equilibrium_options.smart_method = "kin-clustering-eq-clustering";
+
+    // Step **: Define chemical kinetic solver options
+    KineticOptions kinetic_options;
+    kinetic_options.equilibrium = equilibrium_options;
+    kinetic_options.smart_equilibrium = smart_equilibrium_options;
+    kinetic_options.use_smart_equilibrium_solver = false;
+
+    // Step **: Define smart chemical kinetic solver options
+    SmartKineticOptions smart_kinetic_options;
+    smart_kinetic_options.reltol = 1e-1;
+    smart_kinetic_options.abstol = 1e-4;
+    smart_kinetic_options.tol = 1e-3;
+    smart_kinetic_options.learning = kinetic_options;
+    smart_kinetic_options.learning.equilibrium = equilibrium_options;
+    smart_kinetic_options.smart_equilibrium = smart_equilibrium_options;
+    smart_kinetic_options.use_smart_equilibrium_solver = kinetic_options.use_smart_equilibrium_solver;
+    smart_kinetic_options.smart_method = "kin-clustering-eq-clustering";
+
+    //std::string activity_model = "pitzer";
+    std::string activity_model = "dh";
+
     Database database("supcrt07.xml");
 
     DebyeHuckelParams dhModel{};
@@ -27,8 +58,15 @@ int main()
     ChemicalEditor editor(database);
     StringList selected_elements = "Al C Ca Cl Fe H K Mg Na O S Si";
 
-    editor.addAqueousPhaseWithElements(selected_elements)
-            .setChemicalModelDebyeHuckel(dhModel);
+    if(activity_model=="pitzer")
+        editor.addAqueousPhaseWithElements(selected_elements)
+                .setChemicalModelDebyeHuckel(dhModel)
+                .setChemicalModelPitzerHMW()
+                .setActivityModelDrummondCO2();
+    else if(activity_model=="dh")
+        editor.addAqueousPhaseWithElements(selected_elements)
+                .setChemicalModelDebyeHuckel(dhModel);
+
     editor.addMineralPhase("Pyrrhotite");
     //editor.addMineralPhase("Pyrite");
     editor.addMineralPhase("Calcite");
@@ -40,8 +78,8 @@ int main()
     // Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
 
-//    std::cout << "system = \n" << system << std:: endl;
-//    getchar();
+    //std::cout << "system = \n" << system << std:: endl;
+    //getchar();
 
     const auto I = ChemicalProperty::ionicStrength(system);
 
@@ -451,9 +489,7 @@ int main()
         const unsigned num_species = system.numSpecies();
 
         // The mineral reaction rate using specified surface area
-        ChemicalScalar res(num_species, 0.0),
-            res_growth(num_species, 0.0),
-            res_nuc(num_species, 0.0);
+        ChemicalScalar res(num_species, 0.0), res_growth(num_species, 0.0), res_nuc(num_species, 0.0);
 
         // The universal gas constant (in units of kJ/(mol*K))
         const double R = 8.3144621e-3;
@@ -464,9 +500,12 @@ int main()
         // Auxiliary variables
         ChemicalScalar f(num_species, 1.0);
 
+        // Create a Reaction instance
+        Reaction reaction(min_reaction_siderite.equation(), system);
+
         // Calculate the saturation index of the mineral
-        const auto lnK = reaction_siderite.lnEquilibriumConstant(properties);
-        const auto lnQ = reaction_siderite.lnReactionQuotient(properties);
+        const auto lnK = reaction.lnEquilibriumConstant(properties);
+        const auto lnQ = reaction.lnReactionQuotient(properties);
         const auto lnOmega = lnQ - lnK;
         //std::cout << "lnK = " << lnK << std::endl;
         //std::cout << "lnQ = " << lnQ << std::endl;
@@ -686,6 +725,8 @@ int main()
     std::string eq_str_kaolinite = "Kaolinite + 6*H+ = 2*Al+++ + 2*SiO2(aq) + 5*H2O(l)";
     MineralReaction min_reaction_kaolinite = editor.addMineralReaction("Kaolinite")
             .setEquation(eq_str_kaolinite)
+            .addMechanism("logk = -13.18 mol/(m2*s); Ea = 22.2 kJ/mol")
+            .addMechanism("logk = -11.31 mol/(m2*s); Ea = 65.9 kJ/mol; a[H+] = 0.777")
             .setSpecificSurfaceArea(11.8, "m2/g");
     Reaction reaction_kaolinite = createReaction(min_reaction_kaolinite, system);
     reaction_kaolinite.setName("Kaolinite reaction");
@@ -887,7 +928,7 @@ int main()
 
              */
 
-            // surf_energy = 0.1  # interfacial energy for lateral surface in J m-2 (after Fritz et al 2009; lateral s chosen to be 2 times basal))
+            // surf_energy = 0.06 # interfacial energy in J m-2
             const auto surf_energy = 0.1;
 
             // sheet_thick = 7e-10	# thickness of one mineral layer in m
@@ -959,6 +1000,7 @@ int main()
     //std::string eq_str_quartz = "Quartz = SiO2(aq)";
     MineralReaction min_reaction_quartz = editor.addMineralReaction("Quartz")
             .setEquation(eq_str_quartz)
+            .addMechanism("logk = -13.99 mol/(m2*s); Ea = 87.7 kJ/mol")
             .setSpecificSurfaceArea(0.1, "m2/g");
     Reaction reaction_quartz = createReaction(min_reaction_quartz, system);
     reaction_quartz.setName("Quartz reaction");
@@ -1154,6 +1196,9 @@ int main()
 
     Partition partition(system);
     partition.setKineticSpecies(std::vector<std::string>{"Calcite", "Siderite", "Daphnite,14A", "Kaolinite", "Quartz"});
+    //partition.setKineticSpecies(std::vector<std::string>{"Daphnite,14A"});
+    //partition.setKineticSpecies(std::vector<std::string>{"Siderite", "Daphnite,14A"});
+    //partition.setKineticSpecies(std::vector<std::string>{"Siderite", "Daphnite,14A"});
 
     double water_kg = 1.00;
     double T = 25;
@@ -1182,6 +1227,7 @@ int main()
 
     //std::cout << "state_ic = \n" << state_ic << std:: endl;
     //getchar();
+
     state_ic.setSpeciesAmount("Calcite", 0.1, "mol"); // MM(100.09) = 713.5 g / mol
     state_ic.setSpeciesAmount("Daphnite,14A", 0.1, "mol"); // MM(Daphnite) = 713.5 g / mol
     state_ic.setSpeciesAmount("Siderite", 0.1, "mol"); // MM(Siderite) = 115.86 g / mol
@@ -1198,10 +1244,48 @@ int main()
     reaction_kaolinite.setInitialAmounts(state_ic.speciesAmounts());
     reaction_quartz.setInitialAmounts(state_ic.speciesAmounts());
 
-    // Define kinetic path
-    KineticPath path(reactions, partition);
+    // Define the first boundary condition (with seawater)
+    // Step **: Define the boundary condition (BC)  of the reactive transport modeling problem
+    EquilibriumInverseProblem problem_bc(partition);
+    problem_bc.setTemperature(T, "celsius");
+    problem_bc.setPressure(P, "atm");
+    problem_bc.add("H2O", water_kg, "kg");
+    problem_bc.add("HCO3-", 1441.11, "mg"); // 1441.11 mg/l
+    problem_bc.add("Ca++", 310, "mg"); // 310 mg/l
+    problem_bc.add("Cl-", 19100, "mg"); // 19100 charge
+    problem_bc.add("Fe++", 0.0034, "mg"); // 0.0034 mg/l
+    problem_bc.add("Mg++", 1240, "mg"); // 1240 mg/l
+    problem_bc.add("Na+", 11400, "mg"); // 11400 mg/l
+    problem_bc.add("SO4--", 2420, "mg"); // 2420 mg/l
+    //problem_bc.add("HS-", 0.0196504 / 58, "mol");
+    //problem_bc.add("H2S(aq)", 0.167794 / 58, "mol");
+    //problem_bc.add("S2-(aq)", 0.177794 / 58, "mol");
+    problem_bc.add("S", 100, "mg"); // 100 mg/l
+    problem_bc.pH(7.1015);
+    problem_bc.pE(-3.6887);
+//
+//    // Equilibrate the initial condition
+    ChemicalState state_bc = equilibrate(problem_bc);
+//    state_bc.scaleVolume(1.0, "m3");
+//
+//    std::cout << "state_bc = \n" << state_bc << std:: endl;
+//    getchar();
 
-    // Define the list of output values
+
+    KineticPathOptions kinetic_path_options;
+    kinetic_path_options.use_smart_equilibrium_solver = kinetic_options.use_smart_equilibrium_solver;
+    kinetic_path_options.use_smart_kinetic_solver = false;
+    kinetic_path_options.equilibrium = equilibrium_options;
+    kinetic_path_options.smart_equilibrium = smart_equilibrium_options;
+    kinetic_path_options.kinetics = kinetic_options;
+    kinetic_path_options.smart_kinetics = smart_kinetic_options;
+
+    KineticPath path(reactions, partition);
+    path.setOptions(kinetic_path_options);
+
+    // -------------------------------------------------------------------------------------------------//
+    // Approach III: solve the path with embedded in the KineticPath uniform time-stepping procedure
+    // -------------------------------------------------------------------------------------------------//
     ChemicalOutput output = path.output();
     output.add("time(units=s)");
     output.add("pH");
@@ -1226,12 +1310,48 @@ int main()
 
     double t0 = 0;
     double dt = 3600.0; // s, 1 hour
-    int n = 1440;
+    double tfinal = 5184000.0; // s, 1440 hours
+    int n = 1400;
 
-    output.filename("kineticpath-complex-scavenging-" + std::to_string(n) + "-steps.txt");
+    std::ostringstream eqtol_stream, kinreltol_stream, kinabstol_stream, kintol_stream;
+    eqtol_stream << std::scientific << std::setprecision(1) << smart_equilibrium_options.reltol;
+    kinreltol_stream << std::scientific << std::setprecision(1) << smart_kinetic_options.reltol;
+    kinabstol_stream << std::scientific << std::setprecision(1) << smart_kinetic_options.abstol;
+    kintol_stream << std::scientific << std::setprecision(1) << smart_kinetic_options.tol;
+
+    std::string smart_test_tag = "-" + smart_kinetic_options.smart_method +
+                                 "-n-" + std::to_string(n) +
+                                 "-eqtol-" + eqtol_stream.str() +
+                                 "-kintol-" + kintol_stream.str() +
+                                 "-kinrel-" + kinreltol_stream.str() +
+                                 "-kinabs-" + kinabstol_stream.str() +
+                                 "-" + activity_model +
+                                 (kinetic_path_options.use_smart_kinetic_solver ? "-smart-kin" : "-conv-kin") +
+                                 (kinetic_path_options.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
+
+    std::string class_test_tag = "-n-" + std::to_string(n) +
+                                 "-" + activity_model +
+                                 (kinetic_path_options.use_smart_kinetic_solver ? "-smart-kin" : "-conv-kin") +
+                                 (kinetic_path_options.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
+    std::string filename;
+    if(kinetic_path_options.use_smart_kinetic_solver)
+        filename = "kineticpath-scavenging-complex-system-with-kinetic-calcite" + smart_test_tag +  ".txt";
+    else
+        filename = "kineticpath-scavenging-complex-system-with-kinetic-calcite" + class_test_tag +  ".txt";
+    output.filename(filename);
+
+
+    // Step **: Create RTProfiler to track the timing and results of reactive transport
+    //ReactiveTransportProfiler profiler;
 
     //path.solve(state_ic, t0, t0 + dt, "second");
     //state_ic = state_ic + state_bc;
+    tic(TRANSPORT);
     path.solve(state_ic, t0, dt, n, "second");
 
+    //profiler.update(path.result());
+
+    double total_time = toc(TRANSPORT);
+    std::cout << filename << std::endl;
+    std::cout << "total_time = " << total_time << std::endl;
 }
