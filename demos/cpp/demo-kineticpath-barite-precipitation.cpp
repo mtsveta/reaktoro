@@ -202,6 +202,7 @@ int main()
     double water_kg = 1.00;
     double T = 60;
     double P = 200;
+
     EquilibriumInverseProblem problem_ic_fw(system);
     problem_ic_fw.setTemperature(T, "celsius");
     problem_ic_fw.setPressure(P, "atm");
@@ -243,6 +244,9 @@ int main()
     // Equilibrate the initial condition
     ChemicalState state_bc = equilibrate(problem_bc_sw);
     state_bc.scaleVolume(1.0, "m3");
+
+    std::cout << state_bc << std::endl;
+    getchar();
 
 
     KineticPath path(reactions, partition);
