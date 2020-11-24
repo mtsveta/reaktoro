@@ -51,7 +51,7 @@ struct SmartEquilibriumOptions
     /// The small negative cutoff value for estimated species mole amounts.
     double cutoff = -1e-5;
 
-    /// Smart method
+    /// The tag indicating the implementation of the ODML method.
     std::string smart_method = "kin-clustering-eq-clustering";
 
 };
