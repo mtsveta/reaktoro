@@ -51,6 +51,18 @@ public:
     auto outputInfo() const -> void;
 private:
 
+    /// The chemical potentials at the calculated equilibrium state
+    ChemicalVector u;
+
+    /// The storage for matrix du/db = du/dn * dn/db
+    Matrix dudb;
+
+    /// The storage for vector u(imajor)
+    Vector um;
+
+    /// The storage for matrix Mbe = inv(u(imajor)) * du(imajor)/db.
+    Matrix Mbe;
+
     /// The record of the knowledge database containing input, output, and derivatives data
     struct Record
     {

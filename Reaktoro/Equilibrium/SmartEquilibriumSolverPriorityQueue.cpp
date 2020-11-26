@@ -85,17 +85,24 @@ auto SmartEquilibriumSolverPriorityQueue::learn(ChemicalState& state, double T, 
                           - imajorminor.begin();
     const auto imajor = imajorminor.head(nummajor);
 
-    // Fetch chemical potentials and their derivatives
-    const auto u = _properties.chemicalPotentials();
+    // The chemical potentials at the calculated equilibrium state
+    u = _properties.chemicalPotentials();
+
+    // Auxiliary references to the derivatives dn/db and du/dn
     const auto& dndb = solver.sensitivity().dndb;
     const auto& dudn = u.ddn;
-    const Matrix dudb = dudn * dndb;
 
-    // Calculate matrix Mb for the error control based on the potentials
-    const Vector um = u.val(imajor);
-    const auto dumdb = rows(dudb, imajor);
+    // Compute the matrix du/db = du/dn * dn/db
+    dudb = dudn * dndb;
+
+    // The vector u(imajor) with chemical potentials of major species
+    um.noalias() = u.val(imajor);
+
+    // The matrix du(imajor)/dbe with derivatives of chemical potentials (major species only)
     const auto dumdbe = dudb(imajor, iee);
-    const Matrix Mbe = diag(inv(um)) * dumdbe;
+
+    // Compute matrix Mbe = 1/um * dum/db
+    Mbe.noalias() = diag(inv(um)) * dumdbe;
 
     _result.timing.learn_error_control_matrices = toc(ERROR_CONTROL_MATRICES);
 
