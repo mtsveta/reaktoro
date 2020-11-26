@@ -41,27 +41,40 @@ public:
     /// Destroy this SmartEquilibriumSolverPriorityQueue instance.
     virtual ~SmartEquilibriumSolverPriorityQueue();
 
-    /// Learn how to perform a full equilibrium calculation (with tracking)
+    /// Learn how to perform a full equilibrium calculation (with tracking).
     auto learn(ChemicalState& state, double T, double P, VectorConstRef be) -> void;
 
-    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expences)
+    /// Estimate the equilibrium state using sensitivity derivatives (profiling the expenses).
     auto estimate(ChemicalState& state, double T, double P, VectorConstRef be) -> void;
 
-    /// Output clusters created during the ODML algorithm
+    /// Output clusters created during the ODML algorithm.
     auto outputInfo() const -> void;
 private:
 
-    struct TreeNode
+    /// The record of the knowledge database containing input, output, and derivatives data
+    struct Record
     {
+        /// The amounts of elements in the equilibrium state (in units of mol).
         Vector be;
+
+        /// The calculated equilibrium state at `T`, `P`, `be`.
         ChemicalState state;
+
+        /// The chemical properties at the calculated equilibrium state.
         ChemicalProperties properties;
+
+        /// The sensitivity derivatives at the calculated equilibrium state.
         EquilibriumSensitivity sensitivity;
-        Matrix Mb;
+
+        /// The matrix used to compute relative change of chemical potentials due to change in `be`.
+        Matrix Mbe;
+
+        /// Vector with indices of the major species
         VectorXi imajor;
     };
+
     /// The tree used to save the calculated equilibrium states and respective sensitivities
-    std::deque<TreeNode> tree;
+    std::deque<Record> database;
 
     // The queue with priority indices, in which equilibrium states of the `tree` must be considered
     std::deque<Index> priority;
