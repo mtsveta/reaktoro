@@ -53,9 +53,9 @@ int main()
     params.P = 1.01325;                      // the pressure (in units of bar)
 
     // Define the activity model for the aqueous species
-    params.activity_model = ReactiveTransportParams::AqueousActivityModel::HKF;
-    //params.activity_model = ReactiveTransportParams::AqueousActivityModel::Pitzer;
-    //params.activity_model = ReactiveTransportParams::AqueousActivityModel::DebyeHuckel;
+    params.activity_model = ActivityModel::HKF;
+    //params.activity_model = ActivityModel::Pitzer;
+    //params.activity_model = ActivityModel::DebyeHuckel;
 
     // Define equilibrium solver cutoff tolerances
     params.amount_fraction_cutoff = 1e-14;
@@ -151,28 +151,28 @@ auto runReactiveTransport(ReactiveTransportParams& params, ReactiveTransportResu
     StringList selected_elements = "C Ca Cl Fe H K Mg Na O S";
 
     // Define activity model depending on the parameter
-    if(params.activity_model == ReactiveTransportParams::AqueousActivityModel::HKFSelectedSpecies){
+    if(params.activity_model == ActivityModel::HKFSelectedSpecies){
         // HKF full system
         editor.addAqueousPhase(selected_species);
     }
-    else if(params.activity_model == ReactiveTransportParams::AqueousActivityModel::PitzerSelectedSpecies){
+    else if(params.activity_model == ActivityModel::PitzerSelectedSpecies){
         // Pitzer selected species system
         editor.addAqueousPhase(selected_species)
                 .setChemicalModelPitzerHMW()
                 .setActivityModelDrummondCO2();
     }
-    else if(params.activity_model == ReactiveTransportParams::AqueousActivityModel::Pitzer){
+    else if(params.activity_model == ActivityModel::Pitzer){
         // Debye-Huckel full system
         editor.addAqueousPhaseWithElements(selected_elements)
                 .setChemicalModelPitzerHMW()
                 .setActivityModelDrummondCO2();
     }
-    else if(params.activity_model == ReactiveTransportParams::AqueousActivityModel::DebyeHuckelSelectedSpecies){
+    else if(params.activity_model == ActivityModel::DebyeHuckelSelectedSpecies){
         // Debye-Huckel selected species system
         editor.addAqueousPhase(selected_species)
                 .setChemicalModelDebyeHuckel(dhModel);
     }
-    else if(params.activity_model == ReactiveTransportParams::AqueousActivityModel::DebyeHuckel){
+    else if(params.activity_model == ActivityModel::DebyeHuckel){
         // Debye-Huckel full system
         editor.addAqueousPhaseWithElements(selected_elements)
                 .setChemicalModelDebyeHuckel(dhModel);
