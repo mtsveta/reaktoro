@@ -17,7 +17,7 @@
 #include <Reaktoro/Reaktoro.hpp>
 
 // Reactive transport test includes
-#include <demos/cpp/TestUtils.h>
+#include <demos/cpp/DemosUtils.h>
 #include <ThermoFun/ThermoFun.h>
 
 using namespace Reaktoro;
@@ -148,7 +148,9 @@ auto runReactiveTransport(ReactiveTransportParams& params, ReactiveTransportResu
     StringList selected_elements = "Al Cl H K Na O Si";
 
     // Define the list of selected species
-    StringList selected_species = "H2O@ H+ OH- Cl- HCl@ Na+ NaOH@ NaHSiO3@ NaCl@ NaAl(OH)4@ K+ KOH@ KCl@ KAlO2@ "
+    StringList selected_species = "H2O@ H+ OH- Cl- HCl@ "
+                                  "Na+ NaOH@ NaHSiO3@ NaCl@ NaAl(OH)4@ "
+                                  "K+ KOH@ KCl@ KAlO2@ "
                                   "Al+3 AlOH+2 Al(OH)2+ Al(OH)3@ Al(OH)4-";
 
     // Depending on the activity model, define it using ChemicalEditor
