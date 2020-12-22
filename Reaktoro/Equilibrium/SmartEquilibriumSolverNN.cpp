@@ -176,6 +176,14 @@ auto SmartEquilibriumSolverNN::estimate(ChemicalState& state, double T, double P
     // Update equilibrium species
     state.setSpeciesAmounts(ne, ies);
 
+    // Make sure that pressure and temperature is set to the current one
+    state.setTemperature(T);
+    state.setPressure(P);
+
+    // Update the chemical properties of the system as well as temperature and pressure
+    _properties = properties0;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+    _properties.update(T, P);
+
     // Set the estimate accepted status to true
     _result.estimate.accepted = true;
 
