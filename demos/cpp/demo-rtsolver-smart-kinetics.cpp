@@ -217,7 +217,7 @@ int main()
     params.xl = 0.0; // the x-coordinates of the left boundaries
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretizatio
-    params.nsteps = 100; // the number of steps in the reactive transport simulation
+    params.nsteps = 10; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -263,8 +263,7 @@ int main()
 //    params.smart_kinetics_reltol = 1e-1;
 //    params.smart_kinetics_abstol = 1e-4;
 //    params.output_results = true;
-//
-    //
+
     // // Run nn-search algorithm
     // params.smart_method = "kin-nnsearch-eq-nnsearch";
     // params.smart_equilibrium_reltol = 1e-1;
@@ -287,7 +286,7 @@ int main()
     // RTKineticsResults
     RTKineticsResults results;
 
-     // ------------------------------------------------------------------------------------------------------------- //
+    // ------------------------------------------------------------------------------------------------------------- //
     // CONVENTIONAL kinetics & SMART equilibrium
     // ------------------------------------------------------------------------------------------------------------- //
     /// Execute reactive transport with different solvers
@@ -304,14 +303,14 @@ int main()
     // SMART kinetics & SMART equilibrium
     // ------------------------------------------------------------------------------------------------------------- //
 
-//    params.use_smart_kinetics_solver = true;  params.use_smart_equilibrium_solver = true;  runReactiveTransport(params, results);
+    params.use_smart_kinetics_solver = true;  params.use_smart_equilibrium_solver = true;  runReactiveTransport(params, results);
 
 
     /// **************************************************************************************************************///
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     /// **************************************************************************************************************///
 
-    params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     // **************************************************************************************************************///
     // SPEED-UP analysis
