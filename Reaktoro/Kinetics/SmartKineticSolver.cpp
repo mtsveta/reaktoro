@@ -2692,6 +2692,9 @@ struct SmartKineticSolver::Impl
 
         result.timing.solve = toc(SOLVE_STEP);
 
+        // Update the time
+        t += dt;
+
         return t;
 
     }
