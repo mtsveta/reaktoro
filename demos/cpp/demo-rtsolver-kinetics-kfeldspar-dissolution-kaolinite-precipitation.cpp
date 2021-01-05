@@ -301,7 +301,7 @@ int main()
     Time start = time();
 
     // Step 1: Initialise auxiliary time-related constants
-    // int second = 1;
+    int second = 1;
     int minute = 60;
     int hour = 60 * minute;
     int day = 24 * hour;
@@ -319,18 +319,18 @@ int main()
     params.ncells = 10; // the number of cells in the spacial discretization
     */
     ///*
-    params.xr = 100.0; // the x-coordinates of the right boundaries
-    params.ncells = 100; // the number of cells in the spacial discretization
+    params.xr = 50.0; // the x-coordinates of the right boundaries
+    params.ncells = 50; // the number of cells in the spacial discretization
     //*/
     params.nsteps = 10; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
-    params.dt = 1 * minute; // the time step (in units of s)
+    params.dt = 0.01 * second; // the time step (in units of s)
 
     // Define physical and chemical parameters
     params.D = 5.0e-3;     // the diffusion coefficient (in units of m2/s)
     params.v = 10.0;       // the Darcy velocity (in units of m/s)
     params.T = 25.0;       // the temperature (in units of degC)
-    params.P = 1;          // the pressure (in units of bar)
+    params.P = 1.0;          // the pressure (in units of bar)
 
     // Define parameters of the equilibrium solvers
     params.smart_equilibrium_reltol = 1e-1;
@@ -414,286 +414,41 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     ChemicalSystem system(editor);
 
     // ------------------------------------------------------------------------------------------
-    // Definition of K-feldspar reaction
+    // Definition of K-feldspar(K(AlSi3)O8) reaction
     // ------------------------------------------------------------------------------------------
-    std::string kfeldspar_eq_str = "K-Feldspar + 8*H+ = 2*Al+++ + 2*K+ + 6*SiO2(aq) + 4*H2O(l)";
-    ReactionEquation kfeldspar_equation(kfeldspar_eq_str);
-//    // The sum function of the mechanism contributions
-//    ChemicalScalar f(num_species);
-// The molar surface area of the mineral
-//    const double molar_surface_area = molarSurfaceArea(mineralrxn, system);
-//
-//    ------------------------------------------------------------------------
-//    I version:
-//    ------------------------------------------------------------------------
-//    // The surface area of the mineral
-//    const double surface_area = mineralrxn.surfaceArea();
-//
-//    rate = [=](const ChemicalProperties& properties) mutable
-//    {
-//        // The composition of the chemical system
-//        const auto n = properties.composition();
-//
-//        // The number of moles of the mineral
-//        auto nm = n[imineral];
-//
-//        // Prevent negative mole numbers here for the solution of the ODEs
-//        nm.val = std::max(nm.val, 0.0);
-//
-//        // Iterate over all mechanism functions
-//        f = 0.0;
-//        for(const ReactionRateFunction& mechanism : mechanisms)
-//            f += mechanism(properties);
-//
-//        // Multiply the mechanism contributions by the molar surface area of the mineral
-//        f *= molar_surface_area;
-//
-//        // The rate of the reaction and its partial derivatives
-//        return nm * f;
-//    };
-//    ------------------------------------------------------------------------
-//    II version:
-//    ------------------------------------------------------------------------
-//    ReactionRateFunction fn = [=](const ChemicalProperties& properties) mutable
-//    {
-//        // The temperature and pressure of the system
-//        const Temperature T = properties.temperature();
-//
-//        // The result of this function evaluation
-//        ChemicalScalar res(num_species);
-//
-//        // Calculate the saturation index of the mineral
-//        const auto lnK = reaction.lnEquilibriumConstant(properties);
-//        const auto lnQ = reaction.lnReactionQuotient(properties);
-//        const auto lnOmega = lnQ - lnK;
-//
-//        // Calculate the rate constant for the current mechanism
-//        const auto kappa = mechanism.kappa * exp(-mechanism.Ea/R * (1.0/T - 1.0/298.15));
-//
-//        // Calculate the saturation index
-//        const auto Omega = exp(lnOmega);
-//
-//        // Calculate the p and q powers of the saturation index Omega
-//        const auto pOmega = pow(Omega, mechanism.p);
-//        const auto qOmega = pow(1 - pOmega, mechanism.q);
-//
-//        // Calculate the function f
-//        f = kappa * qOmega;
-//
-//        // Calculate the function g
-//        g = ChemicalScalar(num_species, 1.0);
-//
-//        for(const MineralCatalystFunction& catalyst : catalysts)
-//            g *= catalyst(properties);
-//
-//        // Calculate the resulting mechanism function
-//        res = f * g;
-//
-//        return res;
-//    };
-//
-//    ReactionRateFunction rate = [=](const ChemicalProperties& properties)
-//    {
-//        // The mineral reaction rate using specified surface area
-//        ChemicalScalar r(num_species);
-//
-//        // Iterate over all mechanism functions
-//        for(const ReactionRateFunction& mechanism : mechanisms)
-//            r += mechanism(properties);
-//
-//        // Multiply the mechanism contributions by the surface area of the mineral
-//        r *= mineralrxn.surfaceArea();
-//
-//        return r;
-//    };
 
-//    Reaction kfeldspar_reaction(kfeldspar_equation, system);
-//    kfeldspar_reaction.setName("K-Feldspar dissolution");
-//    kfeldspar_reaction.setRate(kfeldspar_rate_func);
-
-    double ssa_m2mol_kfeldspar = 1.0; // defined in PHREEQC, m2/mol
+    double ssa_m2mol_kfeldspar = 10.0; // defined in PHREEQC, m2/mol
     double ssa_m2kg_kfeldspar = ssa_m2mol_kfeldspar / molar_mass_kfeldspar / 1e-3;
     double mass_kfeldspar = 10 * 1e-3; // 10 g
-    double sa_m2_feldspar = ssa_m2kg_kfeldspar * mass_kfeldspar;
+    double sa_m2_kfeldspar = ssa_m2kg_kfeldspar * mass_kfeldspar;
     double vsa_m2m3_kfeldspar = 1000.0;
 
+    std::string eq_str_kfeldspar = "K-Feldspar + 4*H+ = Al+++ + K+ + 3*SiO2(aq) + 2*H2O(l)";
+//    ReactionEquation eq_kfeldspar(eq_str_kfeldspar);
+//    Reaction kfeldspar_reaction(eq_kfeldspar, system);
+//    kfeldspar_reaction.setName("K-Feldspar dissolution");
+//    kfeldspar_reaction.setRate(kfeldspar_rate_func);
     MineralReaction min_react_kfeldspar("K-Feldspar");
-    min_react_kfeldspar.setEquation(kfeldspar_eq_str)
+    min_react_kfeldspar.setEquation(eq_str_kfeldspar)
             .addMechanism("logk = -11.5 mol/(m2*s); Ea = 38.2 kJ/mol; p = 1.0; q = 1.0")
-            .setSpecificSurfaceArea(vsa_m2m3_kfeldspar, "m2/m3")
-            .setSurfaceArea(sa_m2_feldspar, "m2");
-
-    // Reaction function (with provided surface area )
-//    ReactionRateFunction kfeldspar_rate_func = [&min_react_kfeldspar, &system](const ChemicalProperties& properties) -> ChemicalScalar {
-//
-//        // ---------------------------
-//        // Using predefined functions
-//        // ---------------------------
-//
-////        // The number of chemical species in the system
-////        const unsigned num_species = system.numSpecies();
-////
-////        // The mineral reaction rate using specified surface area
-////        ChemicalScalar res(num_species);
-////
-////        // Create a Reaction instance
-////        Reaction reaction(min_react_kfeldspar.equation(), system);
-////
-////        // Create the mineral mechanism functions
-////        std::vector<ReactionRateFunction> mechanisms;
-////        for(const MineralMechanism& mechanism : min_react_kfeldspar.mechanisms())
-////            mechanisms.push_back(mineralMechanismFunction(mechanism, reaction, system));
-////
-////        // Iterate over all mechanism functions
-////        for(const ReactionRateFunction& mechanism : mechanisms)
-////            res += mechanism(properties);
-////
-////        // Multiply the mechanism contributions by the surface area of the mineral
-////        res *= min_react_kfeldspar.surfaceArea();
-////
-////        return res;
-//
-//        // ---------------------------------------------------------------------------------------------------------- //
-//
-//        // The number of chemical species in the system
-//        const unsigned num_species = system.numSpecies();
-//
-//        // The mineral reaction rate using specified surface area
-//        ChemicalScalar res(num_species);
-//
-//        // The universal gas constant (in units of kJ/(mol*K))
-//        const double R = 8.3144621e-3;
-//
-//        // The temperature and pressure of the system
-//        const Temperature T = properties.temperature();
-//
-//        // Create a Reaction instance
-//        Reaction reaction(min_react_kfeldspar.equation(), system);
-//
-//        for(const MineralMechanism& mechanism : min_react_kfeldspar.mechanisms()){
-//            // Create the mineral catalyst functions
-//            std::vector<MineralCatalystFunction> catalysts;
-//            for(const MineralCatalyst& catalyst : mechanism.catalysts)
-//                catalysts.push_back(mineralCatalystFunction(catalyst, system));\
-//
-//            // Auxiliary variables
-//            ChemicalScalar aux, f, g;
-//
-//            // Calculate the saturation index of the mineral
-//            const auto lnK = reaction.lnEquilibriumConstant(properties);
-//            const auto lnQ = reaction.lnReactionQuotient(properties);
-//            const auto lnOmega = lnQ - lnK;
-//
-//            // Calculate the rate constant for the current mechanism
-//            const auto kappa = mechanism.kappa * exp(-mechanism.Ea/R * (1.0/T - 1.0/298.15));
-//
-//            // Calculate the saturation index
-//            const auto Omega = exp(lnOmega);
-//
-//            // Calculate the p and q powers of the saturation index Omega
-//            const auto pOmega = pow(Omega, mechanism.p);
-//            const auto qOmega = pow(1 - pOmega, mechanism.q);
-//
-//            // Calculate the function f
-//            f = kappa * qOmega;
-//
-//            // Calculate the function g
-//            g = ChemicalScalar(num_species, 1.0);
-//
-//            for(const MineralCatalystFunction& catalyst : catalysts)
-//                g *= catalyst(properties);
-//
-//            // Calculate the resulting mechanism function
-//            res = f * g;
-//
-//            // Multiply the mechanism contributions by the surface area of the mineral
-//            res *= min_react_kfeldspar.surfaceArea();
-//
-//        }
-//        return res;
-//
-////        double logk = -11.5;
-////        double k = std::pow(10.0, logk);
-////        double Ea = 71.0;
-////        double m = 1.0;
-////        double n = 1.0;
-////        // Rate = A * k * (Omega^m - 1)^n
-////        // k is the growth (dissolution) rate constant
-////        // m, n > 0
-////        // Omega^m is saturation ration
-////        // Rate > 0, precipitation (solution is supersaturated w.r.t. mineral)
-////        // Rate < 0, dissolution (solution is undersaturated w.r.t. mineral)
-////        // A is the reactive surface area (not constant), A = ? * specific surface area
-////        // A ~ total surface area
-//
-//    };
-//    Reaction react_kfeldspar = createReaction(min_react_kfeldspar, system);
-//    react_kfeldspar.setRate(kfeldspar_rate_func);
-//    react_kfeldspar.setName("K-Feldspar dissolution");
+            .setSurfaceArea(sa_m2_kfeldspar, "m2");
 
     // ------------------------------------------------------------------------------------------
     // Definition of Kaolinite(Al2Si2O5(OH)4) reaction
     // ------------------------------------------------------------------------------------------
-    std::string kaolinite_eq_str = "2*Al+++ + 2*SiO2(aq) + 5*H2O(l) = Kaolinite + 6*H+";
-    ReactionEquation kaolinite_equation(kaolinite_eq_str);
-
     double ssa_m2mol_kaolinite = 1.0; // defined in PHREEQC, m2/mol
     double ssa_m2kg_kaolinite = ssa_m2mol_kaolinite / molar_mass_kaolinite / 1e-3;
     double mass_kaolinite = 10 * 1e-3; // 10 g
-    double sa_m2_kaolinite = ssa_m2kg_kfeldspar * mass_kaolinite;
+    double sa_m2_kaolinite = ssa_m2kg_kaolinite * mass_kaolinite;
     double vsa_m2m3_kaolinite = 1000.0;
 
+    std::string eq_str_kaolinite = "2*Al+++ + 2*SiO2(aq) + 5*H2O(l) = Kaolinite + 6*H+";
+    //std::string kaolinite_eq_str = "Kaolinite + 6*H+ = 2*Al+++ + 2*SiO2(aq) + 5*H2O(l)";
+    //ReactionEquation kaolinite_equation(kaolinite_eq_str);
     MineralReaction min_react_kaolinite("Kaolinite");
-    min_react_kaolinite.setEquation(kfeldspar_eq_str)
+    min_react_kaolinite.setEquation(eq_str_kaolinite)
             .addMechanism("logk = -13.2 mol/(m2*s); Ea = 71.0 kJ/mol; p = 1/9; q = 2.0")
-            .setSpecificSurfaceArea(ssa_m2kg_kaolinite, "m2/kg")
             .setSurfaceArea(sa_m2_kaolinite, "m2");
-
-//    auto kaolinite_rate_func = [&min_react_kaolinite, &system](const ChemicalProperties& props) -> ChemicalScalar {
-//        ChemicalScalar val;
-//        double A = 0.0; // reactive surface area of the mineral [m2 / m3_total_rock]
-//        double k_kaolinite = 0.0; // rate constant [mol / m2 / s]
-//        double Omega = 0.0; // function of saturation state, f(Omega)
-//        double logk = -13.2;
-//        double k = std::pow(10.0, -logk);
-//
-//        double Ea = 71.0;
-//        double m = 1/9;
-//        double n = 2.0;
-//        // Omega = IAP / K_eq
-//        // IAP ion activity product (written for the dissolution reaction)
-//        // K_eq equilibrium constant
-//
-//        // Rate = A * k * (Omega^m - 1)^n
-//        // k is the growth (dissolution) rate constant
-//        // m, n > 0
-//        // Omega^m is saturation ration
-//        //
-//        // Rate > 0, precipitation (solution is supersaturated w.r.t. mineral)
-//        // Rate < 0, dissolution (solution is undersaturated w.r.t. mineral)
-//        //  A * k_kaolinite * std::pow((std::pow(Omega, m) - 1), n)
-//        return val;
-//    };
-//    Reaction react_kaolinite = createReaction(min_react_kaolinite, system);
-//    react_kaolinite.setRate(kaolinite_rate_func);
-//    react_kaolinite.setName("Kaolinite precipitation");
-
-//    // K-Feldspar: K(AlSi3)O8
-//    MineralReaction reaction = editor.addMineralReaction("K-Feldspar")
-//            .setEquation("K-Feldspar + H2O(l) + H+ = Al+++ + 3*HSiO3- + K+")
-//            .addMechanism("logk = -12.41 mol/(m2*s); Ea = 38.0 kJ/mol")
-//            .addMechanism("logk = -10.06 mol/(m2*s); Ea = 51.7 kJ/mol; a[H+] = 0.5")
-//            .setSpecificSurfaceArea(initial_sa_m2mol / molar_mass_kfeldspar / 1e-3, "m2/kg");kg
-
-//    // Kaolinite: Al2Si2O5(OH)4
-//    editor.addMineralReaction("Kaolinite")
-//            .setEquation("Kaolinite + 4*H+ = 3*H2O(l) + 2*HSiO3- + 2*Al+++")
-//            .addMechanism("logk = -13.18 mol/(m2*s); Ea = 22.2 kJ/mol")
-//            .addMechanism("logk = -11.31 mol/(m2*s); Ea = 65.9 kJ/mol; a[H+] = 0.777")
-//            .setSpecificSurfaceArea(initial_sa_m2mol / molar_mass_kaolinite / 1e-3, "m2/kg");
-
-    //editor.addReaction(min_react_kaolinite);
-    //editor.addReaction(min_react_kfeldspar);
 
     editor.addMineralReaction(min_react_kfeldspar);
     editor.addMineralReaction(min_react_kaolinite);
@@ -702,50 +457,43 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     ReactionSystem reactions(editor);
     //ReactionSystem reacts(system, {react_kfeldspar, react_kaolinite});
 
-    std::cout << "system = \n" << system << std:: endl;
+    //std::cout << "system = \n" << system << std:: endl;
     std::cout << "reactions number = " << reactions.numReactions() << std:: endl;
-    getchar();
 
     // Step **: Create the ReactionSystem instances
     Partition partition(system);
     std::vector<std::string> kin_species = {"Kaolinite", "K-Feldspar"};
     partition.setKineticSpecies(kin_species);
 
+    std::cout << "num kinetic species = " << partition.numKineticSpecies() << std:: endl;
+
     // Step **: Define the initial condition (IC) of the reactive transport modeling problem
     EquilibriumProblem problem_ic(system);
     problem_ic.setTemperature(params.T, "celsius");
     problem_ic.setPressure(params.P, "bar");
+    problem_ic.add("H2O",   1.0, "kg");
     problem_ic.add("K", 1e-3, "mol");
-    problem_ic.add("Na", 1e-3, "mol");
+    problem_ic.add("NaCl", 1e-3, "mol");
     problem_ic.add("SiO2", 1e-3, "mol");
     problem_ic.add("CO2", 1e-4, "mol");
-    problem_ic.add("Al", 1e-4, "mol");
-    problem_ic.add("Cl", 1e-4, "mol");
-    problem_ic.add("H", 1e-4, "mol");
 
     // Step **: Calculate the equilibrium states for the IC and BC
     ChemicalState state_ic = equilibrate(problem_ic);
-    std::cout << "state_ic = \n" << state_ic << std:: endl;
-    getchar();
+    state_ic.setSpeciesAmount("K-Feldspar", 10.0, "mol");
+    state_ic.setSpeciesAmount("Kaolinite", 10.0, "mol");
 
     // Step **: Define the boundary condition (BC, rainfall)
-    EquilibriumProblem problem_bc(system);
+    EquilibriumInverseProblem problem_bc(system);
     problem_bc.setTemperature(params.T, "celsius");
     problem_bc.setPressure(params.P, "bar");
     problem_bc.add("H2O",   1.0, "kg");
-    problem_bc.add("O2",    1.0, "umol");
     problem_bc.add("K",  10e-6, "mol");
     problem_bc.add("Al", 10-8, "mol");
     problem_bc.add("SiO2", 10e-6, "mol");
     problem_bc.add("Cl",   std::pow(10, -4.98), "mol");
-    //problem_bc.pH(5.0);
+    problem_bc.pH(5.0);
 
     ChemicalState state_bc = equilibrate(problem_bc);
-
-    state_ic.setSpeciesAmount("K(AlSi3)O8", 10.0, "mol");
-
-    std::cout << "state_bc = \n" << state_bc << std:: endl;
-    getchar();
 
     // Step **: Scale the boundary condition state
     state_bc.scaleVolume(1.0, "m3");
@@ -753,8 +501,197 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Step **: Scale the volumes of the phases in the initial condition
     state_ic.scaleVolume(1.0, "m3");
     state_ic.scalePhaseVolume("Aqueous", 0.1, "m3");    // 10% if the 1.0m3
-    //state_ic.scalePhaseVolume("Quartz", 0.882, "m3");   // 0.882 = 0.98 * 0.9 (0.9 is 90% of 1.0m3, 0.98 is 98% quartz of the rock)
-    //state_ic.scalePhaseVolume("Calcite", 0.018, "m3");  // 0.018 = 0.02 * 0.9 (0.9 is 90% of 1.0m3, 0.02 is 2% calcite of the rock)
+    state_ic.scalePhaseVolume("K-Feldspar", 0.882, "m3");   // 0.882 = 0.98 * 0.9 (0.9 is 90% of 1.0m3, 0.98 is 98% K-Feldspar of the rock)
+    state_ic.scalePhaseVolume("Kaolinite", 0.018, "m3");  // 0.882 = 0.02 * 0.9 (0.9 is 90% of 1.0m3, 0.02 is 2% Kaolinite of the rock)
+
+    std::cout << "state_ic = \n" << state_ic << std:: endl;
+    getchar();
+    std::cout << "state_bc = \n" << state_bc << std:: endl;
+    getchar();
+
+    // Reaction function (with provided surface area )
+    ReactionRateFunction kfeldspar_rate_func = [&min_react_kfeldspar, &system](const ChemicalProperties& properties) -> ChemicalScalar {
+
+        // The number of chemical species in the system
+        const unsigned num_species = system.numSpecies();
+
+        // The mineral reaction rate using specified surface area
+        ChemicalScalar res(num_species);
+
+        // The universal gas constant (in units of kJ/(mol*K))
+        const double R = 8.3144621e-3;
+
+        // The temperature and pressure of the system
+        const Temperature T = properties.temperature();
+
+        // Create a Reaction instance
+        Reaction reaction(min_react_kfeldspar.equation(), system);
+
+        for(const MineralMechanism& mechanism : min_react_kfeldspar.mechanisms()){
+            // Create the mineral catalyst functions
+            std::vector<MineralCatalystFunction> catalysts;
+            for(const MineralCatalyst& catalyst : mechanism.catalysts)
+                catalysts.push_back(mineralCatalystFunction(catalyst, system));\
+
+            // Auxiliary variables
+            ChemicalScalar aux, f, g;
+
+            // Calculate the saturation index of the mineral
+            const auto lnK = reaction.lnEquilibriumConstant(properties);
+            const auto lnQ = reaction.lnReactionQuotient(properties);
+            const auto lnOmega = lnQ - lnK;
+
+            // Calculate the rate constant for the current mechanism (Arrhenius equation)
+            const auto kappa = mechanism.kappa * exp(-mechanism.Ea/R * (1.0/T - 1.0/298.15));
+
+            // Calculate the saturation index
+            const auto Omega = exp(lnOmega);
+
+            // Calculate the p and q powers of the saturation index Omega
+            const auto pOmega = pow(Omega, mechanism.p);
+            const auto qOmega = pow(1 - pOmega, mechanism.q);
+
+            std::cout << "lnK = " << lnK << std:: endl;
+            std::cout << "lnQ = " << lnQ << std:: endl;
+            std::cout << "lnOmega = " << lnOmega << std:: endl;
+            std::cout << "Omega = " << Omega << std:: endl;
+            std::cout << "p = " << mechanism.p << std:: endl;
+            std::cout << "q = " << mechanism.q << std:: endl;
+            std::cout << "pOmega = " << pOmega << std:: endl;
+            std::cout << "qOmega = " << qOmega << std:: endl;
+            std::cout << "kappa = " << kappa << std:: endl;
+
+
+            // Calculate the function f
+            f = kappa * qOmega;
+
+            // Calculate the function g
+            g = ChemicalScalar(num_species, 1.0);
+
+            // Calculate the resulting mechanism function
+            res = f * g;
+
+            // Multiply the mechanism contributions by the surface area of the mineral
+            res *= min_react_kfeldspar.surfaceArea();
+            std::cout << "kappa = " << kappa << std:: endl;
+
+
+        }
+        std::cout << "res = " << res << std:: endl;
+
+        return res;
+
+//        double logk = -11.5;
+//        double k = std::pow(std::exp(1), logk);
+//        double Ea = 71.0;
+//        double m = 1.0;
+//        double n = 1.0;
+//        // Rate = A * k * (Omega^m - 1)^n
+//        // k is the growth (dissolution) rate constant
+//        // m, n > 0
+//        // Omega^m is saturation ration
+//        // Rate > 0, precipitation (solution is supersaturated w.r.t. mineral)
+//        // Rate < 0, dissolution (solution is undersaturated w.r.t. mineral)
+//        // A is the reactive surface area (not constant), A = ? * specific surface area
+//        // A ~ total surface area
+
+    };
+
+    ReactionRateFunction kaolinite_rate_func = [&min_react_kaolinite, &system](const ChemicalProperties& properties) -> ChemicalScalar {
+
+        // The number of chemical species in the system
+        const unsigned num_species = system.numSpecies();
+
+        // The mineral reaction rate using specified surface area
+        ChemicalScalar res(num_species);
+
+        // The universal gas constant (in units of kJ/(mol*K))
+        const double R = 8.3144621e-3;
+
+        // The temperature and pressure of the system
+        const Temperature T = properties.temperature();
+
+        // Create a Reaction instance
+        Reaction reaction(min_react_kaolinite.equation(), system);
+
+        for(const MineralMechanism& mechanism : min_react_kaolinite.mechanisms()){
+            // Create the mineral catalyst functions
+            std::vector<MineralCatalystFunction> catalysts;
+            for(const MineralCatalyst& catalyst : mechanism.catalysts)
+                catalysts.push_back(mineralCatalystFunction(catalyst, system));\
+
+            // Auxiliary variables
+            ChemicalScalar aux, f, g;
+
+            // Calculate the saturation index of the mineral
+            const auto lnK = reaction.lnEquilibriumConstant(properties);
+            const auto lnQ = reaction.lnReactionQuotient(properties);
+            const auto lnOmega = lnQ - lnK;
+
+            // Calculate the rate constant for the current mechanism
+            const auto kappa = mechanism.kappa * exp(-mechanism.Ea/R * (1.0/T - 1.0/298.15));
+
+            // Calculate the saturation index
+            const auto Omega = exp(lnOmega);
+
+            // Calculate the p and q powers of the saturation index Omega
+            const auto pOmega = pow(Omega, mechanism.p);
+            const auto qOmega = pow(1 - pOmega, mechanism.q);
+
+            // Calculate the function f
+            f = kappa * qOmega;
+
+            // Calculate the function g
+            g = ChemicalScalar(num_species, 1.0);
+
+            // Calculate the resulting mechanism function
+            res = f * g;
+
+            // Multiply the mechanism contributions by the surface area of the mineral
+            res *= min_react_kaolinite.surfaceArea();
+
+        }
+        return res;
+//        ChemicalScalar val;
+//        double A = 0.0; // reactive surface area of the mineral [m2 / m3_total_rock]
+//        double k_kaolinite = 0.0; // rate constant [mol / m2 / s]
+//        double Omega = 0.0; // function of saturation state, f(Omega)
+//        double logk = -13.2;
+//        double k = std::pow(std::exp(1), -logk);
+//
+//        double Ea = 71.0;
+//        double m = 1/9;
+//        double n = 2.0;
+        // Omega = IAP / K_eq
+        // IAP ion activity product (written for the dissolution reaction)
+        // K_eq equilibrium constant
+
+        // Rate = A * k * (Omega^m - 1)^n
+        // k is the growth (dissolution) rate constant
+        // m, n > 0
+        // Omega^m is saturation ration
+        //
+        // Rate > 0, precipitation (solution is supersaturated w.r.t. mineral)
+        // Rate < 0, dissolution (solution is undersaturated w.r.t. mineral)
+        //  A * k_kaolinite * std::pow((std::pow(Omega, m) - 1), n)
+    };
+
+    ChemicalProperties props = state_ic.properties();
+    auto evaluate_pH = ChemicalProperty::pH(system);
+    auto evaluate_alkalinity = ChemicalProperty::alkalinity(system);
+    auto pH = evaluate_pH(props);
+
+    std::cout << "pH  = " << pH.val << std::endl;
+
+    ChemicalScalar kfeldspar_r = kfeldspar_rate_func(props);
+    std::cout << "kfeldspar_r  = " << kfeldspar_r.val << std::endl;
+    std::cout << "kfeldspar_r_ddn  = " << kfeldspar_r.ddn << std::endl;
+    getchar();
+
+    ChemicalScalar kaolinite_r = kaolinite_rate_func(props);
+    std::cout << "kaolinite_r  = " << kaolinite_r.val << std::endl;
+    std::cout << "kaolinite_r_ddn  = " << kaolinite_r.ddn << std::endl;
+    getchar();
 
     // Step **: Create the mesh for the column
     Mesh mesh(params.ncells, params.xl, params.xr);
@@ -785,31 +722,14 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     ChemicalOutput output(rtsolver.output());
     output.add("pH");
     output.add("speciesMolality(H+)");
-    output.add("speciesMolality(Ca++)");
-    output.add("speciesMolality(Mg++)");
-    output.add("speciesMolality(HCO3-)");
+    output.add("speciesMolality(Al+++)");
+    output.add("speciesMolality(K+)");
+    output.add("speciesMolality(SiO2(aq))");
     output.add("speciesMolality(CO2(aq))");
-    output.add("phaseVolume(Calcite)");
-    output.add("phaseVolume(Dolomite)");
-    output.add("speciesMolality(CO3--)");
-    output.add("speciesMolality(CaCl+)");
-    output.add("speciesMolality(Ca(HCO3)+)");
-    output.add("speciesMolality(MgCl+)");
-    output.add("speciesMolality(Mg(HCO3)+)");
-    output.add("speciesMolality(OH-)");
-    output.add("elementmolality(C)");
-    output.add("elementmolality(Ca)");
-    output.add("elementmolality(Cl)");
-    output.add("elementmolality(H)");
-    output.add("elementmolality(Mg)");
-    output.add("elementmolality(Na)");
-    output.add("elementmolality(O)");
-    output.add("elementmolality(Si)");
-    output.add("elementmolality(Z)");
-    output.add("speciesMolality(MgCO3(aq))");
-    output.add("speciesMolality(MgOH+)");
-    output.add("speciesAmount(Calcite)");
-    output.add("speciesAmount(Dolomite)");
+    output.add("phaseVolume(K-Feldspar)");
+    output.add("phaseVolume(Kaolinite)");
+    output.add("speciesAmount(K-Feldspar)");
+    output.add("speciesAmount(Kaolinite)");
     output.filename(folder + "/" + "test.txt");
 
     // Step **: Create RTProfiler to track the timing and results of reactive transport
@@ -836,6 +756,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         // Increment time step and number of time steps
         t += params.dt;
 
+        //getchar();
         step += 1;
     }
 
@@ -894,7 +815,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                            "-nsteps-" + std::to_string(params.nsteps) +
                            "-activity-model-" + params.activity_model +
                            "-conv-kin-conv-eq";
-    std::string folder = "../rt" + test_tag;
+    std::string folder = "../plotting-results/rt" + test_tag;
     //std::string folder = "../rt-sa-5000-no-cvode" + test_tag;
     //std::string folder = "../rt-sa-5000" + test_tag;
     if (stat(folder.c_str(), &status) == -1) mkdir(folder);
