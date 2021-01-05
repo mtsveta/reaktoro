@@ -392,21 +392,21 @@ int main()
     params.P = 200 * 1.01325;   // the pressure (in units of bar)
     params.water_kg = 1.0;      // amount of water used in the experiment
 
-    // Run clustering algorithm
-    params.smart_method = "kin-clustering-eq-clustering";
-    params.smart_equilibrium_reltol = 1e-2;
-    //params.smart_equilibrium_reltol = 5e-3;
-    params.smart_kinetics_tol = 1e-2;
-    params.smart_kinetics_reltol = 1e-1;
-    params.smart_kinetics_abstol = 1e-4;
-
-//    // Run priority-based queue algorithm
-//    params.smart_method = "kin-priority-eq-priority";
-//    params.smart_equilibrium_reltol = 5e-3;
+//    // Run clustering algorithm
+//    params.smart_method = "kin-clustering-eq-clustering";
+//    params.smart_equilibrium_reltol = 1e-3;
+//    //params.smart_equilibrium_reltol = 5e-3;
 //    params.smart_kinetics_tol = 1e-3;
 //    params.smart_kinetics_reltol = 1e-1;
 //    params.smart_kinetics_abstol = 1e-4;
-//    params.output_results = true;
+
+    // Run priority-based queue algorithm
+    params.smart_method = "kin-priority-eq-priority";
+    params.smart_equilibrium_reltol = 1e-3;
+    params.smart_kinetics_tol = 5e-4;
+    params.smart_kinetics_reltol = 1e-1;
+    params.smart_kinetics_abstol = 1e-4;
+    params.output_results = true;
 
     //
     // // Run nn-search algorithm
@@ -445,7 +445,7 @@ int main()
     /// **************************************************************************************************************///
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     /// **************************************************************************************************************///
-    params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     /// **************************************************************************************************************///
     /// SMART kinetics & SMART equilibrium
@@ -658,7 +658,13 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         if((nm <= 0 && Omega < 1) || (Omega == 1)) // the is no way to precipitate further
             return res;
         // S = 0.006 # average BET from 16zhe/did ; suggested value in m2/g
-        const auto ssa = 0.006 * 1e3;
+        //const auto ssa = 0.006 * 1e3; // such big surface areas must be still tested, might influence the accuracy of the ODML method
+        //const auto ssa = 0.006;
+        const auto ssa = 0.06;
+        //const auto ssa_ = min_reaction_barite.specificSurfaceArea();
+        //std::cout << "ssa = " << ssa << std::endl;
+        //std::cout << "ssa_ = " << ssa_ << std::endl;
+        //getchar();
 
         // If (SRmin > 1) Then GoTo 130
         if(Omega > 1) // precipitation kinetics
@@ -1194,7 +1200,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                                  (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    std::string tag = "../plotting-results-21.10.20/rt-scaling-barite-shell"; // -kin-clustering-eq-clustering";
+    std::string tag = "../plotting-results-21.10.20/rt-scaling-barite-shell-ssa-0.06-m2kg"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-scavenging-with-hematite-1000-pyrite"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-scavenging-no-kinetics"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-kin-priority-eq-clustering";

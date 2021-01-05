@@ -234,7 +234,7 @@ int main()
 
     // Run priority-based queue algorithm
     params.smart_method = "kin-priority-eq-priority";
-    params.smart_equilibrium_reltol = 1e-2;
+    params.smart_equilibrium_reltol = 1e-1;
     params.smart_kinetics_tol = 1e-2;
     params.smart_kinetics_reltol = 1e-1;
     params.smart_kinetics_abstol = 1e-5;
@@ -252,8 +252,8 @@ int main()
     params.hessian = GibbsHessian::Exact;
     //params.hessian = GibbsHessian::Approximation;
 
-    //params.activity_model = "dk-full";
-    params.activity_model = "pitzer-full";
+    params.activity_model = "dk-full";
+    //params.activity_model = "pitzer-full";
 
     // Output
     outputConsole(params);
@@ -274,7 +274,7 @@ int main()
     // ------------------------------------------------------------------------------------------------------------- //
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     // ------------------------------------------------------------------------------------------------------------- //
-    params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     // ------------------------------------------------------------------------------------------------------------- //
     // SMART kinetics & SMART equilibrium
@@ -520,7 +520,8 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         if(nm <= 0 && Omega < 1) // the is no way to precipitate further
             res = ChemicalScalar(num_species, 0.0);
         // S = 1 # default value in m2/g
-        const auto ssa = 1.0 * 1e3;
+        //const auto ssa = 1.0 * 1e3; // needs testing, might influence results of the ODML negatively
+        const auto ssa = 1.0;
 
         if(Omega < 1) // dissolution kinetics
         {
@@ -699,7 +700,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     {
         // Print some progress
         //if (!(step % 1))
-        std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        //std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.stepKinetics(field);
@@ -960,7 +961,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                                  (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    std::string tag = "../plotting-results/rt-scavenging-goethite-shell"; // -kin-clustering-eq-clustering";
+    std::string tag = "../plotting-results-21.10.20/rt-scavenging-goethite-shell-ssa-1-m2kg"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-scavenging-with-Goethite-1000-pyrite"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-scavenging-no-kinetics"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-kin-priority-eq-clustering";
