@@ -51,7 +51,7 @@ int main()
 
     EquilibriumProblem problem(system);
     problem.setTemperature(300, "celsius");
-    problem.setPressure(84.75, "atm"); // is Psat a water saturation at the T = 300? 8588 *1e3 Pa / 85.88 bar / 84.75 atm
+    problem.setPressure(84.75, "atm"); // is Psat a water saturation at the T = 300 C? 8588 *1e3 Pa / 85.88 bar / 84.75 atm
     // Residual fluid
     problem.add("H2O", 55.51, "mol"); // H2O 55.51 M
     problem.add("NaCl", 0.27, "mol"); // NaCl (aq) 0.27 M

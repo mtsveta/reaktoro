@@ -30,7 +30,7 @@ int main()
 
 //    StringList selected_species = "H2O@ H+ OH- Cl- HCl@ Na+ NaOH@ NaHSiO3@ NaCl@ NaAl(OH)4@ "
 //                                  "K+ KOH@ KCl@ KAl(OH)4@ Al+++ AlOH++ Al(OH)2+ Al(OH)3@ Al(OH)4-";
-    // Missing: KAl(OH)4@
+    // Missing:KAl(OH)4@
     StringList selected_species = "H2O@ H+ OH- Cl- HCl@ Na+ NaOH@ NaHSiO3@ NaCl@ NaAl(OH)4@ "
                                   "K+ KOH@ KCl@ Al+3 AlOH+2 Al(OH)2+ Al(OH)3@ Al(OH)4-";
 
@@ -49,7 +49,7 @@ int main()
     editor.addMineralPhase("Kaolinite"); // Al2Si2O5(OH)4
     editor.addMineralPhase("Albite"); // Na(AlSi3)O8
     //editor.addMineralPhase("K-Feldspar"); // K(AlSi3)O8 // Can be replaced by Sanidine or Microcline?
-    editor.addMineralPhase("Sanidine");
+    editor.addMineralPhase("Microcline");
 
     ChemicalSystem system(editor);
     std::cout << system << std::endl;
