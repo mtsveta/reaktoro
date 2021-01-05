@@ -722,24 +722,16 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         output.add("speciesAmount(HSO4-)");
         output.add("speciesAmount(H2S(aq))");
         output.add("speciesAmount(Fe++)");
+        output.add("speciesAmount(Fe+++)");
         output.add("speciesAmount(Siderite)");
         output.add("speciesAmount(Pyrite)");
         output.add("speciesAmount(Hematite)");
         output.add("phaseAmount(Siderite)");
         output.add("phaseAmount(Pyrite)");
         output.add("phaseAmount(Hematite)");
-        output.add("elementAmount(C)");
-        output.add("elementAmount(Ca)");
-        output.add("elementAmount(Cl)");
-        output.add("elementAmount(Fe)");
-        output.add("elementAmount(H)");
-        output.add("elementAmount(K)");
-        output.add("elementAmount(Mg)");
-        output.add("elementAmount(Na)");
-        output.add("elementAmount(O)");
-        output.add("elementAmount(S)");
-        output.add("elementAmount(Z)");
-        output.add("speciesAmount(Fe+++)");
+        output.add("phaseMass(Siderite)");
+        output.add("phaseMass(Pyrite)");
+        output.add("phaseMass(Hematite)");
         output.filename(folder + "/" + "test.txt");
     }
     // Step **: Create RTProfiler to track the timing and results of reactive transport
@@ -1017,7 +1009,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                                  (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    std::string tag = "../plotting-results/rt-scavenging-hematite-supcrt07"; // -kin-clustering-eq-clustering";
+    std::string tag = "../plotting-results-21.10.20/rt-scavenging-hematite-supcrt07-new-ssa-output"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-scavenging-with-hematite-1000-pyrite"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-scavenging-no-kinetics"; // -kin-clustering-eq-clustering";
     //std::string tag = "../plotting-results/rt-kin-priority-eq-clustering";
