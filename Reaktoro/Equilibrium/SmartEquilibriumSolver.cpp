@@ -1445,7 +1445,7 @@ struct SmartEquilibriumSolver::Impl
         tic(ESTIMATE_STEP);
 
         // Perform a smart estimate of the chemical state
-            if(options.smart_method == "kin-clustering-eq-clustering" || options.smart_method == "kin-clustering-extended-eq-clustering" || options.smart_method == "eq-clustering")
+        if(options.smart_method == "kin-clustering-eq-clustering" || options.smart_method == "kin-clustering-extended-eq-clustering" || options.smart_method == "eq-clustering")
             estimate(state, T, P, be);
         else if (options.smart_method == "kin-priority-eq-priority" || options.smart_method == "eq-priority")
             estimate_priority_based_acceptance_potential(state, T, P, be);
