@@ -127,6 +127,7 @@ int main()
     params.T = 60.0;            // the temperature (in units of degC)
     params.P = 200 * 1.01325;   // the pressure (in units of bar)
 
+
     // Define parameters of the equilibrium solvers
     //params.smart_equilibrium_reltol = 0.001;
     //params.smart_equilibrium_reltol = 0.002;
@@ -134,8 +135,8 @@ int main()
     //params.smart_equilibrium_reltol = 0.004;
     //params.smart_equilibrium_reltol = 0.005;
     //params.smart_equilibrium_reltol = 0.01;
-    //params.activity_model = "dk-full";
-    params.activity_model = "pitzer-full";
+    params.activity_model = "dk-full";
+    //params.activity_model = "pitzer-full";
     //params.activity_model = "hkf-full";
 
     // Run clustering algorithm
@@ -359,27 +360,27 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     // Step **: Define the quantities that should be output for every cell, every time step
     ChemicalOutput output(rtsolver.output());
     output.add("pH");
-    output.add("speciesMolality(H+)");
-    output.add("speciesMolality(Cl-)");
-    output.add("speciesMolality(SO4--)");
-    output.add("speciesMolality(Ba++)");
-    output.add("speciesMolality(Ca++)");
-    output.add("speciesMolality(Sr++)");
-    output.add("speciesMolality(Na+)");
-    output.add("speciesMolality(Barite)");
-    output.add("elementmolality(Ba)");
-    output.add("elementmolality(C)");
-    output.add("elementmolality(Ca)");
-    output.add("elementmolality(Cl)");
-    output.add("elementmolality(H)");
-    output.add("elementmolality(K)");
-    output.add("elementmolality(Mg)");
-    output.add("elementmolality(Na)");
-    output.add("elementmolality(O)");
-    output.add("elementmolality(S)");
-    output.add("elementmolality(Si)");
-    output.add("elementmolality(Sr)");
-    output.add("elementmolality(Z)");
+    output.add("speciesAmount(H+)");
+    output.add("speciesAmount(Cl-)");
+    output.add("speciesAmount(SO4--)");
+    output.add("speciesAmount(Ba++)");
+    output.add("speciesAmount(Ca++)");
+    output.add("speciesAmount(Sr++)");
+    output.add("speciesAmount(Na+)");
+    output.add("speciesAmount(Barite)");
+    output.add("elementAmounty(Ba)");
+    output.add("elementAmount(C)");
+    output.add("elementAmount(Ca)");
+    output.add("elementAmount(Cl)");
+    output.add("elementAmount(H)");
+    output.add("elementAmount(K)");
+    output.add("elementAmount(Mg)");
+    output.add("elementAmount(Na)");
+    output.add("elementAmount(O)");
+    output.add("elementAmount(S)");
+    output.add("elementAmount(Si)");
+    output.add("elementAmount(Sr)");
+    output.add("elementAmount(Z)");
     output.add("phaseAmount(Barite)");
     output.add("phaseMass(Barite)");
     output.add("phaseVolume(Barite)");
