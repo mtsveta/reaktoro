@@ -235,7 +235,7 @@ int main()
 
             // Calculate the resulting mechanism function
             // rate = (knu + k1) * S * m * Mm * ((m/m0)^(2/3)) * (1 - SRmin)
-            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2 / 3) * kappa * (1 - Omega);
+            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2.0 / 3.0) * kappa * (1 - Omega);
 
             // Do not dissolve more than what is available
             // IF (moles > M) THEN moles = M
@@ -449,7 +449,7 @@ int main()
 
             // Calculate the resulting mechanism function
             // rate = S * m * Mm * ((m/m0)^(2/3)) * k * (1 - SRmin) # by default
-            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2 / 3) * kappa * (1 - Omega);
+            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2.0 / 3.0) * kappa * (1 - Omega);
 
             // Do not dissolve more than what is available
             // IF (moles > M) THEN moles = M
@@ -620,7 +620,7 @@ int main()
 
             // Calculate the resulting mechanism function
             // rate = S * m * Mm * ((m/m0)^(2/3)) * k * (1 - SRmin) # by default
-            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2 / 3) * kappa * (1 - Omega);
+            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2.0 / 3.0) * kappa * (1 - Omega);
 
             // Do not dissolve more than what is available
             // IF (moles > M) THEN moles = M
@@ -1169,7 +1169,7 @@ int main()
             const auto kappa = kappa_neu + kappa_oh;
 
             // rate = S * m * Mm * ((m/m0)^(2/3)) * k * (1 - SRmin) # by default
-            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2 / 3) * kappa * (1 - Omega);
+            res += f * ssa * nm * molar_mass * pow(nm / nm0, 2.0 / 3.0) * kappa * (1 - Omega);
 
 //            // Do not dissolve more than what is available
 //            double total_moles = nm.val; // current amount of mols of available minerals
@@ -1274,7 +1274,7 @@ int main()
 
     KineticPathOptions kinetic_path_options;
     kinetic_path_options.use_smart_equilibrium_solver = kinetic_options.use_smart_equilibrium_solver;
-    kinetic_path_options.use_smart_kinetic_solver = false;
+    kinetic_path_options.use_smart_kinetic_solver = true;
     kinetic_path_options.equilibrium = equilibrium_options;
     kinetic_path_options.smart_equilibrium = smart_equilibrium_options;
     kinetic_path_options.kinetics = kinetic_options;
@@ -1310,7 +1310,6 @@ int main()
 
     double t0 = 0;
     double dt = 3600.0; // s, 1 hour
-    double tfinal = 5184000.0; // s, 1440 hours
     int n = 1400;
 
     std::ostringstream eqtol_stream, kinreltol_stream, kinabstol_stream, kintol_stream;
@@ -1346,7 +1345,7 @@ int main()
 
     //path.solve(state_ic, t0, t0 + dt, "second");
     //state_ic = state_ic + state_bc;
-    tic(TRANSPORT);
+    tic(TRANSPORT)
     path.solve(state_ic, t0, dt, n, "second");
 
     //profiler.update(path.result());

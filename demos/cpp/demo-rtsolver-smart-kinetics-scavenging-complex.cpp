@@ -214,7 +214,7 @@ int main()
     params.xl = 0.0;                                        // the x-coordinates of the left boundaries
     params.xr = 100.0;                                      // the x-coordinates of the right boundaries
     params.ncells = 100;                                    // the number of cells in the spacial discretization
-    params.nsteps = 200;                                   // the number of steps in the reactive transport simulation
+    params.nsteps = 1000;                                   // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells;    // the time step (in units of s)
     params.dt = 0.1*day;                                    // the time step (in units of s)
 
@@ -225,20 +225,20 @@ int main()
     params.P = 1.01325; // the pressure (in units of bar)
 
 
-//    // Run clustering algorithm
-//    params.smart_method = "kin-clustering-eq-clustering";
-//    params.smart_equilibrium_reltol = 1e-2;
-//    params.smart_kinetics_tol = 1e-2;
-//    params.smart_kinetics_reltol = 1e-1;
-//    params.smart_kinetics_abstol = 1e-4;
-
-    // Run priority-based queue algorithm
-    params.smart_method = "kin-priority-eq-priority";
-    params.smart_equilibrium_reltol = 1e-2;
-    params.smart_kinetics_tol = 1e-2;
+    // Run clustering algorithm
+    params.smart_method = "kin-clustering-eq-clustering";
+    params.smart_equilibrium_reltol = 1e-4;
+    params.smart_kinetics_tol = 1e-4;
     params.smart_kinetics_reltol = 1e-1;
-    params.smart_kinetics_abstol = 1e-5;
-    params.output_results = true;
+    params.smart_kinetics_abstol = 1e-4;
+
+//    // Run priority-based queue algorithm
+//    params.smart_method = "kin-priority-eq-priority";
+//    params.smart_equilibrium_reltol = 1e-3;
+//    params.smart_kinetics_tol = 1e-3;
+//    params.smart_kinetics_reltol = 1e-1;
+//    params.smart_kinetics_abstol = 1e-5;
+//    params.output_results = true;
 
     //
     // // Run nn-search algorithm
@@ -274,12 +274,12 @@ int main()
     // ------------------------------------------------------------------------------------------------------------- //
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     // ------------------------------------------------------------------------------------------------------------- //
-    params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     // ------------------------------------------------------------------------------------------------------------- //
     // SMART kinetics & SMART equilibrium
     // ------------------------------------------------------------------------------------------------------------- //
-    //params.use_smart_kinetics_solver = true;  params.use_smart_equilibrium_solver = true;  runReactiveTransport(params, results);
+    params.use_smart_kinetics_solver = true;  params.use_smart_equilibrium_solver = true;  runReactiveTransport(params, results);
 
     // **************************************************************************************************************///
     // SPEED-UP analysis
@@ -472,12 +472,9 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
         // Auxiliary variables
         ChemicalScalar f(num_species, 1.0);
 
-        // Create a Reaction instance
-        Reaction reaction(min_reaction_calcite.equation(), system);
-
         // Calculate the saturation index of the mineral
-        const auto lnK = reaction.lnEquilibriumConstant(properties);
-        const auto lnQ = reaction.lnReactionQuotient(properties);
+        const auto lnK = reaction_calcite.lnEquilibriumConstant(properties);
+        const auto lnQ = reaction_calcite.lnReactionQuotient(properties);
         const auto lnOmega = lnQ - lnK;
         //std::cout << "lnK = " << lnK << std::endl;
         //std::cout << "lnQ = " << lnQ << std::endl;
@@ -1553,17 +1550,17 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     //ReactionSystem reactions(editor);
     //ReactionSystem reactions(system, {reaction_siderite});
     //ReactionSystem reactions(system, {reaction_siderite, reaction_calcite});
-    ReactionSystem reactions(system, {reaction_siderite, reaction_daphnite});
+    ReactionSystem reactions(system, {reaction_calcite, reaction_siderite, reaction_daphnite, reaction_kaolinite, reaction_quartz});
 
-    std::cout << "system = \n" << system << std:: endl;
-    getchar();
+    //std::cout << "system = \n" << system << std:: endl;
+    //getchar();
     //std::cout << "reactions number = " << reactions.numReactions() << std:: endl;
 
     // Step **: Create the ReactionSystem instances
     Partition partition(system);
     //partition.setKineticSpecies(std::vector<std::string>{"Siderite"});
     //partition.setKineticSpecies(std::vector<std::string>{"Calcite", "Siderite"});
-    partition.setKineticSpecies(std::vector<std::string>{"Daphnite,14A", "Siderite"});
+    partition.setKineticSpecies(std::vector<std::string>{"Calcite", "Daphnite,14A", "Siderite", "Kaolinite", "Quartz"});
     //partition.setKineticSpecies(std::vector<std::string>{"Siderite", "Daphnite,14A"});
 
     /*
@@ -1641,7 +1638,7 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     state_ic.setSpeciesAmount("Daphnite,14A", 0.1, "mol"); // MM(Daphnite) = 713.5 g / mol
     state_ic.setSpeciesAmount("Siderite", 0.1, "mol"); // MM(Siderite) = 115.86 g / mol
     state_ic.setSpeciesAmount("Calcite", 0.1, "mol"); // MM(Calcite) = 100.09 g / mol
-    state_ic.setSpeciesAmount("Quartz", 0.1, "mol"); // MM(Quartz) = 60.083 g / mol
+    state_ic.setSpeciesAmount("Quartz", 1.0, "mol"); // MM(Quartz) = 60.083 g / mol
     state_ic.setSpeciesAmount("Kaolinite", 0.1, "mol"); // MM(Kaolinite) = 258.071 g / mol
 
 
@@ -1999,9 +1996,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                                  (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                                  (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    //std::string tag = "../plotting-results-21.10.20/rt-scavenging-complex-shell-siderite-new";
-    //std::string tag = "../plotting-results-21.10.20/rt-scavenging-complex-shell-siderite-calcite-new";
-    std::string tag = "../plotting-results-21.10.20/rt-scavenging-complex-shell-siderite-daphnite-new";
+    std::string tag = "../plotting-results-22.10.20/rt-scavenging-complex-calcite-siderite-daphnite-kaolinite-quartz";
     std::string folder =
             (params.use_smart_kinetics_solver || params.use_smart_equilibrium_solver) ?
             tag + smart_test_tag :
