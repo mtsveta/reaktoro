@@ -91,7 +91,7 @@ int main()
             .setSpecificSurfaceArea(initial_sa_m2kg, "m2/kg"); // conversion from
     Reaction reaction_halite = createReaction(min_reaction_halite, system);
     reaction_halite.setName("Halite reaction");
-    ReactionRateFunction rate_func_halite_llnl = [&min_reaction_halite, &reaction_halite, &system, &I](const ChemicalProperties& properties) -> ChemicalScalar {
+    ReactionRateFunction rate_func_halite_llnl = [&min_reaction_halite, &reaction_halite, &system](const ChemicalProperties& properties) -> ChemicalScalar {
 
         // The number of chemical species in the system
         const unsigned num_species = system.numSpecies();
@@ -302,7 +302,7 @@ int main()
             .setSpecificSurfaceArea(initial_sa_m2kg, "m2/kg");
     Reaction reaction_calcite = createReaction(min_reaction_calcite, system);
     reaction_calcite.setName("Calcite reaction");
-    ReactionRateFunction rate_func_calcite_llnl = [&min_reaction_calcite, &reaction_calcite, &system, &I](const ChemicalProperties& properties) -> ChemicalScalar {
+    ReactionRateFunction rate_func_calcite_llnl = [&min_reaction_calcite, &reaction_calcite, &system](const ChemicalProperties& properties) -> ChemicalScalar {
 
         // The number of chemical species in the system
         const unsigned num_species = system.numSpecies();
@@ -318,31 +318,21 @@ int main()
         // The temperature and pressure of the system
         const Temperature T = properties.temperature();
 
-        // Create a Reaction instance
-        Reaction reaction(min_reaction_calcite.equation(), system);
-
         // Calculate the saturation index of the mineral
-        const auto lnK = reaction.lnEquilibriumConstant(properties);
-        const auto lnQ = reaction.lnReactionQuotient(properties);
+        const auto lnK = reaction_calcite.lnEquilibriumConstant(properties);
+        const auto lnQ = reaction_calcite.lnReactionQuotient(properties);
         const auto lnOmega = lnQ - lnK;
 
-        const auto lnK_rxn = reaction_calcite.lnEquilibriumConstant(properties);
-        const auto lnQ_rxn = reaction_calcite.lnReactionQuotient(properties);
-        const auto lnOmega_rxn = lnQ_rxn - lnK_rxn;
-
         // Calculate the saturation index
-        //auto Omega = exp(lnOmega);
-        //auto Omega_rxn = exp(lnOmega_rxn);
         double Omega = exp(lnOmega).val;
-        double Omega_rxn = exp(lnOmega_rxn).val;
-        
+
         // The composition of the chemical system
-        const auto n = properties.composition();
+        const auto n = properties.composition().val;
         // The initial composition of the chemical system
-        const auto n0_rxn = reaction_calcite.initialAmounts();
+        const auto n0 = reaction_calcite.initialAmounts();
 
         // Amount of elements
-        const auto b = system.elementAmounts(n.val);
+        const auto b = system.elementAmounts(n);
 
         // Calculate TOT("Ca")
         const Index i_ca = system.indexElementWithError("Ca");
@@ -357,12 +347,11 @@ int main()
 
         // The current and the initial number of moles of the mineral
         auto nm = n[imineral];
-        auto nm0_rxn = n0_rxn[imineral];
+        auto nm0 = n0[imineral];
 
         VectorConstRef lna = properties.lnActivities().val;
         const Index i_h = system.indexSpeciesWithError("H+");
         double activity_h = std::exp(lna(i_h));
-        double ionic_strength = I(properties).val;
 
         // The molar mass of the mineral (in units of kg/mol)
         const double molar_mass = system.species(imineral).molarMass();
@@ -383,12 +372,12 @@ int main()
         // IF (M = 0) AND (SatIndex < PARM(2)) THEN GOTO 900
         // PARM(2): used when M0 = 0, (Nucleation) SatIndex threshold for precipitation
         double sat_index_threshold = 1e6;
-        if(nm.val == 0 && lnOmega < sat_index_threshold)
+        if(nm == 0 && lnOmega < sat_index_threshold)
             return res;
         // IF (M0 > 0) AND (M > 0) THEN t = (M / M0)^PARM(4)
         // PARM(4): exponent for M/M0 for surface area correction (=1 if no data)
-        if(nm0_rxn > 0 && nm.val > 0)
-            ssa_corr_factor = pow(nm.val/nm0_rxn, 2/3);
+        if(nm0 > 0 && nm > 0)
+            ssa_corr_factor = pow(nm / nm0, 2 / 3);
 
         // k25a =	0.501187234
         // Eaa =	14400
@@ -406,7 +395,8 @@ int main()
 
         auto kappa_diss = kappa_neu + kappa_acid + kappa_base;
         auto kappa_pre = kappa_neu + kappa_acid + kappa_base;
-        
+        auto rate_constant_ratio = kappa_pre / kappa_diss; // PARM(5): when M0 > 0, rate constant ratio (K_precipitation / kappa_dissolution), (=1 if no data)
+
         /*
          * Calcite
             -start
@@ -456,37 +446,27 @@ int main()
         -end
          */
 
-        if(Omega <= 1) // dissolution kinetics
-        {
-            // moles = PARM(1) * M0 * t * (KTa+KTn+KTb) * (1 - SatRatio) * TIME
-            res += f * ssa * nm0_rxn * ssa_corr_factor * molar_mass * kappa_pre * (1 - Omega);
+        // dissolution kinetics
+        // moles = PARM(1) * M0 * t * (KTa+KTn+KTb) * (1 - SatRatio) * TIME
+        res = f * ssa * nm0 * ssa_corr_factor * molar_mass * kappa_pre * (1 - Omega);
 
-            // Do not dissolve more than what is available
-            // 320 IF (SatIndex > 0) THEN GOTO 400
-            // 330   REM Do not dissolve more than what is available
-            // 340   IF (moles > M) THEN moles = M
-            // 350   GOTO 900
-//            double total_moles = nm.val; // current amount of mols of available minerals
-//            if (lnOmega <= 0 && res > nm.val)
-//                res +=  nm.val;
-        }
-        else // precipitation kinetics
+        if(lnOmega > 0) // lnOmega > 0 // precipitation kinetics
         {
             // REM Precipitation when M0 = 0 (secondary mineral)
-            if(nm0_rxn != 0)
+            if(nm0 == 0)
             {
                 // Default nucleation surface area
                 auto nucl_sa = 1.0e-5;
                 // IF (M > 0) THEN surfArea = M * PARM(3)
-                if(nm.val) nucl_sa *= nm.val;
+                if(nm) nucl_sa *= nm;
 
                 // moles = surfArea * (KTa+KTn+KTb)* PARM(5) * (1 - SatRatio) * TIME
-                res += f * nucl_sa * kappa_pre * (1 - Omega);
+                res = f * nucl_sa * kappa_pre * rate_constant_ratio * (1 - Omega);
             }
             else // IF (M0 = 0) THEN GOTO 500
                 // Set nucleation rate
-                // moles = moles * PARM(5)
-                res *= f * kappa_pre / kappa_diss;
+                // moles = moles * PARM(5) // this taking into account that res was initialized by dissolution kinetic rate
+                res *= f * rate_constant_ratio;
 
 //            600 REM Do not precipitate more than the elements in solution
 //            610   maxMol = TOT("Ca")
@@ -499,8 +479,14 @@ int main()
 //            auto max_mol = tot_ca;
 //            if(max_mol > tot_c) max_mol = tot_c;
 //            if(max_mol < -nm.val) return ChemicalScalar(num_species, 0.0);
-
         }
+        else
+        {
+//            330   REM Do not dissolve more than what is available
+//            340   IF (moles > M) THEN moles = M
+//            350   GOTO 900
+        }
+        return res;
         
     };
     reaction_calcite.setRate(rate_func_calcite_llnl);
@@ -530,28 +516,18 @@ int main()
         // The temperature and pressure of the system
         const Temperature T = properties.temperature();
 
-        // Create a Reaction instance
-        Reaction reaction(min_reaction_dolomite.equation(), system);
-
         // Calculate the saturation index of the mineral
-        const auto lnK = reaction.lnEquilibriumConstant(properties);
-        const auto lnQ = reaction.lnReactionQuotient(properties);
+        const auto lnK = reaction_dolomite.lnEquilibriumConstant(properties);
+        const auto lnQ = reaction_dolomite.lnReactionQuotient(properties);
         const auto lnOmega = lnQ - lnK;
 
-        const auto lnK_rxn = reaction_dolomite.lnEquilibriumConstant(properties);
-        const auto lnQ_rxn = reaction_dolomite.lnReactionQuotient(properties);
-        const auto lnOmega_rxn = lnQ_rxn - lnK_rxn;
-
         // Calculate the saturation index
-        //auto Omega = exp(lnOmega);
-        //auto Omega_rxn = exp(lnOmega_rxn);
         auto Omega = exp(lnOmega).val;
-        auto Omega_rxn = exp(lnOmega_rxn).val;
 
         // The composition of the chemical system
         const auto n = properties.composition();
         // The initial composition of the chemical system
-        const auto n0_rxn = reaction_dolomite.initialAmounts();
+        const auto n0 = reaction_dolomite.initialAmounts();
 
         // Amount of elements
         const auto b = system.elementAmounts(n.val);
@@ -568,8 +544,8 @@ int main()
         const Index imineral = system.indexSpeciesWithError(min_reaction_dolomite.mineral());
 
         // The current and the initial number of moles of the mineral
-        auto nm = n[imineral];
-        auto nm0_rxn = n0_rxn[imineral];
+        auto nm = n[imineral].val;
+        auto nm0 = n0[imineral];
 
         VectorConstRef lna = properties.lnActivities().val;
         const Index i_h = system.indexSpeciesWithError("H+");
@@ -594,12 +570,12 @@ int main()
         // IF (M = 0) AND (SatIndex < PARM(2)) THEN GOTO 900
         // PARM(2): used when M0 = 0, (Nucleation) SatIndex threshold for precipitation
         double sat_index_threshold = 1e6;
-        if(nm.val == 0 && lnOmega < sat_index_threshold)
+        if(nm == 0 && lnOmega < sat_index_threshold)
             return res;
         // IF (M0 > 0) AND (M > 0) THEN t = (M / M0)^PARM(4)
         // PARM(4): exponent for M/M0 for surface area correction (=1 if no data)
-        if(nm0_rxn > 0 && nm.val > 0)
-            ssa_corr_factor = pow(nm.val/nm0_rxn, 2/3);
+        if(nm0 > 0 && nm > 0)
+            ssa_corr_factor = pow(nm / nm0, 2 / 3);
 
         // k25n =	2.95121E-08
         // Ean =	52200
@@ -617,6 +593,8 @@ int main()
 
         auto kappa_diss = kappa_neu + kappa_acid + kappa_base;
         auto kappa_pre = kappa_neu + kappa_acid + kappa_base;
+        auto rate_constant_ratio = kappa_pre / kappa_diss; // PARM(5): when M0 > 0, rate constant ratio (K_precipitation / kappa_dissolution), (=1 if no data)
+
         /*
          * Dolomite-dis
         -start
@@ -666,54 +644,46 @@ int main()
         -end
          */
 
-        if(Omega <= 1) // dissolution kinetics
-        {
-            // moles = PARM(1) * M0 * t * (KTa+KTn+KTb) * (1 - SatRatio) * TIME
-            res += f * ssa * nm0_rxn * ssa_corr_factor * molar_mass * kappa_pre * (1 - Omega);
+        // dissolution kinetics
+        // moles = PARM(1) * M0 * t * (KTa+KTn+KTb) * (1 - SatRatio) * TIME
+        res = f * ssa * nm0 * ssa_corr_factor * molar_mass * kappa_pre * (1 - Omega);
 
-            // Do not dissolve more than what is available
-            // 320 IF (SatIndex > 0) THEN GOTO 400
-            // 330   REM Do not dissolve more than what is available
-            // 340   IF (moles > M) THEN moles = M
-            // 350   GOTO 900
-//            double total_moles = nm.val; // current amount of mols of available minerals
-//            if (lnOmega <= 0 && res > nm.val)
-//                res += nm.val;
-        }
-        else // precipitation kinetics
+        if(lnOmega > 0) // lnOmega > 0 // precipitation kinetics
         {
             // REM Precipitation when M0 = 0 (secondary mineral)
-            if(nm0_rxn != 0)
+            if(nm0 == 0)
             {
                 // Default nucleation surface area
                 auto nucl_sa = 1.0e-5;
                 // IF (M > 0) THEN surfArea = M * PARM(3)
-                if(nm.val) nucl_sa *= nm.val;
+                if(nm) nucl_sa *= nm;
 
                 // moles = surfArea * (KTa+KTn+KTb)* PARM(5) * (1 - SatRatio) * TIME
-                res += f * nucl_sa * kappa_pre * (1 - Omega);
+                res = f * nucl_sa * kappa_pre * rate_constant_ratio * (1 - Omega);
             }
             else // IF (M0 = 0) THEN GOTO 500
                 // Set nucleation rate
-                // moles = moles * PARM(5)
-                res *= f * kappa_pre / kappa_diss;
+                // moles = moles * PARM(5) // this taking into account that res was initialized by dissolution kinetic rate
+                res *= f * rate_constant_ratio;
 
 //            600 REM Do not precipitate more than the elements in solution
 //            610   maxMol = TOT("Ca")
 //            620   IF (maxMol > TOT("C")/2) THEN maxMol =TOT("C")/2
 //            630   IF (maxMol > TOT("Mg")) THEN maxMol =TOT("Mg")
 //            690   IF (maxMol < -moles) THEN moles = -maxMol
-
-            // TODO: implement if in the kinetic solver
+              // TODO: implement if in the kinetic solver
 //            // Implement upper bound in precipitation kinetics
 //            auto max_mol = tot_ca;
-//            if(max_mol > tot_c/2) max_mol = tot_c /2;
+//            if(max_mol > tot_c/2) max_mol = tot_c/2;
 //            if(max_mol < -nm.val) return ChemicalScalar(num_species, 0.0);
-
         }
-        
+        else
+        {
+//            330   REM Do not dissolve more than what is available
+//            340   IF (moles > M) THEN moles = M
+//            350   GOTO 900
+        }
         return res;
-
     };
     reaction_dolomite.setRate(rate_func_dolomite_llnl);
 
