@@ -51,9 +51,9 @@ int main()
     params.P = 200 * 1.01325;   // the pressure (in units of bar)
 
     // Define the activity model for the aqueous species
-    params.activity_model = ActivityModel::HKF;
+    //params.activity_model = ActivityModel::HKF;
     //params.activity_model = ActivityModel::Pitzer;
-    //params.activity_model = ActivityModel::DebyeHuckel;
+    params.activity_model = ActivityModel::DebyeHuckel;
 
     // Define activity model depending on the parameter
     params.amount_fraction_cutoff = 1e-14;
@@ -139,6 +139,10 @@ auto runReactiveTransport(ReactiveTransportParams& params, ReactiveTransportResu
 
     // Depending on the activity model, define it using ChemicalEditor
     if(params.activity_model == ActivityModel::HKF){
+        // HKF full system
+        editor.addAqueousPhaseWithElements(selected_elements);
+    }
+    else if(params.activity_model == ActivityModel::DebyeHuckel){
         // Debye-Huckel full system
         editor.addAqueousPhaseWithElements(selected_elements)
                 .setChemicalModelDebyeHuckel(dhModel);
@@ -300,7 +304,7 @@ auto runReactiveTransport(ReactiveTransportParams& params, ReactiveTransportResu
     while (step <  params.nsteps)
     {
         // Print the progress of simulations
-        std::cout << "Step " << step << " of " << params.nsteps << std::endl;
+        //std::cout << "Step " << step << " of " << params.nsteps << std::endl;
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.step(field);

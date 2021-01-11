@@ -41,7 +41,7 @@ int main()
     params.xl = 0.0; // the x-coordinates of the left boundaries
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
-    params.nsteps = 1000; // the number of steps in the reactive transport simulation
+    params.nsteps = 10000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -49,7 +49,6 @@ int main()
     params.D = 1.0e-9;     // the diffusion coefficient (in units of m2/s)
     params.v = 1.0 / week; // the Darcy velocity (in units of m/s)
     params.T = 300;        // the temperature (in units of degC)
-    params.P = 85.88;      // the pressure (in units of bar)
     // Calculate the water saturation pressure using the Wagner and Pruss (1995) equation of state
     params.P = Reaktoro::waterSaturatedPressureWagnerPruss(Temperature(params.T + 273.15)).val * 1e-5;
 
