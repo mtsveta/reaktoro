@@ -332,18 +332,19 @@ auto SmartEquilibriumSolverClustering::estimate(ChemicalState& state, double T, 
                 // Assign small values to all the amount in the interval [cutoff, 0] (instead of mirroring above)
                 for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
 
-                // Update the chemical properties of the system
-                //_properties =  record.properties;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
-
                 // Update the amounts of elements for the equilibrium species
                 n(ies) = ne;
 
                 // Update the chemical state res with estimated amounts
                 //state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
                 state.setSpeciesAmounts(ne, ies);
+
                 // Make sure that pressure and temperature is set to the current one we are trying to predict
                 state.setPressure(P);
                 state.setTemperature(T);
+
+                // Update the chemical properties of the system
+                _properties =  record.properties;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
 
                 //---------------------------------------------------------------------
                 // DATABASE PRIORITY UPDATE STEP DURING THE ESTIMATE PROCESS

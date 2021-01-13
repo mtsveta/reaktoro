@@ -173,6 +173,9 @@ auto SmartEquilibriumSolverNN::estimate(ChemicalState& state, double T, double P
     // Assign small values to all the amount  in the interval [cutoff, 0] (instead of mirroring above)
     for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
 
+    // Update the amounts of elements for the equilibrium species
+    n(ies) = ne;
+
     // Update equilibrium species
     state.setSpeciesAmounts(ne, ies);
 
@@ -182,7 +185,6 @@ auto SmartEquilibriumSolverNN::estimate(ChemicalState& state, double T, double P
 
     // Update the chemical properties of the system as well as temperature and pressure
     _properties = properties0;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
-    _properties.update(T, P);
 
     // Set the estimate accepted status to true
     _result.estimate.accepted = true;
