@@ -55,6 +55,8 @@ struct Params
 
     std::string activity_model = "";
 
+    std::string smart_method = "";
+
 };
 
 struct Results
@@ -117,9 +119,7 @@ int main()
     ///*
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
-    //params.nsteps = 1000; // the number of steps in the reactive transport simulation
-    params.nsteps = 10; // the number of steps in the reactive transport simulation
-    //params.nsteps = 100; // the number of steps in the reactive transport simulation
+    params.nsteps = 100; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -132,8 +132,18 @@ int main()
     // Define parameters of the equilibrium solvers
     //params.smart_equilibrium_reltol = 8e-1;
     //params.smart_equilibrium_reltol = 1e-1;
-    params.smart_equilibrium_reltol = 1e-3;  // priority-based search with potential
     //params.smart_equilibrium_reltol = 1e-3;  // priority-based search with potential
+    //params.smart_equilibrium_reltol = 1e-3;  // priority-based search with potential
+
+    // Run clustering algorithm
+    params.smart_method = "eq-clustering";
+    params.smart_equilibrium_reltol = 1e-3;
+
+//    // Run clustering algorithm
+//    params.smart_method = "eq-priority";
+//    params.smart_equilibrium_reltol = 2e-3;
+//    params.amount_fraction_cutoff = 1e-14;
+//    params.mole_fraction_cutoff = 1e-14;
 
     params.activity_model = "hkf-full";
     //params.activity_model = "hkf-selected-species";
@@ -153,7 +163,7 @@ int main()
 
     // Execute reactive transport with different solvers
     params.use_smart_equilibrium_solver = true; runReactiveTransport(params, results);
-    //params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
+    params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;
     results.smart_total = results.smart_equilibrium_timing.solve;
@@ -194,6 +204,7 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
     smart_equilibrium_options.reltol = params.smart_equilibrium_reltol;
     smart_equilibrium_options.amount_fraction_cutoff = params.amount_fraction_cutoff;
     smart_equilibrium_options.mole_fraction_cutoff = params.mole_fraction_cutoff;
+    smart_equilibrium_options.smart_method = params.smart_method;
 
     // Step **: Construct the chemical system with its phases and species (using ChemicalEditor)
     ChemicalEditor editor;
@@ -235,9 +246,9 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
                 .setChemicalModelDebyeHuckel()
                 .setActivityModelDrummondCO2();
     }
+    editor.addMineralPhase("Quartz");
     editor.addMineralPhase("Calcite");
     editor.addMineralPhase("Dolomite");
-    editor.addMineralPhase("Quartz");
 
     // Step **: Create the ChemicalSystem object using the configured editor
     ChemicalSystem system(editor);
@@ -363,8 +374,8 @@ auto runReactiveTransport(const Params& params, Results& results) -> void
         step += 1;
     }
 
-    //if(params.use_smart_equilibrium_solver)
-    //    rtsolver.outputClusterInfo();
+    if(params.use_smart_equilibrium_solver)
+        rtsolver.outputClusterInfo();
 
     if(params.use_smart_equilibrium_solver)
         results.time_reactive_transport_smart = toc(REACTIVE_TRANSPORT_STEPS);

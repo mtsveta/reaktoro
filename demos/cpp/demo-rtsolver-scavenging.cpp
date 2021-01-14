@@ -55,6 +55,9 @@ struct Params
 
     std::string activity_model = "";
 
+    std::string smart_method = "";
+
+
 };
 
 struct Results
@@ -110,7 +113,7 @@ int main()
     params.xl = 0.0; // the x-coordinates of the left boundaries
     params.xr = 100.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretization
-    params.nsteps = 50; // the number of steps in the reactive transport simulation
+    params.nsteps = 100; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 0.05*day; // the time step (in units of s)
 
@@ -120,8 +123,10 @@ int main()
     params.T = 25.0;                     // the temperature (in units of degC)
     params.P = 1.01325;                      // the pressure (in units of bar)
 
-    // Define parameters of the equilibrium solvers
-    params.smart_equilibrium_reltol = 0.01;
+    // Run clustering algorithm
+    params.smart_method = "eq-clustering";
+    params.smart_equilibrium_reltol = 1e-3;
+
     //params.activity_model = "hkf";
     //params.activity_model = "pitzer";
     params.activity_model = "dk";
@@ -136,7 +141,7 @@ int main()
     Results results;
 
     // Execute reactive transport with different solvers
-    //params.use_smart_equilibrium_solver = true; runReactiveTransport(params, results);
+    params.use_smart_equilibrium_solver = true; runReactiveTransport(params, results);
     params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     results.conventional_total = results.equilibrium_timing.solve;

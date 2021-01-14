@@ -217,7 +217,7 @@ int main()
     params.xl = 0.0; // the x-coordinates of the left boundaries
     params.xr = 1.0; // the x-coordinates of the right boundaries
     params.ncells = 100; // the number of cells in the spacial discretizatio
-    params.nsteps = 10; // the number of steps in the reactive transport simulation
+    params.nsteps = 2000; // the number of steps in the reactive transport simulation
     params.dx = (params.xr - params.xl) / params.ncells; // the time step (in units of s)
     params.dt = 30 * minute; // the time step (in units of s)
 
@@ -297,19 +297,17 @@ int main()
     /// ------------------------------------------------------------------------------------------------------------- //
 
     // Execute reactive transport with different solvers
-//    params.use_smart_kinetics_solver = true; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
+    //params.use_smart_kinetics_solver = true; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     // ------------------------------------------------------------------------------------------------------------- //
     // SMART kinetics & SMART equilibrium
     // ------------------------------------------------------------------------------------------------------------- //
-
     params.use_smart_kinetics_solver = true;  params.use_smart_equilibrium_solver = true;  runReactiveTransport(params, results);
 
 
     /// **************************************************************************************************************///
     /// CONVENTIONAL kinetics & CONVENTIONAL equilibrium
     /// **************************************************************************************************************///
-
     //params.use_smart_kinetics_solver = false; params.use_smart_equilibrium_solver = false; runReactiveTransport(params, results);
 
     // **************************************************************************************************************///
@@ -410,35 +408,41 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     // Step **: Construct the chemical system with its phases and species (using ChemicalEditor)
     ChemicalEditor editor;
 
+    // Define the list of selected elements
+    StringList selected_elements = "H O Na Cl Ca Mg C";
+
+    // Define the list of selected species
+    StringList selected_species = "H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3-- CaCl+ Ca(HCO3)+ MgCl+ Mg(HCO3)+";
+
     if(params.activity_model == "hkf-full"){
         // HKF full system
-        editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C");
+        editor.addAqueousPhaseWithElements(selected_elements);
     }
     else if(params.activity_model == "hkf-selected-species"){
         // HKF selected species
-        editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3-- CaCl+ Ca(HCO3)+ MgCl+ Mg(HCO3)+");
+        editor.addAqueousPhase(selected_species);
     }
     else if(params.activity_model == "pitzer-full"){
         // Pitzer full system
-        editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
+        editor.addAqueousPhaseWithElements(selected_elements)
                 .setChemicalModelPitzerHMW()
                 .setActivityModelDrummondCO2();
     }
     else if(params.activity_model == "pitzer-selected-species"){
         // Pitzer selected species
-        editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3-- CaCl+ Ca(HCO3)+ MgCl+ Mg(HCO3)+")
+        editor.addAqueousPhase(selected_species)
                 .setChemicalModelPitzerHMW()
                 .setActivityModelDrummondCO2();
     }
     else if(params.activity_model == "dk-full"){
         // Debye-Huckel full system
-        editor.addAqueousPhaseWithElements("H O Na Cl Ca Mg C")
+        editor.addAqueousPhaseWithElements(selected_elements)
                 .setChemicalModelDebyeHuckel()
                 .setActivityModelDrummondCO2();
     }
     else if(params.activity_model == "dk-selected-species"){
         // Debye-Huckel selected species
-        editor.addAqueousPhase("H2O(l) H+ OH- Na+ Cl- Ca++ Mg++ HCO3- CO2(aq) CO3-- CaCl+ Ca(HCO3)+ MgCl+ Mg(HCO3)+")
+        editor.addAqueousPhase(selected_species)
                 .setChemicalModelDebyeHuckel()
                 .setActivityModelDrummondCO2();
     }
@@ -492,7 +496,10 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
     problem_bc.add("CaCl2", 0.01, "mol");
     problem_bc.add("CO2",   0.75, "mol");
 
-    // Step **: Calculate the equilibrium states for the IC and BC
+    //equilibrium_options.optimum.output.active = true;
+    //ChemicalState state_ic = equilibrate(problem_ic, equilibrium_options);
+
+    // Step **: Calculate the equilibrium states for the IC
     ChemicalState state_ic = equilibrate(problem_ic);
     ChemicalState state_bc = equilibrate(problem_bc);
 
@@ -587,6 +594,8 @@ auto runReactiveTransport(const Params& params, RTKineticsResults& results) -> v
 
         // Perform one reactive transport time step (with profiling of some parts of the transport simulations)
         rtsolver.stepKinetics(field);
+
+        ReactiveTransportResult result = rtsolver.result();
 
         // Update the profiler after every call to step method
         profiler.update(rtsolver.result());
@@ -845,7 +854,7 @@ auto makeResultsFolder(const Params& params) -> std::string
                                 (params.use_smart_kinetics_solver ? "-smart-kin" : "-conv-kin") +
                                 (params.use_smart_equilibrium_solver ? "-smart-eq"  : "-conv-eq");      // name of the folder with results
 
-    std::string tag = "../plotting-results-03.09.2020/rt-refactored"; // 
+    std::string tag = "../plotting-results-pr/results-kinetics-dolomitization-set-opt"; //
     //std::string tag = "../plotting-results/rt-kin-priority-eq-clustering";
     //std::string tag = "../plotting-results/rt-kin-priority-eq-priority-primary-potentials";
     //std::string tag = "../plotting-results/rt-new-ode-solve-kin-priority-eq-priority-no-state-copying-no-A";
