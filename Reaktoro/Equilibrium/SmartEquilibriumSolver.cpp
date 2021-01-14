@@ -441,6 +441,15 @@ struct SmartEquilibriumSolver::Impl
         // Perform a full chemical equilibrium calculation
         result.learning.gibbs_energy_minimization = solver.solve(state, T, P, be);
 
+        // Check if the EquilibriumSolver calculation failed, if so, use cold-start
+        if(!result.learning.gibbs_energy_minimization.optimum.succeeded)
+        {
+            state.setSpeciesAmounts(0.0);
+            result.learning.gibbs_energy_minimization = solver.solve(state, T, P, be);
+            if(!result.learning.gibbs_energy_minimization.optimum.succeeded)
+                return;
+        }
+
         result.timing.learn_gibbs_energy_minimization = toc(EQUILIBRIUM_STEP);
 
         //---------------------------------------------------------------------
@@ -465,14 +474,6 @@ struct SmartEquilibriumSolver::Impl
         // ERROR CONTROL MATRICES ASSEMBLING STEP DURING THE LEARNING PROCESS
         //---------------------------------------------------------------------
         tic(ERROR_CONTROL_MATRICES);
-
-        // The indices of the equilibrium species and elements
-        //const auto& ies = partition.indicesEquilibriumSpecies();
-        //const auto& iee = partition.indicesEquilibriumElements();
-
-        // The number of equilibrium species and elements
-        //const auto& Ne = partition.numEquilibriumSpecies();
-        //const auto& Ee = partition.numEquilibriumElements();
 
         // The amounts of the species at the calculated equilibrium state
         n = state.speciesAmounts();
@@ -708,14 +709,19 @@ struct SmartEquilibriumSolver::Impl
 
                     result.timing.estimate_search = toc(SEARCH_STEP);
 
-
-
                     // Assign small values to all the amount  in the interval [cutoff, 0] (instead of mirroring above)
                     for(unsigned int i = 0; i < ne.size(); ++i) if(ne[i] < 0) ne[i] = options.learning.epsilon;
+
+                    // Update the amounts of elements for the equilibrium species
+                    n(ies) = ne;
 
                     // Update the chemical state result with estimated amounts
                     //state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
                     state.setSpeciesAmounts(ne, ies);
+
+                    // Make sure that pressure and temperature is set to the current one we are trying to predict
+                    state.setPressure(P);
+                    state.setTemperature(T);
 
                     // Update the chemical properties of the system
                     properties = record.properties;  // TODO: We need to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!

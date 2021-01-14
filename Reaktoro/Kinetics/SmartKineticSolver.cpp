@@ -840,8 +840,6 @@ struct SmartKineticSolver::Impl
     /// and save the learned state (with the primary potentials) to the priority-based cluster
     auto learn_clustering(ChemicalState& state, double t, double dt) -> void
     {
-        SmartKineticResult res = {};
-
         // Initialize sensitivity matrix by the identity matrix
         benk_S.setIdentity();
 
@@ -1438,7 +1436,6 @@ struct SmartKineticSolver::Impl
 
     }
 
-
     /// Estimate the equilibrium state using priority-based cluster for the search of the reference state and
     /// potentials of primary species for the acceptance criteria
     auto estimate_clustering(ChemicalState& state, double& t) -> void
@@ -1685,8 +1682,12 @@ struct SmartKineticSolver::Impl
                     benk = benk_new;
                     state = record.state; // ATTENTION: If this changes one day, make sure indices of equilibrium primary/secondary species, and indices of strictly unstable species/elements are also transfered from reference state to new state
 
+                    // Make sure that pressure and temperature is set to the current one
+                    state.setTemperature(T);
+                    state.setPressure(P);
+
                     // Update the chemical properties of the system
-                    //properties = record.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
+                    properties = record.properties;  // FIXME: We actually want to estimate properties = properties0 + variation : THIS IS A TEMPORARY SOLUTION!!!
 
                     result.timing.estimate_taylor = toc(TAYLOR_STEP);
 
