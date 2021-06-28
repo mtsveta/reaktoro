@@ -168,7 +168,7 @@ add_custom_target(interpreter
 # Add target "examples" for manual building of examples, as `make examples`, if REAKTORO_BUILD_EXAMPLES is OFF
 add_custom_target(examples
     COMMAND ${CMAKE_MAKE_PROGRAM}
-    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/demos")
+    WORKING_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/examples")
 
 # Add target "utilities" for manual building of utilities, as `make utilities`, if REAKTORO_BUILD_UTILITIES is OFF
 add_custom_target(utilities
