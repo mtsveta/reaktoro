@@ -20,40 +20,45 @@ using namespace Reaktoro;
 
 int main()
 {
-    SupcrtDatabase db("supcrt98.xml");
+    // Initialize a thermodynamic database
+    PhreeqcDatabase db("phreeqc.dat");
 
+    // Create an aqueous phase
     AqueousPhase aqueousphase(speciate("H O C Na Cl"));
     aqueousphase.setActivityModel(chain(
         ActivityModelHKF(),
         ActivityModelDrummond("CO2")
     ));
 
+    // Create a gaseous phase
     GaseousPhase gaseousphase("CO2(g)");
     gaseousphase.setActivityModel(ActivityModelPengRobinson());
 
+    // Collecting all above-defined phases
     Phases phases(db);
     phases.add(aqueousphase);
     phases.add(gaseousphase);
 
+    // Construct the chemical system
     ChemicalSystem system(phases);
+
+    // Define initial equilibrium state
     ChemicalState state(system);
     state.setTemperature(25.0, "celsius");
     state.setPressure(1.0, "bar");
-    state.setSpeciesMass("H2O(l)", 1.0, "kg");
+    state.setSpeciesMass("H2O", 1.0, "kg");
     state.setSpeciesAmount("CO2(g)", 10.0, "mol");
     state.setSpeciesAmount("Na+", 4.0, "mol");
     state.setSpeciesAmount("Cl-", 4.0, "mol");
 
-    EquilibriumOptions options;
-    options.optima.output.active = true;
-
+    // Define equilibrium solver and equilibrate given initial state
     EquilibriumSolver solver(system);
-    solver.setOptions(options);
-
     solver.solve(state);
 
+    // Obtain species composition from the equilibrated state
     const auto n = state.speciesAmounts();
 
+    // Print the species and theirs amounts
     for(auto i = 0; i < n.size(); ++i)
     {
         std::cout << std::setw(20) << system.species(i).name();
