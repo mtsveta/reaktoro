@@ -23,24 +23,30 @@ auto createCustomDatabase() -> Database;
 
 int main()
 {
+    // Print the species and theirs amounts
     Database db = createCustomDatabase();
 
+    // Create an aqueous phase
     Phases phases(db);
     phases.add( AqueousPhase("H2O H+ OH-") );
 
+    // Construct the chemical system
     ChemicalSystem system(phases);
 
+    // Define initial equilibrium state
     ChemicalState state(system);
     state.setTemperature(25.0, "celsius");
     state.setPressure(1.0, "bar");
     state.setSpeciesMass("H2O", 1.0, "kg");
 
+    // Define equilibrium solver and equilibrate given initial state
     EquilibriumSolver solver(system);
-
     solver.solve(state);
 
+    // Obtain species composition from the equilibrated state
     const auto n = state.speciesAmounts();
 
+    // Print the species and theirs amounts
     for(auto i = 0; i < n.size(); ++i)
     {
         std::cout << std::setw(20) << system.species(i).name();
