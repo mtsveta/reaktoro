@@ -39,17 +39,8 @@ def carbonates_in_seawater(system, T, P):
     state_sw.setSpeciesMass("HCO3-", 141.682 * water_kg, "mg")
     state_sw.setSpeciesMass("SO4-2", 2712.0 * water_kg, "mg")
 
-    options = EquilibriumOptions()
-    options.optima.output.active = False
-    options.optima.max_iterations = 100
-    options.optima.kkt.method = optima.SaddlePointMethod.Nullspace
-    options.optima.linesearch.trigger_when_current_error_is_greater_than_initial_error_by_factor = 1000000000000000000000.0  # zero to disable line search
-    options.optima.linesearch.trigger_when_current_error_is_greater_than_previous_error_by_factor = 1000000000000000000000.0
-    options.epsilon = 1e-40
-
     # Calculate chemical state corresponding to the carbonate water
     solver = EquilibriumSolver(system)
-    solver.setOptions(options)
 
     res = solver.solve(state_sw)
     if not res.optima.succeeded:
