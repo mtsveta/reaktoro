@@ -41,17 +41,7 @@ state.setSpeciesAmount("CO2(g)", 10.0, "mol")
 state.setSpeciesAmount("Na+", 1.0, "mol")
 state.setSpeciesAmount("Cl-", 1.0, "mol")
 
-options = EquilibriumOptions()
-options.optima.output.active = True
-# options.optima.kkt.method = Optima.SaddlePointMethod.Fullspace
-# options.optima.kkt.method = Optima.SaddlePointMethod.Nullspace
-# options.optima.kkt.method = Optima.SaddlePointMethod.Rangespace
-# options.optima.linesearch.trigger_when_current_error_is_greater_than_initial_error_by_factor = 0.0  # zero to disable line search
-# options.optima.linesearch.trigger_when_current_error_is_greater_than_previous_error_by_factor = 0.0
-
 solver = EquilibriumSolver(system)
-solver.setOptions(options)
-
 solver.solve(state)
 
 n = state.speciesAmounts()

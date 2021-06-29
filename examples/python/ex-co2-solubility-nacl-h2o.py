@@ -34,17 +34,7 @@ def solubility_co2(system, T, P, mNaCl):
     state.setSpeciesAmount("Na+", mNaCl, "mol")
     state.setSpeciesAmount("Cl-", mNaCl, "mol")
 
-    options = EquilibriumOptions()
-    options.optima.output.active = False
-    options.optima.max_iterations = 100
-    options.optima.kkt.method = optima.SaddlePointMethod.Nullspace
-    options.optima.linesearch.trigger_when_current_error_is_greater_than_initial_error_by_factor = 1000000000000000000000.0  # zero to disable line search
-    options.optima.linesearch.trigger_when_current_error_is_greater_than_previous_error_by_factor = 1000000000000000000000.0
-    options.epsilon = 1e-40
-
     solver = EquilibriumSolver(system)
-    solver.setOptions(options)
-
     res = solver.solve(state)
 
     if not res.optima.succeeded:
@@ -53,8 +43,6 @@ def solubility_co2(system, T, P, mNaCl):
     aqprops = AqueousProps(state)
 
     return aqprops.elementMolality("C")[0]
-
-
 
 db = PhreeqcDatabase("phreeqc.dat")
 # db = PhreeqcDatabase("pitzer.dat")
