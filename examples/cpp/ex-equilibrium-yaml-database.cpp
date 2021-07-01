@@ -24,20 +24,38 @@ int main()
     Database db("supcrt98.yaml");
 
     // Create an aqueous phase
-    AqueousPhase aqueousphase(speciate("H O C Na Cl"));
-    aqueousphase.setActivityModel(chain(
+    AqueousPhase aqphase(speciate("H O C Na Cl"));
+    aqphase.setActivityModel(chain(
             ActivityModelHKF(),
             ActivityModelDrummond("CO2")
     ));
 
+    // Inspect species in the aqueous phase
+    for (int i = 0; i < aqphase.species().size(); ++i)
+    {
+        std::cout << std::setw(20) << aqphase.species().at(i) << std::endl;
+    }
+
+    // Create an aqueous phase without organic species
+    AqueousPhase aqphasenoorganic(speciate("H O C Na Cl"), exclude("organic"));
+    aqphasenoorganic.setActivityModel(chain(
+            ActivityModelHKF(),
+            ActivityModelDrummond("CO2")
+    ));
+    // Inspect species in the aqueous phase without organic species
+    for (const auto& species : aqphasenoorganic.species())
+    {
+        std::cout << std::setw(20) << species << std::endl;
+    }
+
     // Create a gaseous phase
-    GaseousPhase gaseousphase("CO2(g)");
-    gaseousphase.setActivityModel(ActivityModelPengRobinson());
+    GaseousPhase gasphase("CO2(g)");
+    gasphase.setActivityModel(ActivityModelPengRobinson());
 
     // Collecting all above-defined phases
     Phases phases(db);
-    phases.add(aqueousphase);
-    phases.add(gaseousphase);
+    phases.add(aqphase);
+    phases.add(gasphase);
 
     // Construct the chemical system
     ChemicalSystem system(phases);
