@@ -23,8 +23,8 @@ int main()
     // Initialize a thermodynamic database
     Database db("supcrt98.yaml");
 
-    // Create an aqueous phase
-    AqueousPhase aqphase(speciate("H O C Na Cl"));
+    // Create an aqueous phase without organic species
+    AqueousPhase aqphase(speciate("H O C Na Cl"), exclude("organic"));
     aqphase.setActivityModel(chain(
             ActivityModelHKF(),
             ActivityModelDrummond("CO2")
@@ -34,6 +34,8 @@ int main()
     GaseousPhase gasphase("CO2(g)");
     gasphase.setActivityModel(ActivityModelPengRobinson());
 
+    std::cout << "Phases with organics" << std::endl;
+
     // Collecting all above-defined phases
     Phases phases(db);
     phases.add(aqphase);
@@ -41,7 +43,6 @@ int main()
 
     // Construct the chemical system
     ChemicalSystem system(phases);
-
     // Define initial equilibrium state
     ChemicalState state(system);
     state.setTemperature(25.0, "celsius");
